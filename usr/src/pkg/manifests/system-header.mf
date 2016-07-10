@@ -1296,6 +1296,7 @@ file path=usr/include/sys/pg.h
 file path=usr/include/sys/pghw.h
 file path=usr/include/sys/physmem.h
 $(i386_ONLY)file path=usr/include/sys/pic.h
+file path=usr/include/sys/pidnode.h
 $(i386_ONLY)file path=usr/include/sys/pit.h
 file path=usr/include/sys/pkp_hash.h
 file path=usr/include/sys/pm.h

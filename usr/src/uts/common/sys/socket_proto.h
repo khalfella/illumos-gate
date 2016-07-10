@@ -30,6 +30,7 @@ extern "C" {
 #endif
 
 #include <sys/socket.h>
+#include <sys/pidnode.h>
 
 /*
  * Generation count
@@ -200,6 +201,7 @@ struct sock_upcalls_s {
 	void	(*su_zcopy_notify)(sock_upper_handle_t);
 	void	(*su_set_error)(sock_upper_handle_t, int);
 	void	(*su_closed)(sock_upper_handle_t);
+	mblk_t *(*su_get_sock_pid_mblk)(sock_upper_handle_t);
 };
 
 #define	SOCK_UC_VERSION		sizeof (sock_upcalls_t)

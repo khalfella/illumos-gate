@@ -163,6 +163,7 @@ extern void	so_connected(sock_upper_handle_t, sock_connid_t, struct cred *,
 extern int	so_disconnected(sock_upper_handle_t, sock_connid_t, int);
 extern void	so_txq_full(sock_upper_handle_t, boolean_t);
 extern void 	so_opctl(sock_upper_handle_t, sock_opctl_action_t, uintptr_t);
+extern mblk_t	*so_get_sock_pid_mblk(sock_upper_handle_t);
 /* Common misc. functions */
 
 	/* accept queue */
@@ -233,6 +234,8 @@ extern void	sonode_destructor(void *, void *);
 extern void 	sonode_init(struct sonode *, struct sockparams *,
     int, int, int, sonodeops_t *);
 extern void	sonode_fini(struct sonode *);
+extern void	sonode_insert_pid(struct sonode *, pid_t);
+extern void	sonode_remove_pid(struct sonode *, pid_t);
 
 /*
  * Event flags to socket_sendsig().

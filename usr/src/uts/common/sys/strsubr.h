@@ -44,6 +44,7 @@
 #include <sys/proc.h>
 #include <sys/netstack.h>
 #include <sys/modhash.h>
+#include <sys/pidnode.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -241,6 +242,11 @@ typedef struct stdata {
 	uint_t		sd_copyflag;	/* copy-related flags */
 	zoneid_t	sd_anchorzone;	/* Allow removal from same zone only */
 	struct msgb	*sd_cmdblk;	/* reply from _I_CMD */
+	/*
+	 * pids associated with this stream head.
+	 */
+	avl_tree_t	sd_pid_tree;
+	kmutex_t	sd_pid_tree_lock;
 } stdata_t;
 
 /*
@@ -1140,6 +1146,9 @@ extern int getiocseqno(void);
 extern int strwaitbuf(size_t, int);
 extern int strwaitq(stdata_t *, int, ssize_t, int, clock_t, int *);
 extern struct stdata *shalloc(queue_t *);
+extern void sh_insert_pid(struct stdata *, pid_t);
+extern void sh_remove_pid(struct stdata *, pid_t);
+extern mblk_t *sh_get_pid_mblk(struct stdata *);
 extern void shfree(struct stdata *s);
 extern queue_t *allocq(void);
 extern void freeq(queue_t *);

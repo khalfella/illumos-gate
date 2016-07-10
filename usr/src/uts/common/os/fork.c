@@ -1189,7 +1189,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	 */
 	uarea = PTOU(cp);
 	bcopy(PTOU(pp), uarea, sizeof (*uarea));
-	flist_fork(P_FINFO(pp), P_FINFO(cp));
+	flist_fork(pp, cp);
 
 	gethrestime(&uarea->u_start);
 	uarea->u_ticks = ddi_get_lbolt();

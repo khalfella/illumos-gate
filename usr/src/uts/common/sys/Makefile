@@ -137,6 +137,7 @@ CHKHDRS=			\
 	crc32.h			\
 	cred.h			\
 	cred_impl.h		\
+	pidnode.h		\
 	crtctl.h		\
 	cryptmod.h		\
 	csiioctl.h		\

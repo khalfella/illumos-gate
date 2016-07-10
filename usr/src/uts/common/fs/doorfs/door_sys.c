@@ -1784,6 +1784,12 @@ door_insert(struct file *fp, door_desc_t *dp)
 	setf(fd, fp);
 	dp->d_data.d_desc.d_descriptor = fd;
 
+	/* Add pid to the list associated with that descriptor. */
+	if (fp->f_vnode != NULL)
+		(void) VOP_IOCTL(fp->f_vnode, F_ASSOCI_PID,
+		    (intptr_t)curproc->p_pidp->pid_id, FKIOCTL, kcred, NULL,
+		    NULL);
+
 	/* Fill in the attributes */
 	if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 		vp = fp->f_vnode;
@@ -2724,7 +2730,7 @@ door_translate_out(void)
  */
 static int
 door_results(kthread_t *caller, caddr_t data_ptr, size_t data_size,
-		door_desc_t *desc_ptr, uint_t desc_num)
+    door_desc_t *desc_ptr, uint_t desc_num)
 {
 	door_client_t	*ct = DOOR_CLIENT(caller->t_door);
 	door_upcall_t	*dup = ct->d_upcall;

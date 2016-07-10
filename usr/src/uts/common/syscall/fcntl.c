@@ -179,6 +179,13 @@ fcntl(int fdes, int cmd, intptr_t arg)
 				f_setfd(retval, FD_CLOEXEC);
 			}
 		}
+
+		if (error == 0 && fp->f_vnode != NULL) {
+			(void) VOP_IOCTL(fp->f_vnode, F_ASSOCI_PID,
+			    (intptr_t)p->p_pidp->pid_id, FKIOCTL, kcred,
+			    NULL, NULL);
+		}
+
 		goto done;
 
 	case F_DUP2FD_CLOEXEC:
@@ -215,6 +222,14 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			fp->f_count++;
 			mutex_exit(&fp->f_tlock);
 			releasef(fdes);
+
+			/* assume we have forked successfully */
+			if (fp->f_vnode != NULL) {
+				(void) VOP_IOCTL(fp->f_vnode, F_ASSOCI_PID,
+				    (intptr_t)p->p_pidp->pid_id, FKIOCTL,
+				    kcred, NULL, NULL);
+			}
+
 			if ((error = closeandsetf(iarg, fp)) == 0) {
 				if (cmd == F_DUP2FD_CLOEXEC) {
 					f_setfd(iarg, FD_CLOEXEC);
@@ -225,6 +240,13 @@ fcntl(int fdes, int cmd, intptr_t arg)
 				if (fp->f_count > 1) {
 					fp->f_count--;
 					mutex_exit(&fp->f_tlock);
+					if (fp->f_vnode != NULL) {
+						(void) VOP_IOCTL(fp->f_vnode,
+						    F_DASSOC_PID,
+						    (intptr_t)p->p_pidp->pid_id,
+						    FKIOCTL, kcred, NULL, NULL);
+					}
+
 				} else {
 					mutex_exit(&fp->f_tlock);
 					(void) closef(fp);

@@ -28,7 +28,7 @@
 
 PROG=		netstat
 
-LOCALOBJS=	netstat.o unix.o
+LOCALOBJS=	netstat.o
 COMMONOBJS=	compat.o
 
 include ../../../Makefile.cmd

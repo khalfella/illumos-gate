@@ -2722,3 +2722,30 @@ conn_untrace_ref(conn_t *connp)
 	return (1);
 }
 #endif
+
+mblk_t *
+conn_get_pid_mblk(conn_t *connp)
+{
+	mblk_t *mblk;
+	conn_pid_info_t *cpi;
+
+	if (connp->conn_upper_handle != NULL) {
+		return (*connp->conn_upcalls->su_get_sock_pid_mblk)
+		    (connp->conn_upper_handle);
+	} else if (!IPCL_IS_NONSTR(connp) && connp->conn_rq != NULL &&
+	    connp->conn_rq->q_stream != NULL) {
+		return (sh_get_pid_mblk(connp->conn_rq->q_stream));
+	}
+
+	/* return an empty mblk */
+	if ((mblk = allocb(sizeof (conn_pid_info_t), BPRI_HI)) == NULL)
+		return (NULL);
+	mblk->b_wptr += sizeof (conn_pid_info_t);
+	cpi = (conn_pid_info_t *)mblk->b_datap->db_base;
+	cpi->cpi_magic = CONN_PID_INFO_MGC;
+	cpi->cpi_contents = CONN_PID_INFO_NON;
+	cpi->cpi_pids_cnt = 0;
+	cpi->cpi_tot_size = sizeof (conn_pid_info_t);
+	cpi->cpi_pids[0] = 0;
+	return (mblk);
+}

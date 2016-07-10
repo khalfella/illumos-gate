@@ -204,7 +204,7 @@ extern void areleasef(int, uf_info_t *);
 #ifndef	_BOOT
 extern void closeall(uf_info_t *);
 #endif
-extern void flist_fork(uf_info_t *, uf_info_t *);
+extern void flist_fork(proc_t *, proc_t *);
 extern int closef(file_t *);
 extern int closeandsetf(int, file_t *);
 extern int ufalloc_file(int, file_t *);

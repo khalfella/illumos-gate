@@ -185,6 +185,7 @@ typedef uint32_t	DeviceIndex;	/* Interface index */
  * There can be one of each of these tables per transport (MIB2_* above).
  */
 #define	EXPER_XPORT_MLP		105	/* transportMLPEntry */
+#define	EXPER_XPORT_PROC_INFO	106	/* conn_pid_node entry */
 
 /* Old names retained for compatibility */
 #define	MIB2_IP_20	MIB2_IP_ADDR

@@ -31,6 +31,7 @@
 #include <sys/buf.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/fcntl.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/stropts.h>
@@ -107,6 +108,7 @@ static ssize_t sctp_assoc_recv(sock_upper_handle_t, mblk_t *, size_t, int,
 static void sctp_assoc_xmitted(sock_upper_handle_t, boolean_t);
 static void sctp_assoc_properties(sock_upper_handle_t,
     struct sock_proto_props *);
+static mblk_t *sctp_get_sock_pid_mblk(sock_upper_handle_t);
 
 sonodeops_t sosctp_sonodeops = {
 	sosctp_init,			/* sop_init	*/
@@ -169,6 +171,9 @@ sock_upcalls_t sosctp_assoc_upcalls = {
 	sctp_assoc_xmitted,
 	NULL,			/* su_recv_space */
 	NULL,			/* su_signal_oob */
+	NULL,			/* su_set_error */
+	NULL,			/* su_closed */
+	sctp_get_sock_pid_mblk
 };
 
 /* ARGSUSED */
@@ -1773,6 +1778,13 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 		mutex_exit(&nfp->f_tlock);
 		setf(nfd, nfp);
 
+		/* Add pid to the list associated with that socket. */
+		if (nfp->f_vnode != NULL) {
+			(void) VOP_IOCTL(nfp->f_vnode, F_ASSOCI_PID,
+			    (intptr_t)curproc->p_pidp->pid_id, FKIOCTL, kcred,
+			    NULL, NULL);
+		}
+
 		mutex_enter(&so->so_lock);
 
 		sosctp_assoc_move(ss, SOTOSSO(nso), ssa);
@@ -2229,4 +2241,18 @@ sctp_assoc_properties(sock_upper_handle_t handle,
 		}
 	}
 	mutex_exit(&so->so_lock);
+}
+
+static mblk_t *
+sctp_get_sock_pid_mblk(sock_upper_handle_t handle)
+{
+	struct sctp_soassoc *ssa = (struct sctp_soassoc *)handle;
+	struct sonode *so;
+
+	if (ssa->ssa_type == SOSCTP_ASSOC)
+		so = &ssa->ssa_sonode->ss_so;
+	else
+		so = &((struct sctp_sonode *)handle)->ss_so;
+
+	return (so_get_sock_pid_mblk((sock_upper_handle_t)so));
 }

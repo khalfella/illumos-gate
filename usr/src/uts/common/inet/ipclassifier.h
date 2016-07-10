@@ -729,6 +729,7 @@ extern int ip_create_helper_stream(conn_t *, ldi_ident_t);
 extern void ip_free_helper_stream(conn_t *);
 extern int	ip_helper_stream_setup(queue_t *, dev_t *, int, int,
     cred_t *, boolean_t);
+extern mblk_t *conn_get_pid_mblk(conn_t *);
 
 #ifdef	__cplusplus
 }
