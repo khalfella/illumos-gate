@@ -223,7 +223,10 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			mutex_exit(&fp->f_tlock);
 			releasef(fdes);
 
-			/* assume we have forked successfully */
+			/*
+			 * Assume we succeed to duplicate the file descriptor
+			 * and associate the pid to the vnode.
+			 */
 			if (fp->f_vnode != NULL) {
 				(void) VOP_IOCTL(fp->f_vnode, F_ASSOCI_PID,
 				    (intptr_t)p->p_pidp->pid_id, FKIOCTL,
@@ -240,6 +243,10 @@ fcntl(int fdes, int cmd, intptr_t arg)
 				if (fp->f_count > 1) {
 					fp->f_count--;
 					mutex_exit(&fp->f_tlock);
+					/*
+					 * Failed to duplicate fdes,
+					 * disassociate the pid from the vnode.
+					 */
 					if (fp->f_vnode != NULL) {
 						(void) VOP_IOCTL(fp->f_vnode,
 						    F_DASSOC_PID,

@@ -181,8 +181,8 @@ extern "C" {
 #endif	/* _STRICT_SYMBOLS */
 #endif /* _LP64 || _FILE_OFFSET_BITS == 32 */
 
-#define	F_ASSOCI_PID	292929
-#define	F_DASSOC_PID	303030
+#define	F_ASSOCI_PID	(INT_MAX)
+#define	F_DASSOC_PID	(INT_MAX - 1)
 
 #if 	defined(_LARGEFILE64_SOURCE)
 

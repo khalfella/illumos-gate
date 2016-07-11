@@ -22,18 +22,21 @@
 extern "C" {
 #endif
 
-#define	CONN_PID_INFO_MGC	0x5A7A0B1D
+/*
+ * Network connections initiated/accepted by user processes are either
+ * socket based connections or stream-bases connections. conn_pid_info_t
+ * expose the type of the connection in the cpi_contents field.
+ */
 
-#define	CONN_PID_INFO_NON	0
-#define	CONN_PID_INFO_SOC	1
-#define	CONN_PID_INFO_XTI	2
+#define	CONN_PID_INFO_NON	0	/* terminated process/kernel sockets */
+#define	CONN_PID_INFO_SOC	1	/* socket netwrok connection */
+#define	CONN_PID_INFO_XTI	2	/* stream network connection */
 
 typedef struct conn_pid_info_s {
 	uint16_t	cpi_contents;	/* CONN_PID_INFO_* */
-	uint32_t	cpi_magic;	/* CONN_PID_INFO_MGC */
 	uint32_t	cpi_pids_cnt;	/* # of elements in cpi_pids */
 	uint32_t	cpi_tot_size;	/* total size of hdr + pids */
-	pid_t		cpi_pids[1];	/* varialbe length array of pids */
+	pid_t		cpi_pids[1];	/* variable length array of pids */
 } conn_pid_info_t;
 
 #if defined(_KERNEL)

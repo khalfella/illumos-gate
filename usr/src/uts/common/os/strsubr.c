@@ -3418,7 +3418,6 @@ sh_get_pid_mblk(struct stdata *stp)
 	}
 	mblk->b_wptr += sz;
 	cpi = (conn_pid_info_t *)mblk->b_datap->db_base;
-	cpi->cpi_magic = CONN_PID_INFO_MGC;
 	cpi->cpi_contents = CONN_PID_INFO_XTI;
 	cpi->cpi_pids_cnt = n;
 	cpi->cpi_tot_size = sz;

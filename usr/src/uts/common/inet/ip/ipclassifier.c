@@ -2742,7 +2742,6 @@ conn_get_pid_mblk(conn_t *connp)
 		return (NULL);
 	mblk->b_wptr += sizeof (conn_pid_info_t);
 	cpi = (conn_pid_info_t *)mblk->b_datap->db_base;
-	cpi->cpi_magic = CONN_PID_INFO_MGC;
 	cpi->cpi_contents = CONN_PID_INFO_NON;
 	cpi->cpi_pids_cnt = 0;
 	cpi->cpi_tot_size = sizeof (conn_pid_info_t);

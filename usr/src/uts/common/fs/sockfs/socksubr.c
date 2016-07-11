@@ -1746,11 +1746,9 @@ static int
 sockfs_update(kstat_t *ksp, int rw)
 {
 	uint_t	n, nactive = 0;		/* # of active AF_UNIX sockets	*/
-	uint_t	tsze;
+	uint_t	tsze  = 0;
 	struct sonode	*so;		/* current sonode on socklist	*/
 	zoneid_t	myzoneid = (zoneid_t)(uintptr_t)ksp->ks_private;
-
-	tsze = 0;
 
 	ASSERT((zoneid_t)(uintptr_t)ksp->ks_private == getzoneid());
 
