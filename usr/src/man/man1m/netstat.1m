@@ -8,7 +8,7 @@ netstat \- show network status
 .SH SYNOPSIS
 .LP
 .nf
-\fBnetstat\fR [\fB-anvR\fR] [\fB-f\fR \fIaddress_family\fR] [\fB-P\fR \fIprotocol\fR]
+\fBnetstat\fR [\fB-anuvR\fR] [\fB-f\fR \fIaddress_family\fR] [\fB-P\fR \fIprotocol\fR]
 .fi
 
 .LP
@@ -334,6 +334,19 @@ Display a time stamp.
 Specify \fBu\fR for a printed representation of the internal representation of
 time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 \fBdate\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-u\fR\fR
+.ad
+.sp .6
+.RS 4n
+When specified, for each network endpoint \fBnetstat\fR will print the list of
+the processes currently have an open file descriptor pointing to that endpoint.
+\fBnetstat\fR will list the username, process id, and the program for each
+process in that list.
 .RE
 
 .sp
