@@ -2729,12 +2729,18 @@ conn_get_pid_mblk(conn_t *connp)
 	mblk_t *mblk;
 	conn_pid_info_t *cpi;
 
-	if (connp->conn_upper_handle != NULL) {
-		return (*connp->conn_upcalls->su_get_sock_pid_mblk)
-		    (connp->conn_upper_handle);
-	} else if (!IPCL_IS_NONSTR(connp) && connp->conn_rq != NULL &&
-	    connp->conn_rq->q_stream != NULL) {
-		return (sh_get_pid_mblk(connp->conn_rq->q_stream));
+	/*
+	 * If the connection is closing, it is not safe to make an upcall or
+	 * access the stream associated with the connection.
+	 */
+	if (!(connp->conn_state_flags & CONN_CLOSING)) {
+		if (connp->conn_upper_handle != NULL) {
+			return (*connp->conn_upcalls->su_get_sock_pid_mblk)
+			    (connp->conn_upper_handle);
+		} else if (!IPCL_IS_NONSTR(connp) && connp->conn_rq != NULL &&
+		    connp->conn_rq->q_stream != NULL) {
+			return (sh_get_pid_mblk(connp->conn_rq->q_stream));
+		}
 	}
 
 	/* return an empty mblk */
