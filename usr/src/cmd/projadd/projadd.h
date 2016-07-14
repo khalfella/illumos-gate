@@ -3,6 +3,8 @@
 
 #include <project.h>
 
+#include <sys/varargs.h>
+
 
 
 typedef struct projent {
@@ -25,6 +27,5 @@ typedef struct errmsg {
 extern void *safe_malloc(size_t);
 extern list_t *projent_get_list(char *, list_t *);
 extern void projent_print_ent(projent_t *);
-extern void projent_add_errmsg(list_t *, char *);
+extern void projent_add_errmsg(list_t *, char *, ...);
 extern void projent_print_errmsgs(list_t *);
-extern void projent_free_errmsgs(list_t *);

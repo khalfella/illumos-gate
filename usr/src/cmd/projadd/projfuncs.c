@@ -25,30 +25,31 @@ safe_malloc(size_t sz)
         return (ptr);
 }
 
-void projent_add_errmsg(list_t *errmsgs, char *errmsg)
+void projent_add_errmsg(list_t *errmsgs, char *format, ...)
 {
-	if (errmsgs == NULL || errmsg == NULL)
+	va_list args;
+	char *errstr;
+	errmsg_t *msg;
+
+	if (errmsgs == NULL || format == NULL)
 		return;
 
-	errmsg_t *msg = safe_malloc(sizeof(errmsg_t));
+	va_start(args, format);
+	vasprintf(&errstr, format, args);
+	va_end(args);
+
+	msg = safe_malloc(sizeof(errmsg_t));
+	msg->msg = errstr;
 	list_link_init(&msg->next);
-	msg->msg = strdup(errmsg);
 	list_insert_tail(errmsgs, msg);
+	va_end(args);
 } 
 
 void projent_print_errmsgs(list_t *errmsgs)
 {
 	errmsg_t *msg;
-	for (msg = list_head(errmsgs); msg != NULL;
-	    msg = list_next(errmsgs, msg)) {
-		fprintf(stderr, "%s\n", msg->msg);
-	}
-}
-
-void projent_free_errmsgs(list_t *errmsgs)
-{
-	errmsg_t *msg;
 	while ((msg = list_head(errmsgs)) != NULL) {
+		fprintf(stderr, "%s\n", msg->msg);
 		list_remove(errmsgs, msg);
 		free(msg->msg);
 		free(msg);
@@ -105,13 +106,12 @@ projent_free_list(list_t *plist) {
 
 
 list_t
-*projent_get_list(char *projfile, list_t *errors)
+*projent_get_list(char *projfile, list_t *perrlst)
 {
 	FILE *fp;
 	list_t *ret;
 	int read, line = 0;
 	char *buf = NULL, *ptr, *nlp;
-	char *errorstr;
 	size_t cap = 0;
 	projent_t *ent;
 
@@ -127,10 +127,9 @@ list_t
 			return (ret);
 		} else {
 			/* Report the error unable to open the file */
-			asprintf(&errorstr, gettext("Cannot open %s: %s"),
+			projent_add_errmsg(perrlst,
+			    gettext("Cannot open %s: %s"),
 			    projfile, strerror(errno));
-			projent_add_errmsg(errors, errorstr);
-			free(errorstr);
 
 			/* destory and free the to-be-returned list */
 			list_destroy(ret);
@@ -149,11 +148,9 @@ list_t
 			list_insert_tail(ret, ent);
 		} else {
 			/* Report the error */
-			asprintf(&errorstr, gettext(
-			    "Error parsing: %s line: %d\n\"%s\""),
+			projent_add_errmsg(perrlst,
+			    gettext("Error parsing: %s line: %d: \"%s\""),
 			    projfile, line, ptr);
-			projent_add_errmsg(errors, errorstr);
-			free(errorstr);
 
 			/* free the allocated resources */
 			projent_free_list(ret);

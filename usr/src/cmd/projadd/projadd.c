@@ -56,7 +56,7 @@ static char *pname;
 static char *userlist, *grouplist, *nvlist;
 static projid_t projid;
 
-static list_t errors;
+static list_t errlst;
 
 /*
  * Print usage
@@ -86,10 +86,9 @@ main(int argc, char **argv)
 	projent_t *ent;
 	char *err = NULL;
 	char *ptr;
-	char *errorstr;
 
 
-	list_create(&errors, sizeof(errmsg_t), offsetof(errmsg_t, next));
+	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
@@ -115,10 +114,9 @@ main(int argc, char **argv)
 				g_pflag = B_TRUE;
 				if (((projid = strtol(optarg, &ptr, 10)) == 0 &&
 				    errno == EINVAL) || *ptr != '\0' ) {
-					asprintf(&errorstr, gettext(
-					    "Invalid project id:  %s"), optarg);
-					projent_add_errmsg(&errors, errorstr);
-					free(errorstr);
+					projent_add_errmsg(&errlst, gettext(
+					    "Invalid project id:  %s"),
+					    optarg);
 					errflg = B_TRUE;
 				}
 				break;
@@ -144,30 +142,25 @@ main(int argc, char **argv)
 
 
 	if (g_oflag && !g_pflag) {
-		asprintf(&errorstr, gettext(
+		projent_add_errmsg(&errlst, gettext(
 		    "-o requires -p projid to be specified"));
-		projent_add_errmsg(&errors, errorstr);
-		free(errorstr);
 		errflg = B_TRUE;
 	}
 
 	if (optind != argc -1) {
-		asprintf(&errorstr, gettext(
+		projent_add_errmsg(&errlst, gettext(
 		    "No project name specified"));
-		projent_add_errmsg(&errors, errorstr);
-		free(errorstr);
 		errflg = B_TRUE;
 	}
 
-	if ((plist = projent_get_list(projfile, &errors)) == NULL) {
+	if ((plist = projent_get_list(projfile, &errlst)) == NULL) {
 		errflg = B_TRUE;
 
 	}
 
 	if (errflg) {
-		projent_print_errmsgs(&errors);
-		projent_free_errmsgs(&errors);
-		list_destroy(&errors);
+		projent_print_errmsgs(&errlst);
+		list_destroy(&errlst);
 		usage();
 		exit(2);
 	}
