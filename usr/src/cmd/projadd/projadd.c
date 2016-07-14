@@ -27,7 +27,7 @@
 #include <locale.h>
 #include <errno.h>
 #include <string.h>
-
+#include <stddef.h>
 
 #include <sys/types.h>
 
@@ -56,6 +56,8 @@ static char *pname;
 static char *userlist, *grouplist, *nvlist;
 static projid_t projid;
 
+static list_t errors;
+
 /*
  * Print usage
  */
@@ -82,6 +84,12 @@ main(int argc, char **argv)
 	id_t projid, maxpjid = 99;
 	list_t *plist;
 	projent_t *ent;
+	char *err = NULL;
+	char *ptr;
+	char *errorstr;
+
+
+	list_create(&errors, sizeof(errmsg_t), offsetof(errmsg_t, next));
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
@@ -105,8 +113,12 @@ main(int argc, char **argv)
 				break;
 			case 'p':
 				g_pflag = B_TRUE;
-				if ((projid = atoi(optarg)) == 0 &&
-				    errno != EINVAL) {
+				if (((projid = strtol(optarg, &ptr, 10)) == 0 &&
+				    errno == EINVAL) || *ptr != '\0' ) {
+					asprintf(&errorstr, gettext(
+					    "Invalid project id:  %s"), optarg);
+					projent_add_errmsg(&errors, errorstr);
+					free(errorstr);
 					errflg = B_TRUE;
 				}
 				break;
@@ -131,24 +143,36 @@ main(int argc, char **argv)
 
 
 
+	if (g_oflag && !g_pflag) {
+		asprintf(&errorstr, gettext(
+		    "-o requires -p projid to be specified"));
+		projent_add_errmsg(&errors, errorstr);
+		free(errorstr);
+		errflg = B_TRUE;
+	}
+
+	if (optind != argc -1) {
+		asprintf(&errorstr, gettext(
+		    "No project name specified"));
+		projent_add_errmsg(&errors, errorstr);
+		free(errorstr);
+		errflg = B_TRUE;
+	}
+
+	if ((plist = projent_get_list(projfile, &errors)) == NULL) {
+		errflg = B_TRUE;
+
+	}
+
 	if (errflg) {
+		projent_print_errmsgs(&errors);
+		projent_free_errmsgs(&errors);
+		list_destroy(&errors);
 		usage();
 		exit(2);
 	}
 
-	if ((g_oflag && !g_pflag) || optind != argc - 1) {
-		usage();
-		exit(1);
-	}
-
 	pname = argv[optind];
-
-	if ((plist = projent_get_list(projfile)) == NULL) {
-		(void) fprintf(stderr, gettext(
-		    "failed to process project file: %s\n"), projfile);
-		exit(1);
-
-	}
 
 	if (plist != NULL) {
 		for(ent = list_head(plist); ent != NULL;

@@ -16,9 +16,15 @@ typedef struct projent {
 } projent_t;
 
 
+typedef struct errmsg {
+	char *msg;
+	list_node_t next;
+} errmsg_t;
+
+
 extern void *safe_malloc(size_t);
-extern list_t *projent_get_list(char *projfile);
+extern list_t *projent_get_list(char *, list_t *);
 extern void projent_print_ent(projent_t *);
-
-
-
+extern void projent_add_errmsg(list_t *, char *);
+extern void projent_print_errmsgs(list_t *);
+extern void projent_free_errmsgs(list_t *);
