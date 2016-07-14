@@ -27,9 +27,16 @@
 
 include ../Makefile.cmd
 
-PROGS= projadd projmod projdel
+PROGS= projmod projdel
 USRSBINPROGS= $(PROGS:%=$(ROOTUSRSBIN)/%)
-POFILES= $(PROGS:%=%.po)
+##POFILES= $(PROGS:%=%.po)
+POFILES= projmod.po projdel.po
+
+CPROGS= projadd
+LDLIBS += -lavl -lcmdutils -ldevinfo -lgen -lkstat
+USRSBINPROGS += $(CPROGS:%=$(ROOTUSRSBIN)/%)
+OBJS= projadd.o projfuncs.o
+SRCS= $(OBJS:%.o=%.c)
 
 # No msg catalog here.
 POFILE=
@@ -38,7 +45,16 @@ CLOBBERFILES += $(PROGS)
 
 .KEEP_STATE:
 
-all: $(PROGS)
+all: $(PROGS) $(CPROGS)
+
+$(CPROGS): $(OBJS)
+	$(LINK.c) -o $(CPROGS) $(OBJS) $(LDLIBS)
+#	$(POST_PROCESS)
+
+
+$(OBJS): $(SRCS)
+	$(COMPILE.c) -o $@ $<
+#	$(POST_PROCESS_O)
 
 install : all .WAIT $(USRSBINPROGS)
 
