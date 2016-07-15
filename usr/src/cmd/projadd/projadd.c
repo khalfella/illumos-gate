@@ -52,8 +52,6 @@ static boolean_t g_Kflag = B_FALSE;
 
 static char *tmpprojfile, *projfile = PROJF_PATH;
 static char *pname;
-static char *userlist, *grouplist, *nvlist;
-static projid_t projid;
 
 static list_t errlst;
 
@@ -80,11 +78,17 @@ main(int argc, char **argv)
 
 	extern char *optarg;
 	extern int optind, optopt;
-	id_t projid, maxpjid = 99;
+	projid_t projid, maxpjid = 99;
+	char *projidstr = "";
+	char *comment = "";
 	list_t *plist;
 	projent_t *ent;
 	char *err = NULL;
 	char *ptr;
+
+	char *userslist = "";
+	char *groupslist = "";
+	char *attr = "";
 
 
 	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
@@ -96,7 +100,7 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	/* Parse the command line argument list */
-	while((c = getopt(argc, argv, ":hnf:p:ocU:G:K:")) != EOF)
+	while((c = getopt(argc, argv, ":hnf:p:oc:U:G:K:")) != EOF)
 		switch(c) {
 			case 'h':
 				usage();
@@ -111,26 +115,26 @@ main(int argc, char **argv)
 				break;
 			case 'p':
 				g_pflag = B_TRUE;
-				if (((projid = strtol(optarg, &ptr, 10)) == 0 &&
-				    errno == EINVAL) || *ptr != '\0' ) {
-					projent_add_errmsg(&errlst, gettext(
-					    "Invalid project id:  %s"),
-					    optarg);
-				}
+				projidstr = optarg;
 				break;
 			case 'o':
 				g_oflag = B_TRUE;
 				break;
 			case 'c':
 				g_cflag = B_TRUE;
+				comment = optarg;
 				break;
 			case 'U':
 				g_Uflag = B_TRUE;
-				userlist = optarg;
+				userslist = optarg;
 				break;
 			case 'G':
-				g_Uflag = B_TRUE;
+				g_Gflag = B_TRUE;
 				grouplist = optarg;
+				break;
+			case 'K':
+				g_Kflag = B_TRUE;
+				attr = optarg;
 				break;
 			default:
 				projent_add_errmsg(&errlst, gettext(
@@ -150,9 +154,8 @@ main(int argc, char **argv)
 		    "No project name specified"));
 	}
 
-	if ((plist = projent_get_list(projfile, &errlst)) == NULL) {
-
-	}
+	/* Parse the project file to get the list of the projects */
+	plist = projent_get_list(projfile, &errlst);
 
 	if (!list_is_empty(&errlst)) {
 		projent_print_errmsgs(&errlst);
@@ -162,6 +165,8 @@ main(int argc, char **argv)
 	}
 
 	pname = argv[optind];
+	if (projent_parse_name(pname, &errlst) == 0 && !g_nflag)
+	    projent_validate_unique_name(plist, pname, &errlst);
 
 	if (plist != NULL) {
 		for(ent = list_head(plist); ent != NULL;
@@ -171,8 +176,36 @@ main(int argc, char **argv)
 			projent_print_ent(ent);
 		}
 	}
-	printf("pname = %s projfile = \n", pname, projfile);
-	printf("maxpjid = %d\n", maxpjid);
+
+	if (g_pflag && projent_parse_projid(projidstr, &projid, &errlst) == 0) {
+		if (!g_nflag) {
+			projent_validate_projid(projid, &errlst);
+			if (!g_oflag) {
+				projent_validate_unique_id(plist, projid,
+				    &errlst);
+			} 
+		}
+
+	}
+	if (g_cflag)
+		(void) projent_parse_comment(comment, &errlst);
+	if (g_Uflag)
+		(void) projent_parse_users(&userslist, &errlst);
+	if (g_Gflag)
+		(void) projent_parse_groups(&groupslist, &errlst);
+
+/* for testing */
+	if (!list_is_empty(&errlst)) {
+		projent_print_errmsgs(&errlst);
+		list_destroy(&errlst);
+		usage();
+		exit(2);
+	}
+/* for testing */
+
+	printf("pname = %s projfile = %s\n", pname, projfile);
+	printf("projid = %d maxpjid = %d\n", projid, maxpjid);
+	printf("comment = %s\n", comment);
 
 	printf("end of main....\n");
 	return (0);

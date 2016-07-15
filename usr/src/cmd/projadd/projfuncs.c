@@ -7,8 +7,10 @@
 #include <errno.h>
 #include <locale.h>
 #include <stddef.h>
+#include <limits.h>
 
 
+#include <ctype.h>
 
 #include "projadd.h"
 
@@ -23,6 +25,172 @@ safe_malloc(size_t sz)
 		exit(1);
         }
         return (ptr);
+}
+
+/*
+char *
+util_remove_spaces(char *str)
+{
+	char *ptr, *sret, *ret;
+	sret = ret = safe_malloc(strlen(users) + 1);
+	for (ptr = str; ptr != '\0'; ptr++) {
+		if (!isspace(*ptr))
+			*ret++ = *ptr;
+	}
+	*ret = '\0';
+	return sret;
+}
+*/
+
+int
+projent_validate_usrgrp(char *usrgrp, char *name, list_t *errlst)
+{
+	char *sname = name;
+	if (strcmp(name, "*") == 0 || strcmp(name, "!*") == 0)
+		return (0);
+	if (*name == '!')
+		name++
+}
+char *
+projent_parse_users(char *users, list_t *errlst)
+{
+	char *ulist, *susrs, *usrs, *usr;
+
+	susrs = usrs = strdup(users);
+	ulist = safe_malloc(strlen(users) + 1);
+	*ulist = '\0';
+
+	while ((usr = strsep(&usrs, " ,")) != NULL) {
+		if (*usr == '\0')
+			continue;
+		if (projent_validate_usrgrp("user", usr, errlst) == 0)
+			strcat(strcat(ulist, ","), usr);
+	}
+
+	free(susrs);
+	return (ulist);
+
+}
+
+char *
+projent_parse_groups(char *groups, list_t *errlst)
+{
+}
+
+int
+projent_parse_comment(char *comment, list_t *errlst)
+{
+	char *cmt = comment;
+	while (*cmt) {
+		if (*cmt++ == ':') {
+			projent_add_errmsg(errlst, gettext(
+			    "Invalid Comment \"%s\": should not contain ':'"),
+			    comment);
+		}
+	
+	}
+	return (0);
+}
+
+int
+projent_validate_unique_id(list_t *plist, projid_t projid,list_t *errlst)
+{
+	projent_t *ent;
+	for (ent = list_head(plist); ent != NULL;
+	    ent = list_next(plist, ent)) {
+		if (ent->projid == projid) {
+			projent_add_errmsg(errlst, gettext(
+			    "Duplicate projid \"%d\""), projid);
+			return (1);
+		}
+	}
+	return (0);
+}
+int
+projent_validate_projid(projid_t projid, list_t *errlst)
+{
+	if (projid < 0) {
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid projid \"%d\": "
+		    "must be >= 100"),
+		    projid);
+		return (1);
+	}
+	return (0);
+}
+
+int
+projent_parse_projid(char *projidstr, projid_t *pprojid, list_t *errlst)
+{
+	char *ptr;
+
+	*pprojid = strtol(projidstr, &ptr, 10);
+
+	/* projid should be a positive number */
+	if (errno == EINVAL || errno == ERANGE || *ptr != '\0' ) {
+		projent_add_errmsg(errlst, gettext("Invalid project id:  %s"),
+		    projidstr);
+		return (1);
+	}
+
+	/* projid should be less than UID_MAX */
+	if (*pprojid > INT_MAX) {
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid projid \"%s\": must be <= %d"), projidstr, INT_MAX);
+		return (1);
+	}
+	return (0);
+}
+
+int
+projent_validate_unique_name(list_t *plist, char *pname, list_t *errlst)
+{
+	projent_t *ent;
+	for (ent = list_head(plist); ent != NULL;
+	    ent = list_next(plist, ent)) {
+		if (strcmp(ent->projname, pname) == 0) {
+			projent_add_errmsg(errlst, gettext(
+			    "Duplicate project name \"%s\""), pname);
+			return (1);
+		}
+	}
+	return (0);
+		
+}
+
+int
+projent_parse_name(char *pname, list_t *errlst)
+{
+	char *name = pname;
+	if (isupper(*pname) || islower(*pname)) {
+		while (isupper(*pname) || islower(*pname) ||
+		    isdigit(*pname) || *pname == '.' || *pname == '-') {
+			pname++;
+		}
+	} else if (*pname == '\0') {
+		/* Empty project names are not allowed */
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid project name \"%s\", "
+		    "empty project name"), name);
+		return (1);
+	}
+
+	/* An invalid character was detected */
+	if (*pname != '\0') {
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid project name \"%s\", "
+		    "contains invalid characters"), name);
+		return (1);
+	}
+
+	if (strlen(name) > PROJNAME_MAX) {
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid project name \"%s\", "
+		    "name too long"), name);
+		return (1);
+	}
+
+	return (0);
 }
 
 void projent_add_errmsg(list_t *errmsgs, char *format, ...)

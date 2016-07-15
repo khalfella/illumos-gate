@@ -5,11 +5,9 @@
 
 #include <sys/varargs.h>
 
-
-
 typedef struct projent {
 	char *projname;
-	id_t projid;
+	projid_t projid;
 	char *comment;
 	char *userlist;
 	char *grouplist;
@@ -29,3 +27,11 @@ extern list_t *projent_get_list(char *, list_t *);
 extern void projent_print_ent(projent_t *);
 extern void projent_add_errmsg(list_t *, char *, ...);
 extern void projent_print_errmsgs(list_t *);
+extern int  projent_parse_name(char *, list_t *);
+extern int  projent_validate_unique_name(list_t *, char *, list_t *);
+extern int  projent_parse_projid(char *, projid_t *, list_t *);
+extern int  projent_validate_projid(projid_t, list_t *);
+extern int  projent_validate_unique_id(list_t *, projid_t ,list_t *);
+extern int  projent_parse_comment(char *, list_t *);
+extern int  projent_parse_users(char **, list_t *);
+extern int  projent_parse_groups(char **, list_t *);
