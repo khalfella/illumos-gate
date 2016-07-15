@@ -27,20 +27,6 @@ safe_malloc(size_t sz)
         return (ptr);
 }
 
-/*
-char *
-util_remove_spaces(char *str)
-{
-	char *ptr, *sret, *ret;
-	sret = ret = safe_malloc(strlen(users) + 1);
-	for (ptr = str; ptr != '\0'; ptr++) {
-		if (!isspace(*ptr))
-			*ret++ = *ptr;
-	}
-	*ret = '\0';
-	return sret;
-}
-*/
 
 int
 projent_validate_usrgrp(char *usrgrp, char *name, list_t *errlst)
@@ -48,34 +34,51 @@ projent_validate_usrgrp(char *usrgrp, char *name, list_t *errlst)
 	char *sname = name;
 	if (strcmp(name, "*") == 0 || strcmp(name, "!*") == 0)
 		return (0);
-	if (*name == '!')
-		name++
+	if (*name == '!' && name[1] != '\0')
+		name++;
+	while (isalnum(*name))
+		name++;
+
+	if (*name != '\0') {
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid %s \"%s\": should not contain '%c'"),
+		    usrgrp, sname, *name);
+		return (1);
+	}
+	return (0);
 }
+
 char *
-projent_parse_users(char *users, list_t *errlst)
+projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 {
 	char *ulist, *susrs, *usrs, *usr;
 
-	susrs = usrs = strdup(users);
-	ulist = safe_malloc(strlen(users) + 1);
+	susrs = usrs = strdup(nlist);
+	ulist = safe_malloc(strlen(nlist) + 1);
 	*ulist = '\0';
 
 	while ((usr = strsep(&usrs, " ,")) != NULL) {
 		if (*usr == '\0')
 			continue;
-		if (projent_validate_usrgrp("user", usr, errlst) == 0)
-			strcat(strcat(ulist, ","), usr);
+		/* Error validating this user/group */
+		if (projent_validate_usrgrp(usrgrp, usr, errlst) != 0) {
+			free(ulist);
+			ulist = NULL;
+			break;
+		}
+		/*
+		 * If it is not the first user in the list,
+		 * append ',' before appending the username. 
+		 */
+		ulist = (*ulist != '\0') ? strcat(ulist, ",") : ulist;
+
+		ulist = strcat(ulist, usr);
 	}
 
 	free(susrs);
 	return (ulist);
-
 }
 
-char *
-projent_parse_groups(char *groups, list_t *errlst)
-{
-}
 
 int
 projent_parse_comment(char *comment, list_t *errlst)

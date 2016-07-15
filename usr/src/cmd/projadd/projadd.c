@@ -86,9 +86,8 @@ main(int argc, char **argv)
 	char *err = NULL;
 	char *ptr;
 
-	char *userslist = "";
-	char *groupslist = "";
-	char *attr = "";
+	char *users, *userslist, *groups, *groupslist, *attrs, *attrslist;
+	users = userslist = groups = groupslist = attrs = attrslist = "";
 
 
 	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
@@ -130,11 +129,11 @@ main(int argc, char **argv)
 				break;
 			case 'G':
 				g_Gflag = B_TRUE;
-				grouplist = optarg;
+				groupslist = optarg;
 				break;
 			case 'K':
 				g_Kflag = B_TRUE;
-				attr = optarg;
+				attrslist = optarg;
 				break;
 			default:
 				projent_add_errmsg(&errlst, gettext(
@@ -190,9 +189,9 @@ main(int argc, char **argv)
 	if (g_cflag)
 		(void) projent_parse_comment(comment, &errlst);
 	if (g_Uflag)
-		(void) projent_parse_users(&userslist, &errlst);
+		users =  projent_parse_usrgrp("user",userslist, &errlst);
 	if (g_Gflag)
-		(void) projent_parse_groups(&groupslist, &errlst);
+		groups =  projent_parse_usrgrp("group", groupslist, &errlst);
 
 /* for testing */
 	if (!list_is_empty(&errlst)) {
@@ -206,7 +205,19 @@ main(int argc, char **argv)
 	printf("pname = %s projfile = %s\n", pname, projfile);
 	printf("projid = %d maxpjid = %d\n", projid, maxpjid);
 	printf("comment = %s\n", comment);
+	printf("g_Uflag = %d g_Gflag = %d\n", g_Uflag, g_Gflag);
+	printf("userslist = \"%s\"\n", userslist);
+	printf("groupslist = \"%s\"\n", groupslist);
+	if (users)
+		printf("users = \"%s\"\n", users);
+	if (groups)
+		printf("groups = \"%s\"\n", groups);
 
 	printf("end of main....\n");
+
+	if (users != NULL)
+		free(users);
+	if (groups != NULL)
+		free(groups);
 	return (0);
 }
