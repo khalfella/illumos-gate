@@ -49,7 +49,6 @@ static boolean_t g_Gflag = B_FALSE;
 static boolean_t g_Kflag = B_FALSE;
 
 
-static boolean_t errflg = B_FALSE;
 
 static char *tmpprojfile, *projfile = PROJF_PATH;
 static char *pname;
@@ -80,7 +79,7 @@ main(int argc, char **argv)
 	int c;
 
 	extern char *optarg;
-	extern int optind;
+	extern int optind, optopt;
 	id_t projid, maxpjid = 99;
 	list_t *plist;
 	projent_t *ent;
@@ -117,7 +116,6 @@ main(int argc, char **argv)
 					projent_add_errmsg(&errlst, gettext(
 					    "Invalid project id:  %s"),
 					    optarg);
-					errflg = B_TRUE;
 				}
 				break;
 			case 'o':
@@ -135,7 +133,8 @@ main(int argc, char **argv)
 				grouplist = optarg;
 				break;
 			default:
-				errflg = B_TRUE;
+				projent_add_errmsg(&errlst, gettext(
+				    "Invalid option: -%c"), optopt);
 				break;
 		}
 
@@ -144,21 +143,18 @@ main(int argc, char **argv)
 	if (g_oflag && !g_pflag) {
 		projent_add_errmsg(&errlst, gettext(
 		    "-o requires -p projid to be specified"));
-		errflg = B_TRUE;
 	}
 
 	if (optind != argc -1) {
 		projent_add_errmsg(&errlst, gettext(
 		    "No project name specified"));
-		errflg = B_TRUE;
 	}
 
 	if ((plist = projent_get_list(projfile, &errlst)) == NULL) {
-		errflg = B_TRUE;
 
 	}
 
-	if (errflg) {
+	if (!list_is_empty(&errlst)) {
 		projent_print_errmsgs(&errlst);
 		list_destroy(&errlst);
 		usage();
