@@ -10,9 +10,35 @@
 #include <limits.h>
 
 
+#include <regex.h>
+
+
 #include <ctype.h>
 
 #include "projadd.h"
+
+#define BOSTR_REG_EXP	"^"
+#define EOSTR_REG_EXP	"$"
+#define EQUAL_REG_EXP	"="
+#define STRNG_REG_EXP	".*"
+#define STRN0_REG_EXP	"(.*)"
+/*
+ * #define IDENT_REG_EXP	"[A-Za-z][A-Za-z0-9_.-]*"
+ */
+#define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
+/*
+ * #define STOCK_REG_EXP	"([A-Z]{1,5}(.[A-Z]{1,5})?,)?"
+ */
+
+#define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
+#define ATTRB_REG_EXP	STOCK_REG_EXP IDENT_REG_EXP
+#define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
+
+#define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
+
+#define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
+#define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
+
 
 void *
 safe_malloc(size_t sz)
@@ -25,6 +51,58 @@ safe_malloc(size_t sz)
 		exit(1);
         }
         return (ptr);
+}
+
+int
+projent_parse_attribute(regex_t *attrbexp, regex_t *atvalexp, char *att,
+    list_t *errlst)
+{
+	return (0);
+}
+
+char *
+projent_parse_attributes(char *attribs, list_t *errlst)
+{
+	char *sattrs, *attrs, *att;
+	regex_t attrbexp, atvalexp;
+	char *ret = NULL;
+	char *retatt
+
+	if (regcomp(&attrbexp, ATTRB_EXP, REG_EXTENDED) != 0)
+		goto out1;
+	if (regcomp(&atvalexp, ATVAL_EXP, REG_EXTENDED) != 0)
+		goto out2;
+
+	sattrs = attrs = strdup(attribs);
+	ret = safe_malloc(strlen(attribs) + 1);
+	*ret = '\0';
+
+
+	while ((att = strsep(&attrs, " ;")) != NULL) {
+		if (*att == '\0')
+			continue;
+		if (projent_parse_attribute(attrregexp,
+		    attrvalexp, att, errlst) != 0) {
+			free(ret);
+			ret = NULL;
+			break;
+		}
+
+		ret = (*ret != '\0') ? strcat(ret, ";") : ret;
+		ret = strcat(ret, att);
+	}
+
+	free(sattrs);
+
+	if (att == NULL) {
+		projent_add_errmsg(errlst, gettext(
+		    "Error compiling attribute regular expressions"));
+	}
+	regfree(&atvalexp);
+out2:
+	regfree(&attrbexp);
+out1:
+	return (ret);
 }
 
 

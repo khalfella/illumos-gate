@@ -34,6 +34,7 @@
 
 
 
+
 #include "projadd.h"
 
 
@@ -192,6 +193,8 @@ main(int argc, char **argv)
 		users =  projent_parse_usrgrp("user",userslist, &errlst);
 	if (g_Gflag)
 		groups =  projent_parse_usrgrp("group", groupslist, &errlst);
+	if (g_Kflag)
+		projent_parse_attributes(attrslist, &errlst);
 
 /* for testing */
 	if (!list_is_empty(&errlst)) {
@@ -215,9 +218,9 @@ main(int argc, char **argv)
 
 	printf("end of main....\n");
 
-	if (users != NULL)
-		free(users);
-	if (groups != NULL)
-		free(groups);
+	free(users);
+	free(groups);
+	free(attrs);
+
 	return (0);
 }

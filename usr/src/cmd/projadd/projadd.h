@@ -34,3 +34,5 @@ extern int  projent_validate_projid(projid_t, list_t *);
 extern int  projent_validate_unique_id(list_t *, projid_t ,list_t *);
 extern int  projent_parse_comment(char *, list_t *);
 extern char *projent_parse_usrgrp(char *, char *, list_t *);
+
+extern int  projent_parse_attributes(char *, list_t *);
