@@ -194,7 +194,7 @@ main(int argc, char **argv)
 	if (g_Gflag)
 		groups =  projent_parse_usrgrp("group", groupslist, &errlst);
 	if (g_Kflag)
-		projent_parse_attributes(attrslist, &errlst);
+		attrs = projent_parse_attributes(attrslist, &errlst);
 
 /* for testing */
 	if (!list_is_empty(&errlst)) {
@@ -215,6 +215,8 @@ main(int argc, char **argv)
 		printf("users = \"%s\"\n", users);
 	if (groups)
 		printf("groups = \"%s\"\n", groups);
+	if (attrs)
+		printf("attrs = \"%s\"\n", attrs);
 
 	printf("end of main....\n");
 

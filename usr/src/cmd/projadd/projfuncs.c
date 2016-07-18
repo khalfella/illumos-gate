@@ -22,16 +22,11 @@
 #define EQUAL_REG_EXP	"="
 #define STRNG_REG_EXP	".*"
 #define STRN0_REG_EXP	"(.*)"
-/*
- * #define IDENT_REG_EXP	"[A-Za-z][A-Za-z0-9_.-]*"
- */
-#define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
-/*
- * #define STOCK_REG_EXP	"([A-Z]{1,5}(.[A-Z]{1,5})?,)?"
- */
 
+#define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
 #define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
-#define ATTRB_REG_EXP	STOCK_REG_EXP IDENT_REG_EXP
+
+#define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
 #define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
 
 #define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
@@ -39,6 +34,8 @@
 #define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
 #define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
 
+
+#define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
 void *
 safe_malloc(size_t sz)
@@ -53,20 +50,33 @@ safe_malloc(size_t sz)
         return (ptr);
 }
 
-int
+char *
 projent_parse_attribute(regex_t *attrbexp, regex_t *atvalexp, char *att,
     list_t *errlst)
 {
-	return (0);
+	int nmatch = MAX_OF(attrbexp->re_nsub, atvalexp->re_nsub) + 1;
+	char *ret = NULL;
+	regmatch_t *mat = safe_malloc(nmatch);
+
+	if (regexec(attrbexp, att, attrbexp->re_nsub + 1 , mat, 0) == 0) {
+		ret = strdup(att);
+	} else if (regexec(atvalexp, att, atvalexp->re_nsub + 1, mat, 0) == 0) {
+		ret = strdup(att);
+	} else {
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid attribute \"%s\""), att);
+	}
+	
+	free(mat);
+	return (ret);
 }
 
 char *
 projent_parse_attributes(char *attribs, list_t *errlst)
 {
-	char *sattrs, *attrs, *att;
+	char *sattrs, *attrs, *att, *natt = NULL;
 	regex_t attrbexp, atvalexp;
 	char *ret = NULL;
-	char *retatt
 
 	if (regcomp(&attrbexp, ATTRB_EXP, REG_EXTENDED) != 0)
 		goto out1;
@@ -78,26 +88,22 @@ projent_parse_attributes(char *attribs, list_t *errlst)
 	*ret = '\0';
 
 
-	while ((att = strsep(&attrs, " ;")) != NULL) {
+	while ((att = strsep(&attrs, ";")) != NULL) {
 		if (*att == '\0')
 			continue;
-		if (projent_parse_attribute(attrregexp,
-		    attrvalexp, att, errlst) != 0) {
+		if ((natt = projent_parse_attribute(&attrbexp,
+		    &atvalexp, att, errlst)) == NULL) {
 			free(ret);
 			ret = NULL;
 			break;
 		}
 
 		ret = (*ret != '\0') ? strcat(ret, ";") : ret;
-		ret = strcat(ret, att);
+		ret = strcat(ret, natt);
+		free(natt);
 	}
 
 	free(sattrs);
-
-	if (att == NULL) {
-		projent_add_errmsg(errlst, gettext(
-		    "Error compiling attribute regular expressions"));
-	}
 	regfree(&atvalexp);
 out2:
 	regfree(&attrbexp);
