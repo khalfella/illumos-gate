@@ -26,16 +26,29 @@
 #define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
 #define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
 
+#define FLTNM_REG_EXP	"([[:digit:]](\.[[:digit:]]+)?)"
+#define	MODIF_REG_EXP	"([kmgtpe])?"
+#define UNIT__REG_EXP	"([bs])?"
+
+#define TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
+
 #define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
 #define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
+#define VALUE_REG_EXP	FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
 
 #define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
 
 #define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
 #define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
+#define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
+#define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
 
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
+
+
+#define BYTES_SCALE	1
+#define SCNDS_SCALE	2
 
 void *
 safe_malloc(size_t sz)
@@ -50,18 +63,279 @@ safe_malloc(size_t sz)
         return (ptr);
 }
 
+int
+projent_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
+{
+	if (scale == BYTES_SCALE) {
+
+		switch(tolower(*unit)) {
+			case 'k':
+				*res = 1024ULL;
+				break;
+			case 'm':
+				*res = 1048576ULL;
+				break;
+			case 'g':
+				*res = 1073741824ULL;
+				break;
+			case 't':
+				*res = 1099511627776ULL;
+				break;
+			case 'p':
+				*res = 1125899906842624ULL;
+				break;
+			case 'e':
+				*res = 1152921504606846976ULL;
+				break;
+			default:
+				projent_add_errmsg(errlst, gettext(
+				    "Invalid unit: \"%s\""), unit);
+				return (1);
+		}
+
+		return (0);
+
+	} else if (scale == SCNDS_SCALE) {
+
+		switch(tolower(*unit)) {
+			case 'k':
+				*res = 1000ULL;
+				break;
+			case 'm':
+				*res = 1000000ULL;
+				break;
+			case 'g':
+				*res = 1000000000ULL;
+				break;
+			case 't':
+				*res = 1000000000000ULL;
+				break;
+			case 'p':
+				*res = 1000000000000000ULL;
+				break;
+			case 'e':
+				*res = 1000000000000000000ULL;
+				break;
+			default:
+				projent_add_errmsg(errlst, gettext(
+				    "Invalid unit: \"%s\""), unit);
+				return (1);
+		}
+		return (0);
+	}
+
+	
+	projent_add_errmsg(errlst, gettext(
+	    "Invalid scale: %d"), scale);
+
+	return (1);	
+}
+
+
+int
+projent_val2num(char *value, int scale, char **retnum, char **retmod,
+    char **retunit)
+{
+	
+	char *ret = NULL;
+	regex_t valueexp;
+	regmatch_t *mat;
+	int nmatch;
+	char *num, *modifier, *type;
+	int s_num, e_num, len_num;
+	int s_mod, e_mod, len_mod;
+	int s_typ, e_typ, len_typ;
+
+	*retnum = *retmod = *retunit = NULL;
+
+	/*
+
+	if (regcomp(&valueexp, VALUE_EXP, REG_EXTENDED) != 0)
+		goto out1;
+
+	nmatch = valueexp.re_nsub + 1;
+	mat = safe_malloc(nmatch * sizeof(regmatch_t));
+
+	if (regexec(&valueexp, value, nmatch, mat, 0) == 0) {
+	}
+
+
+
+	regfree(&valueexp);
+out1:
+	return (ret);
+	*/
+
+	return (0);
+}
+
+void
+projent_free_tokens_array_elements(char **tokens)
+{
+	char *token;
+	while ((token = *tokens++) != NULL) {
+		free(token);
+	}
+}
+
+char **
+projent_tokenize_attribute_values(char *values, list_t *errlst)
+{
+	char *token, *t;
+	char *v;
+
+	regex_t tokenexp;
+
+	char **ctoken, **tokens = NULL;
+
+	if (regcomp(&tokenexp, TOKEN_EXP, REG_EXTENDED | REG_NOSUB) != 0)
+		return (tokens);
+
+	/* assume each character will be a token + NULL terminating value*/
+	ctoken = tokens = safe_malloc((strlen(values) * sizeof(char *)) + 1);
+	token = safe_malloc(strlen(values) + 1);
+
+	v = values;
+	*ctoken = NULL;
+	while (v < (values + strlen(values))) {
+
+		/* get the next token */
+		t = token;
+		while ((*t = *v++) != '\0') {
+			if (*t == '(' || *t == ')' || *t == ','|| 
+			    *v == '(' || *v == ')' || *v == ',') {
+				*++t = '\0';
+				break;
+			}
+			t++;
+		}
+
+		if (strcmp(token, "(") != 0 && strcmp(token, ")") != 0 &&
+		    strcmp(token, ",") != 0 ) {
+			if (regexec(&tokenexp, token, 0, NULL, 0) != 0) {
+				projent_add_errmsg(errlst, gettext(
+				    "Invalid Character at or near \"%s\""),
+				    token); 
+				projent_free_tokens_array_elements(tokens);
+				free(tokens);
+				tokens = NULL;
+				goto out1;
+			}
+		}
+		*ctoken++ = strdup(token);
+		*ctoken = NULL;
+	}
+
+out1:
+	free(token);
+	regfree(&tokenexp);
+	return (tokens);
+}
+
+char *
+projent_parse_attribute_values_tokens(char *values, list_t *errlst)
+{
+	char **tokens = NULL;
+	char *token;
+	int i;
+
+	if ((tokens =
+	    projent_tokenize_attribute_values(values, errlst)) == NULL) {
+		goto out1;
+	}
+
+
+	/* walk the tokens list */
+	for (i = 0; (token = tokens[i]) != NULL; i++) {
+		printf("***** token[%d] = \"%s\"\n", i, token);
+	}
+
+
+	projent_free_tokens_array_elements(tokens);
+	free(tokens);
+out1:
+	/* fake return */
+	return strdup(values);
+}
+char *
+projent_parse_attribute_values(char *name, char *values, list_t *errlst)
+{
+	/*
+	 * 1 - Make sure that the value is in the acceptable grammatical shape.
+	 * This should call the parser to parse the value and put make sure
+	 * it is ok. else return NULL and report the error in errlst.
+	 */
+	char *pvalues;
+	if ((pvalues =
+	    projent_parse_attribute_values_tokens(values, errlst)) != NULL) {
+		free(pvalues);
+	}
+
+	/*
+	 * 2- Process the part of "rcap.max-rss". Double check and adjust the
+	 * value if needed
+	 */
+
+	/*
+	 * 3- Process the part of RctlRules. Make sure it is ok.
+	 */
+
+	/*
+	 * 4- Finally, check if there is any scaling required
+	 */
+
+
+	/*
+	 * 5- Given all the above, return the value in the correct shape
+	 */
+	
+	return strdup(values);
+}
+
 char *
 projent_parse_attribute(regex_t *attrbexp, regex_t *atvalexp, char *att,
     list_t *errlst)
 {
 	int nmatch = MAX_OF(attrbexp->re_nsub, atvalexp->re_nsub) + 1;
 	char *ret = NULL;
-	regmatch_t *mat = safe_malloc(nmatch);
+	char *nvalues, *name, *values = NULL;
+	int vstart, vend, vlen;
+	int nstart, nend, nlen;
+	int retlen;
+	regmatch_t *mat = safe_malloc(nmatch * sizeof(regmatch_t));
+
 
 	if (regexec(attrbexp, att, attrbexp->re_nsub + 1 , mat, 0) == 0) {
 		ret = strdup(att);
 	} else if (regexec(atvalexp, att, atvalexp->re_nsub + 1, mat, 0) == 0) {
-		ret = strdup(att);
+		vstart = mat[atvalexp->re_nsub].rm_so;
+		vend = mat[atvalexp->re_nsub].rm_eo;
+		vlen = vend - vstart;
+		nstart = mat[atvalexp->re_nsub - 3].rm_so;
+		nend = mat[atvalexp->re_nsub - 3].rm_eo;
+		nlen = nend - nstart;
+		if (vlen > 0) {
+
+			values = safe_malloc(vlen + 1);
+			strlcpy(values, (char *)(att + vstart), vlen + 1);
+			name = safe_malloc(nlen + 1);
+			strlcpy(name, (char *)(att + nstart), nlen + 1);
+
+			if ((nvalues = projent_parse_attribute_values(
+			    name, values, errlst)) != NULL) {
+				retlen = nlen + 1 + strlen(nvalues) + 1;
+				ret = safe_malloc(retlen);
+				*ret = '\0';
+				strcat(strcat(strcat(ret, name), "="), nvalues);
+				free(nvalues);
+			}
+			free(values);
+			free(name);
+		} else {
+			/* the value is empty, just return att name */
+			ret = strdup(att);
+			ret[nend] = '\0';
+		}
 	} else {
 		projent_add_errmsg(errlst, gettext(
 		    "Invalid attribute \"%s\""), att);
