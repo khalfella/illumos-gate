@@ -26,7 +26,7 @@
 #define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
 #define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
 
-#define FLTNM_REG_EXP	"([[:digit:]](\.[[:digit:]]+)?)"
+#define FLTNM_REG_EXP	"([[:digit:]](\\.[[:digit:]]+)?)"
 #define	MODIF_REG_EXP	"([kmgtpe])?"
 #define UNIT__REG_EXP	"([bs])?"
 
@@ -47,6 +47,9 @@
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
 
+#define SEQUAL(X,Y)	(strcmp((X), (Y)) == 0)
+
+
 #define BYTES_SCALE	1
 #define SCNDS_SCALE	2
 
@@ -61,6 +64,34 @@ safe_malloc(size_t sz)
 		exit(1);
         }
         return (ptr);
+}
+
+char *
+projent_extract_matched_substr(regex_t *reg, regmatch_t *mat, char *str,
+    int idx)
+{
+	int str_len, mat_len;
+	int start, end;
+	char *ret;
+	
+	if (idx < 0 || idx > reg->re_nsub)
+		return (NULL);
+	str_len = strlen(str);
+
+	if (mat[idx].rm_so < 0 || mat[idx].rm_so >= str_len ||
+	    mat[idx].rm_eo < 0 || mat[idx].rm_eo > str_len ||
+	    mat[idx].rm_so > mat[idx].rm_eo)
+		return (NULL);
+
+	start = mat[idx].rm_so;
+	end = mat[idx].rm_eo;
+	mat_len = end - start;
+
+	ret = safe_malloc(mat_len + 1);
+	*ret = '\0';
+
+	strlcpy(ret, str + start, mat_len + 1);
+	return (ret);
 }
 
 int
@@ -133,40 +164,83 @@ projent_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 
 
 int
-projent_val2num(char *value, int scale, char **retnum, char **retmod,
+projent_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmod,
     char **retunit)
 {
 	
-	char *ret = NULL;
+	int ret = 1;
 	regex_t valueexp;
 	regmatch_t *mat;
 	int nmatch;
-	char *num, *modifier, *type;
-	int s_num, e_num, len_num;
-	int s_mod, e_mod, len_mod;
-	int s_typ, e_typ, len_typ;
+	char *num, *modifier, *unit;
+	char *ptr;
+
+	uint64_t mul64, num64;
 
 	*retnum = *retmod = *retunit = NULL;
 
-	/*
-
-	if (regcomp(&valueexp, VALUE_EXP, REG_EXTENDED) != 0)
+	if (regcomp(&valueexp, VALUE_EXP, REG_EXTENDED) != 0) {
+		projent_add_errmsg(errlst, gettext(
+		    "Failed to compile regex: '%s'"), VALUE_EXP);
 		goto out1;
+	}
 
 	nmatch = valueexp.re_nsub + 1;
 	mat = safe_malloc(nmatch * sizeof(regmatch_t));
 
 	if (regexec(&valueexp, value, nmatch, mat, 0) == 0) {
+		goto out2;
 	}
 
 
+	num = projent_extract_matched_substr(&valueexp, mat, value, 0);
+	modifier = projent_extract_matched_substr(&valueexp, mat, value, 1);
+	unit = projent_extract_matched_substr(&valueexp, mat, value, 2);
 
+	if ((num == NULL || modifier == NULL || unit == NULL) ||
+	    (strlen(modifier) == 0 && strchr(num, '.') != NULL) ||
+	    (projent_scale(unit, scale, &mul64, errlst) != 0) ||
+	    (scale == BYTES_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "b")) ||
+	    (scale == SCNDS_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "s"))) {
+		projent_add_errmsg(errlst, gettext( "Error near: \"%s\""),
+		    value);
+		free(num);
+		free(modifier);
+		free(unit);
+		goto out2;
+	}
+
+	num64 = strtoll(num, &ptr, 10);
+	if (errno == EINVAL || errno == ERANGE || *ptr != '\0' ) {
+		projent_add_errmsg(errlst, gettext("Invalid value:  \"%s\""),
+		    value);
+		free(num);
+		free(modifier);
+		free(unit);
+		goto out2;
+	}
+
+
+	if (UINT64_MAX / mul64 > num64) {
+		projent_add_errmsg(errlst, gettext("Too big value:  \"%s\""),
+		    value);
+		free(num);
+		free(modifier);
+		free(unit);
+		goto out2;
+	}
+
+	num64 *= mul64;
+	asprintf(retnum, "%ull", num64);
+	free(num);
+	*retmod = modifier;
+	*retunit = unit;
+	ret = 0;
+
+out2:
 	regfree(&valueexp);
 out1:
 	return (ret);
-	*/
-
-	return (0);
 }
 
 void
@@ -239,23 +313,80 @@ projent_parse_attribute_values_tokens(char *values, list_t *errlst)
 	char *token;
 	int i;
 
+	char *ret;
+
+
+	char *prev = "";
+	int parendepth = 0;
+	ret = NULL;
+
 	if ((tokens =
 	    projent_tokenize_attribute_values(values, errlst)) == NULL) {
 		goto out1;
 	}
 
+	ret = safe_malloc(1);
+	*ret = '\0';
+
 
 	/* walk the tokens list */
 	for (i = 0; (token = tokens[i]) != NULL; i++) {
 		printf("***** token[%d] = \"%s\"\n", i, token);
+
+		ret = realloc(ret, (strlen(ret) + strlen(token) + 1));
+		ret = strcat(ret, token);
+
+		printf("ret = \"%s\"\n", ret);
+
+		if (SEQUAL(token, ",")) {
+			prev = ",";
+		} else if (SEQUAL(token, "(")) {
+			if (!(SEQUAL(prev, "(") ||
+			    SEQUAL(prev,",") ||
+			    SEQUAL(prev, ""))) {
+				projent_add_errmsg(errlst, gettext(
+				    "\"%s\" <- \"(\" unexpected"), ret); 
+				free(ret);
+				ret = NULL;
+				break;
+			}
+			parendepth++;
+			prev = "(";
+		} else if (SEQUAL(token, ")")) {
+			if (parendepth <= 0) {
+				projent_add_errmsg(errlst, gettext(
+				    "\"%s\" <- \")\" unexpected"), ret); 
+				free(ret);
+				break;
+			}
+			parendepth--;
+			prev = ")";
+		} else {
+			if (!(SEQUAL(prev, "(") ||
+			    SEQUAL(prev, ",") ||
+			    SEQUAL(prev, ""))) {
+				projent_add_errmsg(errlst, gettext(
+				    "\"%s\" <- \"%s\" unexpected"),
+				    ret, token); 
+				free(ret);
+				break;
+			}
+			prev = token;
+		}
+	}
+
+	if (parendepth != 0) {
+		projent_add_errmsg(errlst, gettext(
+		    "\"%s\" <- \")\" missing"),
+		    ret, token); 
+		free(ret);
 	}
 
 
 	projent_free_tokens_array_elements(tokens);
 	free(tokens);
 out1:
-	/* fake return */
-	return strdup(values);
+	return (ret);
 }
 char *
 projent_parse_attribute_values(char *name, char *values, list_t *errlst)
@@ -264,17 +395,25 @@ projent_parse_attribute_values(char *name, char *values, list_t *errlst)
 	 * 1 - Make sure that the value is in the acceptable grammatical shape.
 	 * This should call the parser to parse the value and put make sure
 	 * it is ok. else return NULL and report the error in errlst.
+	 * This already done in projent_parse_attribute_values_tokens().
 	 */
 	char *pvalues;
+	char *ret;
+
+
+	ret = NULL;
 	if ((pvalues =
-	    projent_parse_attribute_values_tokens(values, errlst)) != NULL) {
-		free(pvalues);
+	    projent_parse_attribute_values_tokens(values, errlst)) == NULL) {
+		goto out1;
 	}
 
 	/*
 	 * 2- Process the part of "rcap.max-rss". Double check and adjust the
 	 * value if needed
 	 */
+
+	if (SEQUAL(name, "rcap.max-rss")) {
+	}
 
 	/*
 	 * 3- Process the part of RctlRules. Make sure it is ok.
@@ -288,8 +427,13 @@ projent_parse_attribute_values(char *name, char *values, list_t *errlst)
 	/*
 	 * 5- Given all the above, return the value in the correct shape
 	 */
+
+	free(pvalues);
 	
-	return strdup(values);
+out1:
+	/* fake the return */
+	ret = strdup(values);
+	return (ret);
 }
 
 char *
