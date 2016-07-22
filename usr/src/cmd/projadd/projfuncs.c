@@ -26,7 +26,7 @@
 #define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
 #define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
 
-#define FLTNM_REG_EXP	"([[:digit:]](\\.[[:digit:]]+)?)"
+#define FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
 #define	MODIF_REG_EXP	"([kmgtpe])?"
 #define UNIT__REG_EXP	"([bs])?"
 
@@ -70,27 +70,18 @@ char *
 projent_extract_matched_substr(regex_t *reg, regmatch_t *mat, char *str,
     int idx)
 {
-	int str_len, mat_len;
-	int start, end;
+	int mat_len;
 	char *ret;
 	
 	if (idx < 0 || idx > reg->re_nsub)
 		return (NULL);
-	str_len = strlen(str);
 
-	if (mat[idx].rm_so < 0 || mat[idx].rm_so >= str_len ||
-	    mat[idx].rm_eo < 0 || mat[idx].rm_eo > str_len ||
-	    mat[idx].rm_so > mat[idx].rm_eo)
-		return (NULL);
-
-	start = mat[idx].rm_so;
-	end = mat[idx].rm_eo;
-	mat_len = end - start;
+	mat_len = mat[idx].rm_eo - mat[idx].rm_so;
 
 	ret = safe_malloc(mat_len + 1);
 	*ret = '\0';
 
-	strlcpy(ret, str + start, mat_len + 1);
+	strlcpy(ret, str + mat[idx].rm_so, mat_len + 1);
 	return (ret);
 }
 
@@ -117,6 +108,9 @@ projent_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 				break;
 			case 'e':
 				*res = 1152921504606846976ULL;
+				break;
+			case '\0':
+				*res = 1ULL;
 				break;
 			default:
 				projent_add_errmsg(errlst, gettext(
@@ -147,6 +141,9 @@ projent_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 			case 'e':
 				*res = 1000000000000000000ULL;
 				break;
+			case '\0':
+				*res = 1ULL;
+				break;
 			default:
 				projent_add_errmsg(errlst, gettext(
 				    "Invalid unit: \"%s\""), unit);
@@ -176,6 +173,7 @@ projent_val2num(char *value, int scale, list_t *errlst, char **retnum, char **re
 	char *ptr;
 
 	uint64_t mul64, num64;
+	long double dnum;
 
 	*retnum = *retmod = *retunit = NULL;
 
@@ -188,18 +186,20 @@ projent_val2num(char *value, int scale, list_t *errlst, char **retnum, char **re
 	nmatch = valueexp.re_nsub + 1;
 	mat = safe_malloc(nmatch * sizeof(regmatch_t));
 
-	if (regexec(&valueexp, value, nmatch, mat, 0) == 0) {
+	if (regexec(&valueexp, value, nmatch, mat, 0) != 0) {
+		projent_add_errmsg(errlst, gettext(
+		    "Invalid value: '%s'"), value);
 		goto out2;
 	}
 
 
-	num = projent_extract_matched_substr(&valueexp, mat, value, 0);
-	modifier = projent_extract_matched_substr(&valueexp, mat, value, 1);
-	unit = projent_extract_matched_substr(&valueexp, mat, value, 2);
+	num = projent_extract_matched_substr(&valueexp, mat, value, 1);
+	modifier = projent_extract_matched_substr(&valueexp, mat, value, 3);
+	unit = projent_extract_matched_substr(&valueexp, mat, value, 4);
 
 	if ((num == NULL || modifier == NULL || unit == NULL) ||
 	    (strlen(modifier) == 0 && strchr(num, '.') != NULL) ||
-	    (projent_scale(unit, scale, &mul64, errlst) != 0) ||
+	    (projent_scale(modifier, scale, &mul64, errlst) != 0) ||
 	    (scale == BYTES_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "b")) ||
 	    (scale == SCNDS_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "s"))) {
 		projent_add_errmsg(errlst, gettext( "Error near: \"%s\""),
@@ -210,7 +210,7 @@ projent_val2num(char *value, int scale, list_t *errlst, char **retnum, char **re
 		goto out2;
 	}
 
-	num64 = strtoll(num, &ptr, 10);
+	dnum = strtold(num, &ptr);
 	if (errno == EINVAL || errno == ERANGE || *ptr != '\0' ) {
 		projent_add_errmsg(errlst, gettext("Invalid value:  \"%s\""),
 		    value);
@@ -221,7 +221,8 @@ projent_val2num(char *value, int scale, list_t *errlst, char **retnum, char **re
 	}
 
 
-	if (UINT64_MAX / mul64 > num64) {
+
+	if (UINT64_MAX / mul64 <= dnum) {
 		projent_add_errmsg(errlst, gettext("Too big value:  \"%s\""),
 		    value);
 		free(num);
@@ -230,8 +231,8 @@ projent_val2num(char *value, int scale, list_t *errlst, char **retnum, char **re
 		goto out2;
 	}
 
-	num64 *= mul64;
-	asprintf(retnum, "%ull", num64);
+
+	asprintf(retnum, "%llu", (unsigned long long)(mul64 * dnum));
 	free(num);
 	*retmod = modifier;
 	*retunit = unit;
@@ -331,12 +332,9 @@ projent_parse_attribute_values_tokens(char *values, list_t *errlst)
 
 	/* walk the tokens list */
 	for (i = 0; (token = tokens[i]) != NULL; i++) {
-		printf("***** token[%d] = \"%s\"\n", i, token);
 
 		ret = realloc(ret, (strlen(ret) + strlen(token) + 1));
 		ret = strcat(ret, token);
-
-		printf("ret = \"%s\"\n", ret);
 
 		if (SEQUAL(token, ",")) {
 			prev = ",";
@@ -400,6 +398,9 @@ projent_parse_attribute_values(char *name, char *values, list_t *errlst)
 	char *pvalues;
 	char *ret;
 
+	char *num, *modifier, *unit;
+	uint64_t res;
+
 
 	ret = NULL;
 	if ((pvalues =
@@ -413,8 +414,14 @@ projent_parse_attribute_values(char *name, char *values, list_t *errlst)
 	 */
 
 	if (SEQUAL(name, "rcap.max-rss")) {
+		if (projent_val2num(pvalues, BYTES_SCALE, errlst,
+		    &num, &modifier, &unit) != 0){
+			goto out2;
+		}
 	}
 
+
+	ret = strdup(num);
 	/*
 	 * 3- Process the part of RctlRules. Make sure it is ok.
 	 */
@@ -428,11 +435,14 @@ projent_parse_attribute_values(char *name, char *values, list_t *errlst)
 	 * 5- Given all the above, return the value in the correct shape
 	 */
 
+
+out2:
+	free(num);
+	free(modifier);
+	free(unit);
 	free(pvalues);
-	
 out1:
 	/* fake the return */
-	ret = strdup(values);
 	return (ret);
 }
 
