@@ -35,7 +35,7 @@ POFILES= projmod.po projdel.po
 CPROGS= projadd
 LDLIBS += -lavl -lcmdutils -ldevinfo -lgen -lkstat
 USRSBINPROGS += $(CPROGS:%=$(ROOTUSRSBIN)/%)
-OBJS= projadd.o projfuncs.o
+OBJS= projadd.o projent.o lst.o attrib.o util.o rctl.o
 SRCS= $(OBJS:%.o=%.c)
 
 # No msg catalog here.

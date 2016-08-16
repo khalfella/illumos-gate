@@ -35,7 +35,7 @@
 
 
 
-#include "projadd.h"
+#include "projent.h"
 
 
 
@@ -87,9 +87,10 @@ main(int argc, char **argv)
 	char *err = NULL;
 	char *ptr;
 
-	char *users, *userslist, *groups, *groupslist, *attrs, *attrslist;
-	users = userslist = groups = groupslist = attrs = attrslist = "";
+	char *users, *userslist, *groups, *groupslist, *attrslist;
+	users = userslist = groups = groupslist = attrslist = "";
 
+	lst_t *attrs = NULL;
 
 	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
 
@@ -215,8 +216,13 @@ main(int argc, char **argv)
 		printf("users = \"%s\"\n", users);
 	if (groups)
 		printf("groups = \"%s\"\n", groups);
-	if (attrs)
-		printf("attrs = \"%s\"\n", attrs);
+	if (attrs) {
+		char *str = attrib_lst_tostring(attrs);
+		if (str) {
+			printf("attrs = \"%s\"\n", str);
+			free(str);
+		}
+	}
 
 	printf("end of main....\n");
 
