@@ -376,6 +376,8 @@ attrib_t
 	int retlen;
 	int vidx, nidx;
 
+	char *num, *mod, *unit;
+
 	regmatch_t *mat = util_safe_malloc(nmatch * sizeof(regmatch_t));
 	ret = ATT_ALLOC();
 
@@ -412,6 +414,16 @@ attrib_t
 		goto out;
 	}
 
+	if (SEQU(ret->att_name, "rcap.max-rss")) {
+		values = attrib_val_tostring(ret->att_value);
+		if (util_val2num(values, BYTES_SCALE, errlst,
+		    &num, &mod, &unit) == 0) {
+			attrib_val_free(ret->att_value);
+			ret->att_value = ATT_VAL_ALLOC_VALUE(num);
+			free(mod);
+			free(unit);
+		}
+	}
 
 	/*
 	 * 1- Handle the case of rcap.max-rss
