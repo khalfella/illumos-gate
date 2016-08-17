@@ -28,6 +28,22 @@
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
 
 
+attrib_t
+*attrib_alloc()
+{
+	return (util_safe_zmalloc(sizeof(attrib_t)));
+}
+
+attrib_val_t
+*attrib_val_alloc(int type, void *val)
+{
+	attrib_val_t *ret;
+
+	ret = util_safe_malloc(sizeof(attrib_val_t));
+	ret->att_val_type = type;
+	ret->att_val_value = val;
+	return (ret);
+}
 
 char
 *attrib_val_tostring(attrib_val_t *val)
@@ -171,9 +187,7 @@ attrib_val_to_list(attrib_val_t *atv)
 	lst_create(atv->att_val_values);
 
 	if (type == ATT_VAL_TYPE_VALUE && val != NULL) {
-		mat = util_safe_malloc(sizeof(attrib_val_t));
-		mat->att_val_type = type;
-		mat->att_val_value = val;
+		mat = ATT_VAL_ALLOC_VALUE(val);
 		lst_insert_tail(atv->att_val_values, mat);
 	}
 	return (0);
@@ -191,13 +205,11 @@ attrib_val_append(attrib_val_t *atv, char *token)
 
 	if (atv->att_val_type == ATT_VAL_TYPE_NULL) {
 		/* convert this to VALUE attribute */
-		atv->att_val_value = strdup(token);
 		atv->att_val_type = ATT_VAL_TYPE_VALUE;
+		atv->att_val_value = strdup(token);
 	} else if (atv->att_val_type == ATT_VAL_TYPE_LIST) {
 		/* append token to the list */
-		nat = util_safe_malloc(sizeof(attrib_val_t));
-		nat->att_val_type = ATT_VAL_TYPE_VALUE;
-		nat->att_val_value = strdup(token);
+		nat = ATT_VAL_ALLOC_VALUE(strdup(token));
 		lst_insert_tail(atv->att_val_values, nat);
 	}
 
@@ -228,9 +240,7 @@ attrib_val_t
 		goto out1;
 	}
 
-	ret = util_safe_malloc(sizeof(attrib_val_t));
-	ret->att_val_type = ATT_VAL_TYPE_NULL;
-	ret->att_val_value = NULL;
+	ret = ATT_VAL_ALLOC_NULL();
 
 	at = ret;
 
@@ -272,10 +282,7 @@ attrib_val_t
 					break;
 				case ATT_VAL_TYPE_LIST:
 					/* Allocate NULL node */
-					nat = util_safe_malloc(
-					    sizeof(attrib_val_t));
-					nat->att_val_type = ATT_VAL_TYPE_NULL;
-					nat->att_val_value = NULL;
+					nat = ATT_VAL_ALLOC_NULL();
 					lst_insert_tail(
 					    at->att_val_values, nat);
 					/* push at down one level */
@@ -360,24 +367,11 @@ attrib_t
 	int vidx, nidx;
 
 	regmatch_t *mat = util_safe_malloc(nmatch * sizeof(regmatch_t));
-	ret = util_safe_malloc(sizeof(attrib_t));
-	ret->att_name = NULL;
-	ret->att_value = NULL;
-
-
-	/** DEBUG **/
-	printf("projent_parse_attribute:\n"
-	    "\tatt = %s\n",
-	    att);
-
-
+	ret = ATT_ALLOC();
 
 	if (regexec(attrbexp, att, attrbexp->re_nsub + 1 , mat, 0) == 0) {
 		ret->att_name = strdup(att);
-		ret->att_value = util_safe_malloc(sizeof(attrib_val_t));
-		ret->att_value->att_val_type = ATT_VAL_TYPE_NULL;
-		ret->att_value->att_val_value = NULL;
-		ret->att_value->att_val_values = NULL;
+		ret->att_value = ATT_VAL_ALLOC_NULL();
 	} else if (regexec(atvalexp, att, atvalexp->re_nsub + 1, mat, 0) == 0) {
 		vidx = atvalexp->re_nsub;
 		vlen = mat[vidx].rm_eo - mat[vidx].rm_so;
@@ -391,10 +385,7 @@ attrib_t
 		} else {
 			/* the value is empty, just return att name */
 			ret->att_name = util_substr( atvalexp, mat, att, nidx); 
-			ret->att_value = util_safe_malloc(sizeof(attrib_val_t));
-			ret->att_value->att_val_type = ATT_VAL_TYPE_NULL;
-			ret->att_value->att_val_value = NULL;
-			/* ret->att_value->att_val_values = NULL; */
+			ret->att_value = ATT_VAL_ALLOC_NULL();
 		}
 	} else {
 		projent_add_errmsg(errlst, gettext(

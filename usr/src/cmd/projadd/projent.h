@@ -56,6 +56,7 @@ typedef struct attrib_s {
 #define	UTIL_STR_APPEND2(S, S1, S2)	util_str_append((S), 2, (S1), (S2))
 
 extern void *util_safe_malloc(size_t);
+extern void *util_safe_zmalloc(size_t);
 extern char **util_tokenize(char *, list_t *);
 extern void util_free_tokens(char **);
 extern char *util_substr(regex_t *, regmatch_t *, char *, int);
@@ -65,10 +66,19 @@ extern char *util_str_append(char *, int, ...);
 /*
  * Attribute handling functions
  */
+
+#define	ATT_ALLOC()		attrib_alloc()
+#define ATT_VAL_ALLOC(T, V)	attrib_val_alloc((T), (V))
+#define ATT_VAL_ALLOC_NULL()	ATT_VAL_ALLOC(ATT_VAL_TYPE_NULL, NULL)
+#define ATT_VAL_ALLOC_VALUE(V)	ATT_VAL_ALLOC(ATT_VAL_TYPE_VALUE, (V))
+#define ATT_VAL_ALLOC_LIST(L)	ATT_VAL_ALLOC(ATT_VAL_TYPE_LIST, (L))
+
 extern char *attrib_lst_tostring(lst_t *);
 extern attrib_t *attrib_parse(regex_t *, regex_t *, char *, list_t *);
 extern void attrib_free_lst(lst_t *);
 extern char *attrib_val_tostring(attrib_val_t *);
+extern attrib_t *attrib_alloc();
+extern attrib_val_t *attrib_val_alloc(int, void *);
 
 extern list_t *projent_get_list(char *, list_t *);
 extern void projent_print_ent(projent_t *);
