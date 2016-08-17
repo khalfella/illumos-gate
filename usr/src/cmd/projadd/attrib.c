@@ -387,19 +387,29 @@ attrib_t
 		vlen = mat[vidx].rm_eo - mat[vidx].rm_so;
 		nidx = atvalexp->re_nsub - 3;
 
+		ret->att_name = util_substr(atvalexp, mat, att, nidx); 
+
 		if (vlen > 0) {
-			ret->att_name = util_substr(atvalexp, mat, att, nidx); 
 			values = util_substr(atvalexp, mat, att, vidx);
 			ret->att_value = attrib_val_parse(values, errlst);
 			free(values);
+			if (ret->att_value == NULL) {
+				projent_add_errmsg(errlst, gettext(
+				    "Invalid value on attribute \"%s\""),
+				    ret->att_name);
+				attrib_free(ret);
+				free(ret);
+				ret = NULL;
+				goto out;
+			}
 		} else {
-			/* the value is empty, just return att name */
-			ret->att_name = util_substr(atvalexp, mat, att, nidx); 
+			/* the value is an empty string */
 			ret->att_value = ATT_VAL_ALLOC_NULL();
 		}
 	} else {
 		projent_add_errmsg(errlst, gettext(
 		    "Invalid attribute \"%s\""), att);
+		goto out;
 	}
 
 
@@ -408,7 +418,7 @@ attrib_t
 	 * 2- Handle resource controls caeses
 	 */
 
-
+out:
 	free(mat);
 	return (ret);
 }
