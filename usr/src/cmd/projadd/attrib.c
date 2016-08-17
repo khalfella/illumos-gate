@@ -230,6 +230,7 @@ attrib_val_t
 	attrib_val_t *oat;
 	lst_t stk;
 	char *usedtokens = NULL;
+	int error = 0;
 
 
 	char *prev = "";
@@ -262,19 +263,17 @@ attrib_val_t
 			if (!(SIN3(prev, "(", ",", ""))) {
 				projent_add_errmsg(errlst, gettext(
 				    "\"%s\" <- \"(\" unexpected"), usedtokens); 
-				/*
-				 * properly free this ret LATER ON
-				 */
-				free(ret);
-				ret = NULL;
-				break;
+				error = 1;
+				goto out;
 			}
 
 			switch(at->att_val_type) {
 				case ATT_VAL_TYPE_VALUE:
-					/* Something Wrong */
-					printf("Something WRONGGGGG\n");
-					exit(13);
+					projent_add_errmsg(errlst, gettext(
+					    "\"%s\" <- \"%s\" unexpected"),
+					    usedtokens, token); 
+					error = 1;
+					goto out;
 				break;
 				case ATT_VAL_TYPE_NULL:
 					/* Make is a LIST attrib */
@@ -296,9 +295,8 @@ attrib_val_t
 			if (parendepth <= 0) {
 				projent_add_errmsg(errlst, gettext(
 				    "\"%s\" <- \")\" unexpected"), usedtokens); 
-				/* deal with this later on */
-				free(ret);
-				break;
+				error = 1;
+				goto out;
 			}
 			if (SIN2(prev, ",", "(")) {
 				attrib_val_append(at, "");
@@ -315,10 +313,8 @@ attrib_val_t
 				projent_add_errmsg(errlst, gettext(
 				    "\"%s\" <- \"%s\" unexpected"),
 				    usedtokens, token); 
-				/* deal with this free later on */
-				free(ret);
-				ret = NULL;
-				break;
+				error = 1;
+				goto out;
 			}
 
 			attrib_val_append(at, token);
@@ -329,16 +325,19 @@ attrib_val_t
 	if (parendepth != 0) {
 		projent_add_errmsg(errlst, gettext(
 		    "\"%s\" <- \")\" missing"),
-		    ret, token); 
-		free(ret);
+		    usedtokens); 
+		error = 1;
+		goto out;
 	}
 
 	if (SIN2(prev, ",", "")) {
 		switch(at->att_val_type) {
 			case ATT_VAL_TYPE_NULL:
-				/* Wrong thing */
-				printf("Something WWERWERONG\n");
-				exit(15);
+				projent_add_errmsg(errlst, gettext(
+				    "\"%s\" unexpected"),
+				    usedtokens); 
+				error = 1;
+				goto out;
 			break;
 			case ATT_VAL_TYPE_VALUE:
 			case ATT_VAL_TYPE_LIST:
@@ -347,9 +346,20 @@ attrib_val_t
 		}
 	}
 
+out:
+	while (!lst_is_empty(&stk)) {
+                at = lst_at(&stk, 0);
+                lst_remove(&stk, at);
+        }
+
 	util_free_tokens(tokens);
 	free(tokens);
 	free(usedtokens);
+	if (error) {
+		attrib_val_free(ret);
+		free(ret);
+		ret = NULL;
+	}
 out1:
 	return (ret);
 }
@@ -378,13 +388,13 @@ attrib_t
 		nidx = atvalexp->re_nsub - 3;
 
 		if (vlen > 0) {
-			ret->att_name = util_substr( atvalexp, mat, att, nidx); 
+			ret->att_name = util_substr(atvalexp, mat, att, nidx); 
 			values = util_substr(atvalexp, mat, att, vidx);
 			ret->att_value = attrib_val_parse(values, errlst);
 			free(values);
 		} else {
 			/* the value is empty, just return att name */
-			ret->att_name = util_substr( atvalexp, mat, att, nidx); 
+			ret->att_name = util_substr(atvalexp, mat, att, nidx); 
 			ret->att_value = ATT_VAL_ALLOC_NULL();
 		}
 	} else {
@@ -399,19 +409,6 @@ attrib_t
 	 */
 
 
-	/**** DEBUG ***/
-/*	printf("\t ret = %x\n"
-	    "\tret->att_name = %s\n"
-	    "\tret->att_value = %s\n"
-	    "\tret->att_value->att_val_type = %d\n"
-	    "\tret->att_value->att_val_value = %s\n"
-	    "\tret->att_value->att_val_values = %s\n",
-	    ret, ret->att_name, ret->att_value,
-	    ret->att_value->att_val_type,
-	    ret->att_value->att_val_value,
-	    ret->att_value->att_val_values);
-*/
-	
 	free(mat);
 	return (ret);
 }
