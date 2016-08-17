@@ -51,10 +51,15 @@ typedef struct attrib_s {
 /*
  * Utility functions
  */
+
+#define	UTIL_STR_APPEND1(S, S1)		util_str_append((S), 1, (S1))
+#define	UTIL_STR_APPEND2(S, S1, S2)	util_str_append((S), 2, (S1), (S2))
+
 extern void *util_safe_malloc(size_t);
 extern char **util_tokenize(char *, list_t *);
 extern void util_free_tokens(char **);
 extern char *util_substr(regex_t *, regmatch_t *, char *, int);
+extern char *util_str_append(char *, int, ...);
 
 
 /*

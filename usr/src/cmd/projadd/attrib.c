@@ -19,33 +19,6 @@
 
 #include "projent.h"
 
-#define BOSTR_REG_EXP	"^"
-#define EOSTR_REG_EXP	"$"
-#define EQUAL_REG_EXP	"="
-#define STRNG_REG_EXP	".*"
-#define STRN0_REG_EXP	"(.*)"
-
-#define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
-#define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
-
-#define FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
-#define	MODIF_REG_EXP	"([kmgtpe])?"
-#define UNIT__REG_EXP	"([bs])?"
-
-#define TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
-
-#define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
-#define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
-#define VALUE_REG_EXP	FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
-
-#define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
-
-#define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
-#define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
-#define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
-#define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
-
-
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
 
@@ -55,16 +28,13 @@
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
 
 
-#define BYTES_SCALE	1
-#define SCNDS_SCALE	2
-
 
 char
 *attrib_val_tostring(attrib_val_t *val)
 {
 	char *ret = NULL;
 	char *vstring;
-	int i, len;
+	int i;
 	attrib_val_t *v;
 	switch(val->att_val_type) {
 		case ATT_VAL_TYPE_NULL:
@@ -74,57 +44,46 @@ char
 			return strdup(val->att_val_value);
 		break;
 		case ATT_VAL_TYPE_LIST:
-			ret = util_safe_malloc(3);
-			strcpy(ret, "(");
-			len = 3;
+			ret = UTIL_STR_APPEND1(ret, "(");
 			for (i = 0, v = lst_at(val->att_val_values, 0);
 			    v != NULL;
 			    i++, v = lst_at(val->att_val_values, i)) {
 				if (i > 0) {
-					len++;
-					ret = realloc(ret, len);
-					strcat(ret, ",");
+					ret = UTIL_STR_APPEND1(ret, ",");
 				}
-				vstring = attrib_val_tostring(v);
-				len += strlen(vstring);
-				ret = realloc(ret, len);
-				strcat(ret, vstring);
+				if ((vstring =
+				    attrib_val_tostring(v)) == NULL) {
+					free(ret);
+					ret = NULL;
+					goto out;
+				}
+				ret = UTIL_STR_APPEND1(ret, vstring);
 				free(vstring);
 			}
-			strcat(ret, ")");
+			ret = UTIL_STR_APPEND1(ret, ")");
 			return (ret);
 		break;
 	}
 
-
-	/**** should not reach here *****/
+out:
 	return (ret);
 }
 
 char
 *attrib_tostring(attrib_t *att)
 {
-	char *ret, *vstring;
-	int len;
+	char *ret = NULL, *vstring;
 
-	len = strlen(att->att_name) + 2;
-
-	ret = util_safe_malloc(len);
-	strlcpy(ret, att->att_name, len);
-
+	ret = UTIL_STR_APPEND1(ret, att->att_name);
 	if ((vstring = attrib_val_tostring(att->att_value)) != NULL) {
-		len += strlen(vstring) + 1;
-		if ((strlen(vstring) > 0) &&
-		    (ret = realloc(ret, len)) != NULL) {
-			strcat(strcat(ret, "="), vstring);
-			return (ret);
-		}
-
+		if (strlen(vstring) > 0)
+			ret = UTIL_STR_APPEND2(ret, "=", vstring);
 		free(vstring);
+		return (ret);
 	}
-
+	free(ret);
+	ret = NULL;
 	return (ret);
-
 }
 
 char
@@ -134,48 +93,24 @@ char
 	attrib_t *att;
 	char *ret = NULL;
 	char *str;
-	int len = 1;
 
-	/**** DEBUG ****/
-	printf("projent_attributes2string:\n"
-	     "attrs->numelements = %d\n",
-	     attrs->numelements);
-
+	ret = UTIL_STR_APPEND1(ret, "");
 	for (i = 0, att = lst_at(attrs, 0); att != NULL;
 	    i++, att = lst_at(attrs, i)) {
 
-
-
-		/**** DEBUG *****/
-		printf("\ti = %d\n", i);
-
-
-
 		if ((str = attrib_tostring(att)) != NULL) {
-			len += strlen(str);
+			if (i > 0)
+				ret = UTIL_STR_APPEND1(ret, ";");
 
-			if (ret == NULL) {
-				ret = util_safe_malloc(len);
-				*ret = '\0';
-			} else {
-				len++;	/* account for "," */
-				ret = realloc(ret, len);
-				strcat(ret, ";");
-			}
-
-			strcat(ret, str);
-			/**DEBUG****/
-			printf("\tstr = %s\n", str);
+			ret = UTIL_STR_APPEND1(ret, str);
 			free(str);
-		} else {
-			free(ret);
-			ret = NULL;
-			return (ret);
+			continue;
 		}
-	}
 
-	/*** DEBUG ***/
-	printf("\tret = %s\n", ret);
+		free(ret);
+		ret = NULL;
+		return (ret);
+	}
 	return (ret);
 }
 
@@ -300,23 +235,12 @@ attrib_val_t
 	at = ret;
 
 	lst_create(&stk);
-	usedtokens = util_safe_malloc(1);
-	*usedtokens = '\0';
+	usedtokens = UTIL_STR_APPEND1(usedtokens, "");
 
 
-	/**** DEBUG ****/
-	printf("projent_parse_attribute_values:\n");
-
-
-	/* walk the tokens list */
 	for (i = 0; (token = tokens[i]) != NULL; i++) {
 
-		usedtokens = realloc(usedtokens,
-		    strlen(usedtokens) + strlen(token) + 1);
-		strcat(usedtokens, token);
-
-		/**** DEBUG ****/
-		printf("\ntoken ===== %s\n", token);
+		usedtokens = UTIL_STR_APPEND1(usedtokens, token);
 
 		if (SEQU(token, ",")) {
 			if (SIN3(prev, "," , "(", "")) {

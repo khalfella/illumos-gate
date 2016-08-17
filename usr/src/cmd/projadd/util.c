@@ -56,6 +56,19 @@
 #define SCNDS_SCALE	2
 
 void *
+util_safe_realloc(void *ptr, size_t sz)
+{
+	if ((ptr = realloc(ptr, sz)) == NULL) {
+		(void) fprintf(stderr, gettext(
+		    "projadd: error reallocating %d bytes of memory"),
+		    sz);
+		exit(1);
+	}
+	return (ptr);
+}
+
+
+void *
 util_safe_malloc(size_t sz)
 {
  	char *ptr;
@@ -68,9 +81,40 @@ util_safe_malloc(size_t sz)
         return (ptr);
 }
 
+void *
+util_safe_zmalloc(size_t sz)
+{
+	return memset(util_safe_malloc(sz), 0, sz);
+}
+
 char *
-util_substr(regex_t *reg, regmatch_t *mat, char *str,
-    int idx)
+util_str_append(char *str, int nargs, ...)
+{
+	va_list ap;
+	int i, len;
+	char *s;
+
+	if (str == NULL) {
+		str = util_safe_zmalloc(1);
+	}
+
+	len = strlen(str) + 1;
+
+	va_start(ap, nargs);
+	for(i = 0; i < nargs; i++) {
+		s = va_arg(ap, char*);
+		len += strlen(s);
+		str = util_safe_realloc(str, len);
+		strcat(str, s);
+	}
+	va_end(ap);
+
+
+	return str;
+}
+
+char *
+util_substr(regex_t *reg, regmatch_t *mat, char *str, int idx)
 {
 	int mat_len;
 	char *ret;
