@@ -25,11 +25,6 @@ typedef struct errmsg {
 	list_node_t next;
 } errmsg_t;
 
-typedef struct rctl_info_s {
-	unsigned long long value;
-	int flags;
-} rctl_info_t;
-
 
 #define ATT_VAL_TYPE_NULL	0
 #define ATT_VAL_TYPE_VALUE	1
@@ -46,6 +41,25 @@ typedef struct attrib_s {
 	char *att_name;
 	attrib_val_t *att_value;
 } attrib_t;
+
+/*
+ * Resource controls section
+ */
+
+typedef struct rctl_info_s {
+	unsigned long long value;
+	int flags;
+} rctl_info_t;
+
+/*
+ * Utility functions
+ */
+
+#define	UTIL_STR_APPEND1(S, S1)		util_str_append((S), 1, (S1))
+#define	UTIL_STR_APPEND2(S, S1, S2)	util_str_append((S), 2, (S1), (S2))
+
+#define	BYTES_SCALE	1
+#define	SCNDS_SCALE	2
 
 
 /*
