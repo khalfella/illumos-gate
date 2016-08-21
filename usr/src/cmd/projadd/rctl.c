@@ -17,83 +17,13 @@
 
 #include <ctype.h>
 
+/*
 #include "projent.h"
+*/
 
-#define BOSTR_REG_EXP	"^"
-#define EOSTR_REG_EXP	"$"
-#define EQUAL_REG_EXP	"="
-#define STRNG_REG_EXP	".*"
-#define STRN0_REG_EXP	"(.*)"
+#include "util.h"
+#include "rctl.h"
 
-#define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
-#define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
-
-#define FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
-#define	MODIF_REG_EXP	"([kmgtpe])?"
-#define UNIT__REG_EXP	"([bs])?"
-
-#define TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
-
-#define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
-#define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
-#define VALUE_REG_EXP	FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
-
-#define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
-
-#define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
-#define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
-#define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
-#define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
-
-
-#define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
-
-
-#define SEQUAL(X,Y)	(strcmp((X), (Y)) == 0)
-
-
-#define BYTES_SCALE	1
-#define SCNDS_SCALE	2
-
-#define	RCTL_TYPE_UNKWN	0x00
-#define	RCTL_TYPE_BYTES	0x01
-#define	RCTL_TYPE_SCNDS	0x02
-#define	RCTL_TYPE_COUNT	0x03
-
-#define	RCTL_PRIV_PRIV	0x01
-#define	RCTL_PRIV_PRIVD	0x02
-#define	RCTL_PRIV_BASIC	0x04
-#define	RCTL_PRIV_ALL	0x07
-
-#define RCTL_ACTN_NONE	0x01
-#define RCTL_ACTN_DENY	0x02
-#define RCTL_ACTN_SIG	0x04
-#define RCTL_ACTN_ALL	0x07
-
-#define	RCTL_SIG_ABRT	0x01
-#define	RCTL_SIG_XRES	0x02
-#define	RCTL_SIG_HUP	0x04
-#define	RCTL_SIG_STOP	0x08
-#define	RCTL_SIG_TERM	0x10
-#define	RCTL_SIG_KILL	0x20
-#define	RCTL_SIG_XFSZ	0x40
-#define	RCTL_SIG_XCPU	0x80
-
-#define	RCTL_SIG_CMN	0x3f
-#define	RCTL_SIG_ALL	0xff
-
-typedef struct sig_s {
-	char	sig[6];
-	int	mask;
-} sig_t;
-
-typedef struct rctlrule_s {
-	uint64_t rtcl_max;
-	uint8_t  rtcl_type;
-	uint8_t  rctl_privs;
-	uint8_t  rctl_action;
-	uint8_t  rctl_sigs;
-} rctlrule_t;
 
 
 #define SIGS_CNT	16

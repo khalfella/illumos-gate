@@ -18,6 +18,10 @@
 #include <ctype.h>
 
 #include "projent.h"
+#include "attrib.h"
+
+#include "util.h"
+
 
 #define BOSTR_REG_EXP	"^"
 #define EOSTR_REG_EXP	"$"
@@ -117,7 +121,7 @@ projent_validate_usrgrp(char *usrgrp, char *name, list_t *errlst)
 		name++;
 
 	if (*name != '\0') {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid %s \"%s\": should not contain '%c'"),
 		    usrgrp, sname, *name);
 		return (1);
@@ -163,7 +167,7 @@ projent_parse_comment(char *comment, list_t *errlst)
 	char *cmt = comment;
 	while (*cmt) {
 		if (*cmt++ == ':') {
-			projent_add_errmsg(errlst, gettext(
+			util_add_errmsg(errlst, gettext(
 			    "Invalid Comment \"%s\": should not contain ':'"),
 			    comment);
 		}
@@ -179,7 +183,7 @@ projent_validate_unique_id(list_t *plist, projid_t projid,list_t *errlst)
 	for (ent = list_head(plist); ent != NULL;
 	    ent = list_next(plist, ent)) {
 		if (ent->projid == projid) {
-			projent_add_errmsg(errlst, gettext(
+			util_add_errmsg(errlst, gettext(
 			    "Duplicate projid \"%d\""), projid);
 			return (1);
 		}
@@ -190,7 +194,7 @@ int
 projent_validate_projid(projid_t projid, list_t *errlst)
 {
 	if (projid < 0) {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid projid \"%d\": "
 		    "must be >= 100"),
 		    projid);
@@ -208,14 +212,14 @@ projent_parse_projid(char *projidstr, projid_t *pprojid, list_t *errlst)
 
 	/* projid should be a positive number */
 	if (errno == EINVAL || errno == ERANGE || *ptr != '\0' ) {
-		projent_add_errmsg(errlst, gettext("Invalid project id:  %s"),
+		util_add_errmsg(errlst, gettext("Invalid project id:  %s"),
 		    projidstr);
 		return (1);
 	}
 
 	/* projid should be less than UID_MAX */
 	if (*pprojid > INT_MAX) {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid projid \"%s\": must be <= %d"), projidstr, INT_MAX);
 		return (1);
 	}
@@ -229,7 +233,7 @@ projent_validate_unique_name(list_t *plist, char *pname, list_t *errlst)
 	for (ent = list_head(plist); ent != NULL;
 	    ent = list_next(plist, ent)) {
 		if (strcmp(ent->projname, pname) == 0) {
-			projent_add_errmsg(errlst, gettext(
+			util_add_errmsg(errlst, gettext(
 			    "Duplicate project name \"%s\""), pname);
 			return (1);
 		}
@@ -249,7 +253,7 @@ projent_parse_name(char *pname, list_t *errlst)
 		}
 	} else if (*pname == '\0') {
 		/* Empty project names are not allowed */
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid project name \"%s\", "
 		    "empty project name"), name);
 		return (1);
@@ -257,14 +261,14 @@ projent_parse_name(char *pname, list_t *errlst)
 
 	/* An invalid character was detected */
 	if (*pname != '\0') {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid project name \"%s\", "
 		    "contains invalid characters"), name);
 		return (1);
 	}
 
 	if (strlen(name) > PROJNAME_MAX) {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid project name \"%s\", "
 		    "name too long"), name);
 		return (1);
@@ -272,26 +276,6 @@ projent_parse_name(char *pname, list_t *errlst)
 
 	return (0);
 }
-
-void projent_add_errmsg(list_t *errmsgs, char *format, ...)
-{
-	va_list args;
-	char *errstr;
-	errmsg_t *msg;
-
-	if (errmsgs == NULL || format == NULL)
-		return;
-
-	va_start(args, format);
-	vasprintf(&errstr, format, args);
-	va_end(args);
-
-	msg = util_safe_malloc(sizeof(errmsg_t));
-	msg->msg = errstr;
-	list_link_init(&msg->next);
-	list_insert_tail(errmsgs, msg);
-	va_end(args);
-} 
 
 void projent_print_errmsgs(list_t *errmsgs)
 {
@@ -375,7 +359,7 @@ list_t
 			return (ret);
 		} else {
 			/* Report the error unable to open the file */
-			projent_add_errmsg(perrlst,
+			util_add_errmsg(perrlst,
 			    gettext("Cannot open %s: %s"),
 			    projfile, strerror(errno));
 
@@ -396,7 +380,7 @@ list_t
 			list_insert_tail(ret, ent);
 		} else {
 			/* Report the error */
-			projent_add_errmsg(perrlst,
+			util_add_errmsg(perrlst,
 			    gettext("Error parsing: %s line: %d: \"%s\""),
 			    projfile, line, ptr);
 
@@ -413,4 +397,12 @@ list_t
 	free(buf);
 	fclose(fp);
 	return (ret);
+}
+
+
+
+char
+*projent_attrib_lst_tostring(lst_t *lst)
+{
+	return (attrib_lst_tostring(lst));
 }

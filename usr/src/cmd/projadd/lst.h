@@ -1,4 +1,15 @@
-#include <stdlib.h>
+#ifndef _PROJENT_LST_H
+#define _PROJENT_LST_H
+
+
+/*
+ * #include <stdlib.h>
+ */
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 
 
 struct lst_s;
@@ -22,3 +33,10 @@ int lst_insert_tail(lst_t *, void *);
 
 int lst_remove(lst_t *, void *);
 void *lst_at(lst_t *, int);
+
+
+
+#ifdef  __cplusplus
+}
+#endif
+#endif /* _PROJENT_LST_H */

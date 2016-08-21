@@ -8,16 +8,12 @@
 #include <locale.h>
 #include <stddef.h>
 #include <limits.h>
-
 #include <rctl.h>
-
-
 #include <regex.h>
-
-
 #include <ctype.h>
 
-#include "projent.h"
+#include "attrib.h"
+#include "util.h"
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
@@ -261,7 +257,7 @@ attrib_val_t
 			prev = ",";
 		} else if (SEQU(token, "(")) {
 			if (!(SIN3(prev, "(", ",", ""))) {
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "\"%s\" <- \"(\" unexpected"), usedtokens); 
 				error = 1;
 				goto out;
@@ -269,7 +265,7 @@ attrib_val_t
 
 			switch(at->att_val_type) {
 				case ATT_VAL_TYPE_VALUE:
-					projent_add_errmsg(errlst, gettext(
+					util_add_errmsg(errlst, gettext(
 					    "\"%s\" <- \"%s\" unexpected"),
 					    usedtokens, token); 
 					error = 1;
@@ -293,7 +289,7 @@ attrib_val_t
 			prev = "(";
 		} else if (SEQU(token, ")")) {
 			if (parendepth <= 0) {
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "\"%s\" <- \")\" unexpected"), usedtokens); 
 				error = 1;
 				goto out;
@@ -310,7 +306,7 @@ attrib_val_t
 			prev = ")";
 		} else {
 			if (!(SIN3(prev, ",", "(", ""))) {
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "\"%s\" <- \"%s\" unexpected"),
 				    usedtokens, token); 
 				error = 1;
@@ -323,7 +319,7 @@ attrib_val_t
 	}
 
 	if (parendepth != 0) {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "\"%s\" <- \")\" missing"),
 		    usedtokens); 
 		error = 1;
@@ -333,7 +329,7 @@ attrib_val_t
 	if (SIN2(prev, ",", "")) {
 		switch(at->att_val_type) {
 			case ATT_VAL_TYPE_NULL:
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "\"%s\" unexpected"),
 				    usedtokens); 
 				error = 1;
@@ -396,7 +392,7 @@ attrib_t
 			ret->att_value = attrib_val_parse(values, errlst);
 			free(values);
 			if (ret->att_value == NULL) {
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "Invalid value on attribute \"%s\""),
 				    ret->att_name);
 				attrib_free(ret);
@@ -409,7 +405,7 @@ attrib_t
 			ret->att_value = ATT_VAL_ALLOC_NULL();
 		}
 	} else {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid attribute \"%s\""), att);
 		goto out;
 	}
@@ -422,13 +418,12 @@ attrib_t
 			ret->att_value = ATT_VAL_ALLOC_VALUE(num);
 			free(mod);
 			free(unit);
+		} else {
+			attrib_free(ret);
+			free(ret);
+			ret = NULL;
 		}
 	}
-
-	/*
-	 * 1- Handle the case of rcap.max-rss
-	 * 2- Handle resource controls caeses
-	 */
 
 out:
 	free(mat);

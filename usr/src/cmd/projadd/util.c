@@ -9,15 +9,16 @@
 #include <stddef.h>
 #include <limits.h>
 
-#include <rctl.h>
+#include "util.h"
 
 
-#include <regex.h>
+
 
 
 #include <ctype.h>
 
-#include "projent.h"
+
+
 
 #define BOSTR_REG_EXP	"^"
 #define EOSTR_REG_EXP	"$"
@@ -45,8 +46,6 @@
 #define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
 #define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
 
-
-#define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
 
 #define SEQUAL(X,Y)	(strcmp((X), (Y)) == 0)
@@ -86,6 +85,28 @@ util_safe_zmalloc(size_t sz)
 {
 	return memset(util_safe_malloc(sz), 0, sz);
 }
+
+void
+util_add_errmsg(list_t *errmsgs, char *format, ...)
+{
+	va_list args;
+	char *errstr;
+	errmsg_t *msg;
+
+	if (errmsgs == NULL || format == NULL)
+		return;
+
+	va_start(args, format);
+	vasprintf(&errstr, format, args);
+	va_end(args);
+
+	msg = util_safe_malloc(sizeof(errmsg_t));
+	msg->msg = errstr;
+	list_link_init(&msg->next);
+	list_insert_tail(errmsgs, msg);
+}
+
+
 
 char *
 util_str_append(char *str, int nargs, ...)
@@ -159,7 +180,7 @@ util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 				*res = 1ULL;
 				break;
 			default:
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "Invalid unit: \"%s\""), unit);
 				return (1);
 		}
@@ -191,7 +212,7 @@ util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 				*res = 1ULL;
 				break;
 			default:
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "Invalid unit: \"%s\""), unit);
 				return (1);
 		}
@@ -199,7 +220,7 @@ util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 	}
 
 	
-	projent_add_errmsg(errlst, gettext(
+	util_add_errmsg(errlst, gettext(
 	    "Invalid scale: %d"), scale);
 
 	return (1);	
@@ -224,7 +245,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 	*retnum = *retmod = *retunit = NULL;
 
 	if (regcomp(&valueexp, VALUE_EXP, REG_EXTENDED) != 0) {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Failed to compile regex: '%s'"), VALUE_EXP);
 		goto out1;
 	}
@@ -233,7 +254,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 	mat = util_safe_malloc(nmatch * sizeof(regmatch_t));
 
 	if (regexec(&valueexp, value, nmatch, mat, 0) != 0) {
-		projent_add_errmsg(errlst, gettext(
+		util_add_errmsg(errlst, gettext(
 		    "Invalid value: '%s'"), value);
 		goto out2;
 	}
@@ -248,7 +269,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 	    (util_scale(modifier, scale, &mul64, errlst) != 0) ||
 	    (scale == BYTES_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "b")) ||
 	    (scale == SCNDS_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "s"))) {
-		projent_add_errmsg(errlst, gettext( "Error near: \"%s\""),
+		util_add_errmsg(errlst, gettext( "Error near: \"%s\""),
 		    value);
 		free(num);
 		free(modifier);
@@ -258,7 +279,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 
 	dnum = strtold(num, &ptr);
 	if (errno == EINVAL || errno == ERANGE || *ptr != '\0' ) {
-		projent_add_errmsg(errlst, gettext("Invalid value:  \"%s\""),
+		util_add_errmsg(errlst, gettext("Invalid value:  \"%s\""),
 		    value);
 		free(num);
 		free(modifier);
@@ -269,7 +290,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 
 
 	if (UINT64_MAX / mul64 <= dnum) {
-		projent_add_errmsg(errlst, gettext("Too big value:  \"%s\""),
+		util_add_errmsg(errlst, gettext("Too big value:  \"%s\""),
 		    value);
 		free(num);
 		free(modifier);
@@ -334,7 +355,7 @@ util_tokenize(char *values, list_t *errlst)
 		if (strcmp(token, "(") != 0 && strcmp(token, ")") != 0 &&
 		    strcmp(token, ",") != 0 ) {
 			if (regexec(&tokenexp, token, 0, NULL, 0) != 0) {
-				projent_add_errmsg(errlst, gettext(
+				util_add_errmsg(errlst, gettext(
 				    "Invalid Character at or near \"%s\""),
 				    token); 
 				util_free_tokens(tokens);

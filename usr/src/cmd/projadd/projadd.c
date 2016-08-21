@@ -31,11 +31,8 @@
 
 #include <sys/types.h>
 
-
-
-
-
 #include "projent.h"
+#include "util.h"
 
 
 
@@ -138,7 +135,7 @@ main(int argc, char **argv)
 				attrslist = optarg;
 				break;
 			default:
-				projent_add_errmsg(&errlst, gettext(
+				util_add_errmsg(&errlst, gettext(
 				    "Invalid option: -%c"), optopt);
 				break;
 		}
@@ -146,12 +143,12 @@ main(int argc, char **argv)
 
 
 	if (g_oflag && !g_pflag) {
-		projent_add_errmsg(&errlst, gettext(
+		util_add_errmsg(&errlst, gettext(
 		    "-o requires -p projid to be specified"));
 	}
 
 	if (optind != argc -1) {
-		projent_add_errmsg(&errlst, gettext(
+		util_add_errmsg(&errlst, gettext(
 		    "No project name specified"));
 	}
 
@@ -217,7 +214,7 @@ main(int argc, char **argv)
 	if (groups)
 		printf("groups = \"%s\"\n", groups);
 	if (attrs) {
-		char *str = attrib_lst_tostring(attrs);
+		char *str = projent_attrib_lst_tostring(attrs);
 		if (str) {
 			printf("attrs = \"%s\"\n", str);
 			free(str);
