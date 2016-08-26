@@ -33,6 +33,8 @@ int lst_insert_tail(lst_t *, void *);
 
 int lst_remove(lst_t *, void *);
 void *lst_at(lst_t *, int);
+void *lst_replace_at(lst_t *, int, void *);
+uint32_t lst_numelements(lst_t *);
 
 
 

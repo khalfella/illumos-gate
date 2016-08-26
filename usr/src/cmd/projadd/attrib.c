@@ -13,6 +13,7 @@
 #include <ctype.h>
 
 #include "attrib.h"
+#include "rctl.h"
 #include "util.h"
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
@@ -366,13 +367,20 @@ attrib_t
 {
 	int nmatch = MAX_OF(attrbexp->re_nsub, atvalexp->re_nsub) + 1;
 	attrib_t *ret = NULL;
+	attrib_val_t *retv, *atv, *atvl;
 	char *values = NULL;
 	int vstart, vend, vlen;
 	int nstart, nend, nlen;
 	int retlen;
 	int vidx, nidx;
+	int scale;
 
 	char *num, *mod, *unit;
+	int i;
+
+
+	rctl_info_t rinfo;
+	rctlrule_t rrule;
 
 	regmatch_t *mat = util_safe_malloc(nmatch * sizeof(regmatch_t));
 	ret = ATT_ALLOC();
@@ -422,6 +430,64 @@ attrib_t
 			attrib_free(ret);
 			free(ret);
 			ret = NULL;
+			goto out;
+		}
+		free(values);
+	}
+
+	if (rctl_get_info(ret->att_name, &rinfo) == 0) {
+		rctl_get_rule(&rinfo, &rrule);
+		retv = ret->att_value;
+
+		/*
+		 * Handle the case of RCTL_TYPE_SCNDS
+		 * and RCTL_TYPE_BYTES only
+		 */
+		if (!(rrule.rtcl_type == RCTL_TYPE_SCNDS ||
+		    rrule.rtcl_type == RCTL_TYPE_BYTES))
+			goto out;
+
+		scale = (rrule.rtcl_type == RCTL_TYPE_SCNDS)?
+		    SCNDS_SCALE : BYTES_SCALE;
+
+		if (retv->att_val_type != ATT_VAL_TYPE_LIST)
+			goto out;
+
+		/*
+		 * More work need to be done to handle these cases
+		 */
+
+		for (i = 0; i < lst_numelements(retv->att_val_values); i++) {
+			atvl = atv = lst_at(retv->att_val_values, i);
+
+			/*
+			 * Continue if not a list and the second value
+			 * is not a scaler value
+			 */
+			if (atv->att_val_type != ATT_VAL_TYPE_LIST ||
+			    lst_numelements(atv->att_val_values) < 2 ||
+			    (atv = lst_at(atv->att_val_values, 1)) == NULL ||
+			    atv->att_val_type != ATT_VAL_TYPE_VALUE) {
+				continue;
+			}
+			values = attrib_val_tostring(atv);
+			if (util_val2num(values, scale, errlst,
+			    &num, &mod, &unit) == 0) {
+
+				attrib_val_free(atv);
+				atv = ATT_VAL_ALLOC_VALUE(num);
+				lst_replace_at(atvl->att_val_values, 1, atv);
+				free(mod);
+				free(unit);
+
+			} else {
+				free(values);
+				attrib_free(ret);
+				free(ret);
+				ret = NULL;
+				goto out;
+			}
+			free(values);
 		}
 	}
 

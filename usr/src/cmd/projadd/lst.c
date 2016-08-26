@@ -113,3 +113,35 @@ void
 	/* Should not reach here */
 	return (NULL);
 }
+
+void
+*lst_replace_at(lst_t *plst, int idx, void *ndata)
+{
+	int cnt = 0;
+	lst_node_t *node;
+	void *odata;
+
+	if ((idx < 0) || (idx >= plst->numelements))
+		return (NULL);
+
+	for (node = plst->head;
+	    (node != NULL) && (cnt < plst->numelements);
+	    node = node->next, cnt++) {
+		if (cnt == idx) {
+			odata = node->data;
+			node->data = ndata;
+			return (odata);
+		}
+	}
+
+	/* Should not reach here unless the elemetn doesn't exist */
+	return (NULL);
+}
+
+uint32_t
+lst_numelements(lst_t *plst)
+{
+	return (plst->numelements);
+}
+
+

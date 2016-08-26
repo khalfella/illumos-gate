@@ -93,51 +93,47 @@ out:
 	return (1);
 }
 
-rctlrule_t
-*rctl_get_rule(rctl_info_t *pinfo)
+void
+rctl_get_rule(rctl_info_t *pinfo, rctlrule_t* prule)
 {
-	rctlrule_t *ret;
 
-	ret = util_safe_malloc(sizeof(rctlrule_t));
-
-	ret->rtcl_max = pinfo->value;
+	prule->rtcl_max = pinfo->value;
 	if (pinfo->flags & RCTL_GLOBAL_BYTES) {
-		ret->rtcl_type = RCTL_TYPE_BYTES;
+		prule->rtcl_type = RCTL_TYPE_BYTES;
 	} else if (pinfo->flags & RCTL_GLOBAL_SECONDS) {
-		ret->rtcl_type = RCTL_TYPE_SCNDS;
+		prule->rtcl_type = RCTL_TYPE_SCNDS;
 	} else if (pinfo->flags & RCTL_GLOBAL_COUNT) {
-		ret->rtcl_type = RCTL_TYPE_COUNT;
+		prule->rtcl_type = RCTL_TYPE_COUNT;
 	} else {
-		ret->rtcl_type = RCTL_TYPE_UNKWN;
+		prule->rtcl_type = RCTL_TYPE_UNKWN;
 	}
 
 
 	if (pinfo->flags & RCTL_GLOBAL_NOBASIC) {
-		ret->rctl_privs = RCTL_PRIV_PRIV | RCTL_PRIV_PRIVD;
+		prule->rctl_privs = RCTL_PRIV_PRIV | RCTL_PRIV_PRIVD;
 	} else {
-		ret->rctl_privs = RCTL_PRIV_ALL;
+		prule->rctl_privs = RCTL_PRIV_ALL;
 	}
 
 	if (pinfo->flags & RCTL_GLOBAL_DENY_ALWAYS) {
-		ret->rctl_action = RCTL_ACTN_DENY;
+		prule->rctl_action = RCTL_ACTN_DENY;
 	} else if (pinfo->flags & RCTL_GLOBAL_DENY_NEVER) {
-		ret->rctl_action = RCTL_ACTN_NONE;
+		prule->rctl_action = RCTL_ACTN_NONE;
 	} else {
-		ret->rctl_action = RCTL_ACTN_NONE | RCTL_ACTN_DENY;
+		prule->rctl_action = RCTL_ACTN_NONE | RCTL_ACTN_DENY;
 	}
 
 	if (pinfo->flags & RCTL_GLOBAL_SIGNAL_NEVER) {
-		ret->rctl_sigs = 0;
+		prule->rctl_sigs = 0;
 	} else {
-		ret->rctl_action |= RCTL_ACTN_SIG;
-		ret->rctl_sigs = RCTL_SIG_CMN;
+		prule->rctl_action |= RCTL_ACTN_SIG;
+		prule->rctl_sigs = RCTL_SIG_CMN;
 		if (pinfo->flags & RCTL_GLOBAL_CPU_TIME) {
-			ret->rctl_sigs |= RCTL_SIG_XCPU;
+			prule->rctl_sigs |= RCTL_SIG_XCPU;
 		}
 		if (pinfo->flags & RCTL_GLOBAL_FILE_SIZE) {
-			ret->rctl_sigs |= RCTL_SIG_XFSZ;
+			prule->rctl_sigs |= RCTL_SIG_XFSZ;
 		}
 	}
 
-	return (ret);
 }
