@@ -68,6 +68,7 @@ rctl_get_info(char *name, rctl_info_t *pinfo)
 	blk1 = blk2 = tmp = NULL;
 	blk1 = util_safe_malloc(rctlblk_size());
 	blk2 = util_safe_malloc(rctlblk_size());
+	int ret = 1;
 
 	if (getrctl(name, NULL, blk1, RCTL_FIRST) == 0) {
 		priv = rctlblk_get_privilege(blk1);
@@ -84,13 +85,13 @@ rctl_get_info(char *name, rctl_info_t *pinfo)
 
 		pinfo->value = rctlblk_get_value(blk1);
 		pinfo->flags = rctlblk_get_global_flags(blk1);
-		return (0);
+		ret = 0;
 	}
 
 out:
 	free(blk1);
 	free(blk2);
-	return (1);
+	return (ret);
 }
 
 void
