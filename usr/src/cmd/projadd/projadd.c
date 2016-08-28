@@ -191,8 +191,10 @@ main(int argc, char **argv)
 		users =  projent_parse_usrgrp("user",userslist, &errlst);
 	if (g_Gflag)
 		groups =  projent_parse_usrgrp("group", groupslist, &errlst);
-	if (g_Kflag)
+	if (g_Kflag) {
 		attrs = projent_parse_attributes(attrslist, &errlst);
+		projent_sort_attributes(attrs);
+	}
 
 /* for testing */
 	if (!list_is_empty(&errlst)) {

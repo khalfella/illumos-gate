@@ -59,6 +59,11 @@
 #define BYTES_SCALE	1
 #define SCNDS_SCALE	2
 
+void
+projent_sort_attributes(lst_t *attribs)
+{
+	attrib_sort_lst(attribs);
+}
 
 lst_t
 *projent_parse_attributes(char *attribs, list_t *errlst)
@@ -299,6 +304,16 @@ projent_print_ent(projent_t *ent)
 	if (ent->attr) printf("attr = %s\n", ent->attr);
 }
 
+void
+projent_free(projent_t *ent)
+{
+	free(ent->projname);
+	free(ent->comment);
+	free(ent->userlist);
+	free(ent->grouplist);
+	free(ent->attr);
+}
+
 projent_t
 *projent_parse(char *str) {
 	char *s1;
@@ -306,20 +321,21 @@ projent_t
 	if (str == NULL)
 		return (NULL);
 
-	projent_t *ent = util_safe_malloc(sizeof(projent_t));
+	projent_t *ent = util_safe_zmalloc(sizeof(projent_t));
 	list_link_init(&ent->next);
 
-	if ((ent->projname = strsep(&str, ":")) != NULL &&
+	if ((ent->projname = strdup(strsep(&str, ":"))) != NULL &&
 	    (s1 = strsep(&str, ":")) != NULL &&
 	    ((ent->projid = atoi(s1)) != 0 || errno != EINVAL) &&
-	    (ent->comment = strsep(&str, ":")) != NULL &&
-	    (ent->userlist = strsep(&str, ":")) != NULL &&
-	    (ent->grouplist = strsep(&str, ":")) != NULL &&
-	    (ent->attr = strsep(&str, ":")) != NULL &&
+	    (ent->comment = strdup(strsep(&str, ":"))) != NULL &&
+	    (ent->userlist = strdup(strsep(&str, ":"))) != NULL &&
+	    (ent->grouplist = strdup(strsep(&str, ":"))) != NULL &&
+	    (ent->attr = strdup(strsep(&str, ":"))) != NULL &&
 	    strsep(&str, ":") == NULL) {
 		return (ent);
 	}
 
+	projent_free(ent);
 	free(ent);
 	return (NULL);
 }
@@ -330,7 +346,7 @@ projent_free_list(list_t *plist) {
 	projent_t *ent;
 	while ((ent = list_head(plist)) != NULL) {
 		list_remove(plist, ent);
-		free(ent->projname);
+		projent_free(ent);
 		free(ent);
 	}
 }

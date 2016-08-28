@@ -166,6 +166,28 @@ attrib_free_lst(lst_t *attribs)
 	}
 }
 
+void
+attrib_sort_lst(lst_t *attribs)
+{
+	int i, j, n;
+	attrib_t *atti, *attj, *att;
+
+	if (attribs == NULL)
+		return;
+
+	n = lst_numelements(attribs);
+	for (i = 0; i < n - 1; i++) {
+		for (j = i + 1; j < n; j++) {
+			atti = lst_at(attribs, i);
+			attj = lst_at(attribs, j);
+			if (strcmp(attj->att_name, atti->att_name) < 0) {
+				lst_replace_at(attribs, i, attj);
+				lst_replace_at(attribs, j, atti);
+			}
+		}
+	}
+}
+
 int
 attrib_val_to_list(attrib_val_t *atv)
 {
