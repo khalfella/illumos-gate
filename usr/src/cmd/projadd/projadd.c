@@ -166,15 +166,6 @@ main(int argc, char **argv)
 	if (projent_parse_name(pname, &errlst) == 0 && !g_nflag)
 	    projent_validate_unique_name(plist, pname, &errlst);
 
-	if (plist != NULL) {
-		for(ent = list_head(plist); ent != NULL;
-		    ent = list_next(plist, ent)) {
-			maxpjid = (ent->projid > maxpjid) ?
-			    ent->projid : maxpjid;
-			projent_print_ent(ent);
-		}
-	}
-
 	if (g_pflag && projent_parse_projid(projidstr, &projid, &errlst) == 0) {
 		if (!g_nflag) {
 			projent_validate_projid(projid, &errlst);
@@ -185,6 +176,17 @@ main(int argc, char **argv)
 		}
 
 	}
+
+	/* debugging code shoudl be removed eventually */
+	if (plist != NULL) {
+		for(ent = list_head(plist); ent != NULL;
+		    ent = list_next(plist, ent)) {
+			maxpjid = (ent->projid > maxpjid) ?
+			    ent->projid : maxpjid;
+			projent_print_ent(ent);
+		}
+	}
+
 	if (g_cflag)
 		(void) projent_parse_comment(comment, &errlst);
 	if (g_Uflag)

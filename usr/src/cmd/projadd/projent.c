@@ -226,7 +226,8 @@ projent_parse_projid(char *projidstr, projid_t *pprojid, list_t *errlst)
 	/* projid should be less than UID_MAX */
 	if (*pprojid > INT_MAX) {
 		util_add_errmsg(errlst, gettext(
-		    "Invalid projid \"%s\": must be <= %d"), projidstr, INT_MAX);
+		    "Invalid projid \"%s\": must be <= %d"),
+		    projidstr, INT_MAX);
 		return (1);
 	}
 	return (0);
@@ -245,7 +246,6 @@ projent_validate_unique_name(list_t *plist, char *pname, list_t *errlst)
 		}
 	}
 	return (0);
-		
 }
 
 int
