@@ -315,11 +315,13 @@ projent_free(projent_t *ent)
 }
 
 projent_t
-*projent_parse(char *str) {
-	char *s1;
+*projent_parse(char *projstr) {
+	char *s1, *str;
 
-	if (str == NULL)
+	if (projstr == NULL)
 		return (NULL);
+
+	str = strdup(projstr);
 
 	projent_t *ent = util_safe_zmalloc(sizeof(projent_t));
 	list_link_init(&ent->next);
@@ -332,12 +334,15 @@ projent_t
 	    (ent->grouplist = strdup(strsep(&str, ":"))) != NULL &&
 	    (ent->attr = strdup(strsep(&str, ":"))) != NULL &&
 	    strsep(&str, ":") == NULL) {
-		return (ent);
+		goto done;
 	}
 
+	free(str);
 	projent_free(ent);
 	free(ent);
-	return (NULL);
+	ent = NULL;
+done:
+	return (ent);
 }
 
 
@@ -359,7 +364,7 @@ list_t
 	FILE *fp;
 	list_t *ret;
 	int read, line = 0;
-	char *buf = NULL, *ptr, *nlp;
+	char *buf = NULL, *nlp;
 	size_t cap = 0;
 	projent_t *ent;
 
@@ -388,23 +393,21 @@ list_t
 
 	while((getline(&buf, &cap, fp)) != -1 && ++line) {
 
-		ptr = strdup(buf);	
-		if ((nlp = strchr(ptr, '\n')) != NULL)
+		if ((nlp = strchr(buf, '\n')) != NULL)
 			*nlp = '\0';
 
-		if ((ent = projent_parse(ptr)) != NULL) {
+		if ((ent = projent_parse(buf)) != NULL) {
 			list_insert_tail(ret, ent);
 		} else {
 			/* Report the error */
 			util_add_errmsg(perrlst,
 			    gettext("Error parsing: %s line: %d: \"%s\""),
-			    projfile, line, ptr);
+			    projfile, line, buf);
 
 			/* free the allocated resources */
 			projent_free_list(ret);
 			list_destroy(ret);
 			free(ret);
-			free(ptr);
 			ret = NULL;
 			break;
 		}
