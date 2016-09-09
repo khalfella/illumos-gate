@@ -48,6 +48,7 @@
 #define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
 #define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
 #define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
+#define PROJN_EXP	TO_EXP(IDENT_REG_EXP)
 
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
@@ -250,36 +251,30 @@ projent_validate_unique_name(list_t *plist, char *pname, list_t *errlst)
 int
 projent_parse_name(char *pname, list_t *errlst)
 {
-	char *name = pname;
-	if (isupper(*pname) || islower(*pname)) {
-		while (isupper(*pname) || islower(*pname) ||
-		    isdigit(*pname) || *pname == '.' || *pname == '-') {
-			pname++;
-		}
-	} else if (*pname == '\0') {
-		/* Empty project names are not allowed */
+	int ret = 1;
+	regex_t projnexp;
+	if (regcomp(&projnexp, PROJN_EXP, REG_EXTENDED) != 0) {
 		util_add_errmsg(errlst, gettext(
-		    "Invalid project name \"%s\", "
-		    "empty project name"), name);
-		return (1);
+		    "Failed to compile regular expression: \"%s\""),
+		    PROJN_EXP);
+		goto out;
 	}
 
-	/* An invalid character was detected */
-	if (*pname != '\0') {
+	if (regexec(&projnexp, pname, 0, NULL, 0) != 0) {
 		util_add_errmsg(errlst, gettext(
 		    "Invalid project name \"%s\", "
-		    "contains invalid characters"), name);
-		return (1);
-	}
-
-	if (strlen(name) > PROJNAME_MAX) {
+		    "contains invalid characters"), pname);
+	} else if (strlen(pname) > PROJNAME_MAX) {
 		util_add_errmsg(errlst, gettext(
 		    "Invalid project name \"%s\", "
-		    "name too long"), name);
-		return (1);
+		    "name too long"), pname);
+	} else {
+		ret = 0;
 	}
 
-	return (0);
+	regfree(&projnexp);
+out:
+	return (ret);
 }
 
 void projent_print_errmsgs(list_t *errmsgs)
