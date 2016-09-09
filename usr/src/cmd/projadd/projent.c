@@ -170,16 +170,14 @@ projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 int
 projent_parse_comment(char *comment, list_t *errlst)
 {
-	char *cmt = comment;
-	while (*cmt) {
-		if (*cmt++ == ':') {
-			util_add_errmsg(errlst, gettext(
-			    "Invalid Comment \"%s\": should not contain ':'"),
-			    comment);
-		}
-	
+	int ret = 0;
+	if (strchr(comment, ':') != NULL) {
+		util_add_errmsg(errlst, gettext(
+		    "Invalid Comment \"%s\": should not contain ':'"),
+		    comment);
+		ret = 1;
 	}
-	return (0);
+	return (ret);
 }
 
 int

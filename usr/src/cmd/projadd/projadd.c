@@ -177,15 +177,6 @@ main(int argc, char **argv)
 
 	}
 
-	/* debugging code shoudl be removed eventually */
-	if (plist != NULL) {
-		for(ent = list_head(plist); ent != NULL;
-		    ent = list_next(plist, ent)) {
-			maxpjid = (ent->projid > maxpjid) ?
-			    ent->projid : maxpjid;
-			projent_print_ent(ent);
-		}
-	}
 
 	if (g_cflag)
 		(void) projent_parse_comment(comment, &errlst);
@@ -196,6 +187,16 @@ main(int argc, char **argv)
 	if (g_Kflag) {
 		attrs = projent_parse_attributes(attrslist, &errlst);
 		projent_sort_attributes(attrs);
+	}
+
+	/* debugging code shoudl be removed eventually */
+	if (plist != NULL) {
+		for(ent = list_head(plist); ent != NULL;
+		    ent = list_next(plist, ent)) {
+			maxpjid = (ent->projid > maxpjid) ?
+			    ent->projid : maxpjid;
+			projent_print_ent(ent);
+		}
 	}
 
 /* for testing */
