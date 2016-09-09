@@ -29,6 +29,7 @@
 #define STRNG_REG_EXP	".*"
 #define STRN0_REG_EXP	"(.*)"
 
+#define USERN_REG_EXP	"!?[[:alpha:]][[:alnum:]_.-]*"
 #define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
 #define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
 
@@ -49,6 +50,7 @@
 #define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
 #define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
 #define PROJN_EXP	TO_EXP(IDENT_REG_EXP)
+#define USERN_EXP	TO_EXP(USERN_REG_EXP)
 
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
@@ -114,55 +116,46 @@ out1:
 	return (ret);
 }
 
-
-int
-projent_validate_usrgrp(char *usrgrp, char *name, list_t *errlst)
-{
-	char *sname = name;
-	if (strcmp(name, "*") == 0 || strcmp(name, "!*") == 0)
-		return (0);
-	if (*name == '!' && name[1] != '\0')
-		name++;
-	while (isalnum(*name))
-		name++;
-
-	if (*name != '\0') {
-		util_add_errmsg(errlst, gettext(
-		    "Invalid %s \"%s\": should not contain '%c'"),
-		    usrgrp, sname, *name);
-		return (1);
-	}
-	return (0);
-}
-
 char *
 projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 {
-	char *ulist, *susrs, *usrs, *usr;
+	int ret;
+	char *ulist = NULL;
+	char *susrs, *usrs, *usr;
+	regex_t usernexp;
+
+	if (regcomp(&usernexp, USERN_EXP, REG_EXTENDED) != 0) {
+		util_add_errmsg(errlst, gettext(
+		    "Failed to compile regular expression: \"%s\""),
+		    USERN_EXP);
+		goto out;
+	}
 
 	susrs = usrs = strdup(nlist);
-	ulist = util_safe_malloc(strlen(nlist) + 1);
-	*ulist = '\0';
 
 	while ((usr = strsep(&usrs, " ,")) != NULL) {
 		if (*usr == '\0')
 			continue;
-		/* Error validating this user/group */
-		if (projent_validate_usrgrp(usrgrp, usr, errlst) != 0) {
+
+		if (regexec(&usernexp, usr, 0, NULL, 0) != 0 &&
+		    strcmp(usr, "*") != 0 &&
+		    strcmp(usr, "!*") != 0) {
+			util_add_errmsg(errlst, gettext(
+			    "Invalid %s name \"%s\""),
+			    usrgrp, usr);
 			free(ulist);
 			ulist = NULL;
 			break;
 		}
-		/*
-		 * If it is not the first user in the list,
-		 * append ',' before appending the username. 
-		 */
-		ulist = (*ulist != '\0') ? strcat(ulist, ",") : ulist;
-
-		ulist = strcat(ulist, usr);
+		/* Append ',' first if required */
+		if (ulist)
+			ulist = UTIL_STR_APPEND1(ulist, ",");
+		ulist = UTIL_STR_APPEND1(ulist, usr);
 	}
 
 	free(susrs);
+	regfree(&usernexp);
+out:
 	return (ulist);
 }
 
