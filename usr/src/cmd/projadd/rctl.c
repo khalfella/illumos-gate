@@ -53,8 +53,8 @@ sig_t sigs[SIGS_CNT] = {
 rctlrule_t allrules =  {
 	UINT64_MAX,
 	RCTL_TYPE_UNKWN,
-	RCTL_PRIV_ALL,
-	RCTL_ACTN_ALL,
+	RCTL_PRIV_ALLPR,
+	RCTL_ACTN_ALLA,
 	RCTL_SIG_ALL,
 };
 
@@ -111,9 +111,9 @@ rctl_get_rule(rctl_info_t *pinfo, rctlrule_t* prule)
 
 
 	if (pinfo->flags & RCTL_GLOBAL_NOBASIC) {
-		prule->rctl_privs = RCTL_PRIV_PRIV | RCTL_PRIV_PRIVD;
+		prule->rctl_privs = RCTL_PRIV_PRIVE | RCTL_PRIV_PRIVD;
 	} else {
-		prule->rctl_privs = RCTL_PRIV_ALL;
+		prule->rctl_privs = RCTL_PRIV_ALLPR;
 	}
 
 	if (pinfo->flags & RCTL_GLOBAL_DENY_ALWAYS) {
@@ -127,7 +127,7 @@ rctl_get_rule(rctl_info_t *pinfo, rctlrule_t* prule)
 	if (pinfo->flags & RCTL_GLOBAL_SIGNAL_NEVER) {
 		prule->rctl_sigs = 0;
 	} else {
-		prule->rctl_action |= RCTL_ACTN_SIG;
+		prule->rctl_action |= RCTL_ACTN_SIGN;
 		prule->rctl_sigs = RCTL_SIG_CMN;
 		if (pinfo->flags & RCTL_GLOBAL_CPU_TIME) {
 			prule->rctl_sigs |= RCTL_SIG_XCPU;

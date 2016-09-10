@@ -16,15 +16,15 @@ extern "C" {
 #define RCTL_TYPE_SCNDS 0x02
 #define RCTL_TYPE_COUNT 0x03
 
-#define RCTL_PRIV_PRIV  0x01
+#define RCTL_PRIV_PRIVE 0x01
 #define RCTL_PRIV_PRIVD 0x02
 #define RCTL_PRIV_BASIC 0x04
-#define RCTL_PRIV_ALL   0x07
+#define RCTL_PRIV_ALLPR 0x07
 
 #define RCTL_ACTN_NONE  0x01
 #define RCTL_ACTN_DENY  0x02
-#define RCTL_ACTN_SIG   0x04
-#define RCTL_ACTN_ALL   0x07
+#define RCTL_ACTN_SIGN  0x04
+#define RCTL_ACTN_ALLA  0x07
 
 #define RCTL_SIG_ABRT   0x01
 #define RCTL_SIG_XRES   0x02

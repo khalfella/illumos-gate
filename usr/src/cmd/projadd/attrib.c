@@ -24,6 +24,7 @@
 #define	USERN_REG_EXP "!?[[:alpha:]][[:alnum:]_.-]*"
 #define	IDENT_REG_EXP "[[:alpha:]][[:alnum:]_.-]*"
 #define	STOCK_REG_EXP "([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
+#define INTNM_REG_EXP "[[:digit:]]+"
 #define	FLTNM_REG_EXP "([[:digit:]]+(\\.[[:digit:]]+)?)"
 #define	MODIF_REG_EXP "([kmgtpe])?"
 #define UNIT__REG_EXP "([bs])?"
@@ -39,6 +40,7 @@
 #define PROJN_EXP     TO_EXP(IDENT_REG_EXP)
 #define USERN_EXP     TO_EXP(USERN_REG_EXP)
 #define POOLN_EXP     TO_EXP(IDENT_REG_EXP)
+#define INTNM_EXP     TO_EXP(INTNM_REG_EXP)
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
@@ -49,10 +51,136 @@
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
 
 int
-projent_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
+attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 {
-	/* TODO: Implement this function */
-	return (0);
+	int ret = 0;
+	char *atname = att->att_name;
+	attrib_val_t *atv, *atval = att->att_value;
+	attrib_val_t *priv, *val, *action;
+	char *vpriv, *vval, vaction;
+	int atv_type = atval->att_val_type;
+	char *str, *eptr;
+	int i, j;
+
+	uint8_t rpriv;
+	uint64_t rmax;
+	regex_t pintexp;
+
+	int noncount, denycount, sigcount;
+
+	if (regcomp(&pintexp, INTNM_EXP, REG_EXTENDED) != 0) {
+			util_add_errmsg(errlst, gettext(
+			    "Failed to compile regex for pos. integer"));
+			ret = 1;
+			goto out1;
+	}
+
+	if (atv_type == ATT_VAL_TYPE_NULL) {
+		goto out;
+	} else if (atv_type == ATT_VAL_TYPE_VALUE) {
+		util_add_errmsg(errlst, gettext(
+		    "rctl \"%s\" missing value"), atname);
+		ret = 1;
+		goto out;
+	}
+
+
+	for (i = 0, atv = lst_at(atval->att_val_values, 0); atv != NULL;
+	    i++, atv = lst_at(atval->att_val_values, i)) {
+		if (atv->att_val_type != ATT_VAL_TYPE_LIST) {
+			if ((str = attrib_val_tostring(atv)) != NULL) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" value \"%s\" "
+				    "should be in ()"), atname, str);
+				free(str);
+			} else {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" value "
+				    "should be in ()"), atname);
+			}
+			ret = 1;
+			continue;
+		}
+		/* Values should be in the form (priv, val, actions) */
+		if (lst_numelements(atv->att_val_values) < 3) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" value should be in the form "
+			    "(priv, val, action[,...])[,....]"), atname);
+			ret = 1;
+			continue;
+		}
+
+		priv = lst_at(atv->att_val_values, 0);
+		val = lst_at(atv->att_val_values, 1);
+		/* actions = el[2], el[3], ... */
+
+		vpriv = priv->att_val_value;
+		rpriv = rule->rctl_privs;
+
+
+		if (priv->att_val_type != ATT_VAL_TYPE_VALUE) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" invalid privilege"), atname);
+			ret = 1;
+		} else if (!SIN3(vpriv, "basic", "privileged", "priv")) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" unknown privilege \"%s\""),
+			    atname, vpriv);
+			ret = 1;
+		} else if (!(
+		    ((rpriv & RCTL_PRIV_PRIVE) && SEQU(vpriv, "priv")) ||
+		    ((rpriv & RCTL_PRIV_PRIVD) && SEQU(vpriv, "privileged")) ||
+		    ((rpriv & RCTL_PRIV_BASIC) && SEQU(vpriv, "basic"))
+		    )) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" privilege not allowed \"%s\""),
+			    atname, vpriv);
+			ret = 1;
+		}
+
+		vval = val->att_val_value;
+		rmax = rule->rtcl_max;
+
+		if (val->att_val_type != ATT_VAL_TYPE_VALUE) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" invalid value"), atname);
+			ret = 1;
+		} else if (regexec(&pintexp, vval, 0, NULL, 0) != 0) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" value \"%s\" is not an integer"),
+			    atname, vval);
+			ret = 1;
+		} else if (strtoll(vval, NULL, 0) > rmax) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" value \"%s\" exceeds system limit"),
+			    atname, vval);
+			ret = 1;
+		}
+
+
+		noncount = 0;
+		denycount = 0;
+		sigcount = 0;
+
+		for (j = 2, action = lst_at(atv->att_val_values,2);
+		    action != NULL;
+		    j++, action = lst_at(atv->att_val_values,j)) {
+
+			if (action->att_val_type != ATT_VAL_TYPE_VALUE) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" invalid action"), atname);
+				ret = 1;
+				continue;
+			}
+
+			/* TODO: Continue the code to handle actions */
+		}
+	}
+
+out:
+	regfree(&pintexp);
+out1:
+	return (ret);
 }
 
 int
@@ -69,7 +197,7 @@ attrib_validate(attrib_t *att, list_t *errlst)
 	rctlrule_t rrule;
 
 	regex_t poolnexp;
-	if (regcomp(&poolnexp, ATTRB_EXP, REG_EXTENDED) != 0) {
+	if (regcomp(&poolnexp, POOLN_EXP, REG_EXTENDED) != 0) {
 			util_add_errmsg(errlst, gettext(
 			    "Failed to compile poolname regular expression:"));
 			ret = 1;
@@ -152,10 +280,12 @@ attrib_validate(attrib_t *att, list_t *errlst)
 		}
 	} else if (rctl_get_info(atname, &rinfo) == 0) {
 		rctl_get_rule(&rinfo, &rrule);
-		if (projent_validate_rctl(att, &rrule, errlst) != 0) {
+		if (attrib_validate_rctl(att, &rrule, errlst) != 0) {
 			ret = 1;
 		}
 	}
+
+	regfree(&poolnexp);
 out:
 	return (ret);
 }
@@ -470,7 +600,8 @@ attrib_val_t
 				case ATT_VAL_TYPE_NULL:
 					/* Make is a LIST attrib */
 					attrib_val_to_list(at);
-					break;
+					/*break; */
+					/*fallthrough*/
 				case ATT_VAL_TYPE_LIST:
 					/* Allocate NULL node */
 					nat = ATT_VAL_ALLOC_NULL();
@@ -652,6 +783,7 @@ attrib_t
 		 * More work need to be done to handle these cases
 		 */
 
+		/* TODO: More work is needed here */
 		for (i = 0; i < lst_numelements(retv->att_val_values); i++) {
 			atvl = atv = lst_at(retv->att_val_values, i);
 
