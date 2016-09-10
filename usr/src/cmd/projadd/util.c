@@ -278,7 +278,9 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 	}
 
 	dnum = strtold(num, &ptr);
-	if (errno == EINVAL || errno == ERANGE || *ptr != '\0' ) {
+	if (dnum == 0 &&
+	    (errno == EINVAL || errno == ERANGE ) &&
+	    *ptr != '\0' ) {
 		util_add_errmsg(errlst, gettext("Invalid value:  \"%s\""),
 		    value);
 		free(num);
