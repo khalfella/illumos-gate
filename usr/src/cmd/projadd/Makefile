@@ -33,7 +33,7 @@ USRSBINPROGS= $(PROGS:%=$(ROOTUSRSBIN)/%)
 POFILES= projmod.po projdel.po
 
 CPROGS= projadd
-LDLIBS += -lavl -lcmdutils -ldevinfo -lgen -lkstat
+LDLIBS += -lavl -lcmdutils -ldevinfo -lgen -lkstat -lpool
 USRSBINPROGS += $(CPROGS:%=$(ROOTUSRSBIN)/%)
 OBJS= projadd.o projent.o lst.o attrib.o util.o rctl.o
 SRCS= $(OBJS:%.o=%.c)

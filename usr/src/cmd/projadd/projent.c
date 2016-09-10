@@ -155,8 +155,7 @@ projent_validate_groups(char *groups, list_t *errlst)
 int
 projent_validate_attributes(lst_t *attrs, list_t *errlst)
 {
-	/* Need to code this */
-	return (0);
+	return attrib_validate_lst(attrs, errlst);
 }
 
 char

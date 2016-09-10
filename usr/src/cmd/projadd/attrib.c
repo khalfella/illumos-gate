@@ -16,6 +16,30 @@
 #include "rctl.h"
 #include "util.h"
 
+#define	BOSTR_REG_EXP "^"
+#define	EOSTR_REG_EXP "$"
+#define	EQUAL_REG_EXP "="
+#define	STRNG_REG_EXP ".*"
+#define	STRN0_REG_EXP "(.*)"
+#define	USERN_REG_EXP "!?[[:alpha:]][[:alnum:]_.-]*"
+#define	IDENT_REG_EXP "[[:alpha:]][[:alnum:]_.-]*"
+#define	STOCK_REG_EXP "([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
+#define	FLTNM_REG_EXP "([[:digit:]]+(\\.[[:digit:]]+)?)"
+#define	MODIF_REG_EXP "([kmgtpe])?"
+#define UNIT__REG_EXP "([bs])?"
+#define TOKEN_REG_EXP "[[:alnum:]_./=+-]*"
+#define ATTRB_REG_EXP "(" STOCK_REG_EXP IDENT_REG_EXP ")"
+#define ATVAL_REG_EXP ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
+#define VALUE_REG_EXP FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
+#define TO_EXP(X)     BOSTR_REG_EXP X EOSTR_REG_EXP
+#define ATTRB_EXP     TO_EXP(ATTRB_REG_EXP)
+#define ATVAL_EXP     TO_EXP(ATVAL_REG_EXP)
+#define VALUE_EXP     TO_EXP(VALUE_REG_EXP)
+#define TOKEN_EXP     TO_EXP(TOKEN_REG_EXP)
+#define PROJN_EXP     TO_EXP(IDENT_REG_EXP)
+#define USERN_EXP     TO_EXP(USERN_REG_EXP)
+#define POOLN_EXP     TO_EXP(IDENT_REG_EXP)
+
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
 
@@ -24,6 +48,153 @@
 #define	SIN2(X, S1, S2)		((SEQU((X), (S1))) || (SIN1((X), (S2))))
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
 
+int
+projent_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
+{
+	/* TODO: Implement this function */
+	return (0);
+}
+
+int
+attrib_validate(attrib_t *att, list_t *errlst)
+{
+	int ret = 0;
+	char *atname = att->att_name;
+	attrib_val_t *atv = att->att_value;
+	int atv_type = atv->att_val_type;
+	char *str, *eptr;
+	long long ll;
+
+	rctl_info_t rinfo;
+	rctlrule_t rrule;
+
+	regex_t poolnexp;
+	if (regcomp(&poolnexp, ATTRB_EXP, REG_EXTENDED) != 0) {
+			util_add_errmsg(errlst, gettext(
+			    "Failed to compile poolname regular expression:"));
+			ret = 1;
+			goto out;
+	}
+
+	if (SEQU(atname, "task.final")) {
+		if (atv_type != ATT_VAL_TYPE_NULL) {
+			util_add_errmsg(errlst, gettext(
+			    "task.final should not have value"));
+			ret = 1;
+		}
+	} else if (SEQU(atname, "rcap.max-rss")) {
+		if (atv_type == ATT_VAL_TYPE_NULL) {
+			util_add_errmsg(errlst, gettext(
+			    "rcap.max-rss missing value"));
+			ret = 1;
+		} else if (atv_type == ATT_VAL_TYPE_LIST) {
+			util_add_errmsg(errlst, gettext(
+			    "rcap.max-rss should have single value"));
+			ret = 1;
+		} else if (atv_type == ATT_VAL_TYPE_VALUE) {
+			if ((str = attrib_val_tostring(atv)) != NULL) {
+				ll = strtoll(str, &eptr, 0);
+				if (*eptr != '\0') {
+					util_add_errmsg(errlst, gettext(
+					    "rcap.max-rss is not an integer "
+					    "value: \"%s\""), str);
+					ret = 1;
+				} else if (ll == LLONG_MIN && errno == ERANGE) {
+					util_add_errmsg(errlst, gettext(
+					    "rcap.max-rss too small"));
+					ret = 1;
+				} else if (ll == LLONG_MAX && errno == ERANGE) {
+					util_add_errmsg(errlst, gettext(
+					    "rcap.max-rss too large"));
+					ret = 1;
+				} else if (ll < 0) {
+					util_add_errmsg(errlst, gettext(
+					    "rcap.max-rss should not have "
+					    "negative value: \"%s\""), str);
+					ret = 1;
+				}
+				free(str);
+			} else {
+				util_add_errmsg(errlst, gettext(
+				    "rcap.max-rss has invalid value"));
+				ret = 1;
+			}
+		}
+	} else if (SEQU(atname, "project.pool")) {
+		if (atv_type == ATT_VAL_TYPE_NULL) {
+			util_add_errmsg(errlst, gettext(
+			    "project.pool missing value"));
+			ret = 1;
+		} else if (atv_type == ATT_VAL_TYPE_LIST) {
+			util_add_errmsg(errlst, gettext(
+			    "project.pool should have single value"));
+			ret = 1;
+		} else if (atv_type == ATT_VAL_TYPE_VALUE) {
+			if ((str = attrib_val_tostring(atv)) != NULL) {
+				if (regexec(&poolnexp, str, 0, NULL, 0) != 0) {
+					util_add_errmsg(errlst, gettext(
+					    "project.pool: invalid pool "
+					    "name \"%s\""), str);
+					ret = 1;
+				} else if (util_pool_exist(str) != 0) {
+					util_add_errmsg(errlst, gettext(
+					    "project.pool: pools not enabled  "
+					    "or pool does not exist: \"%s\""),
+					    str);
+					ret = 1;
+				}
+				free(str);
+			} else {
+				util_add_errmsg(errlst, gettext(
+				    "project.pool has invalid value "));
+				ret = 1;
+			}
+		}
+	} else if (rctl_get_info(atname, &rinfo) == 0) {
+		rctl_get_rule(&rinfo, &rrule);
+		if (projent_validate_rctl(att, &rrule, errlst) != 0) {
+			ret = 1;
+		}
+	}
+out:
+	return (ret);
+}
+
+int
+attrib_validate_lst(lst_t *attribs, list_t *errlst)
+{
+	int i, j;
+	attrib_t *att;
+	char **atnames, **atlast;
+	char *atname;
+	int ret = 0;
+
+	atlast = atnames = util_safe_zmalloc(
+	    (lst_numelements(attribs) + 1) * sizeof(char *));
+	for (i = 0, att = lst_at(attribs, 0); att != NULL;
+	    i++, att = lst_at(attribs, i)) {
+		/* Validate this attribute */
+		if(attrib_validate(att, errlst) != 0)
+			ret = 1;
+		/* Make sure it is not duplicated */
+		for (j = 0; (atname = atnames[j]) != NULL; j++) {
+			if (strcmp(atname, att->att_name) == 0) {
+				util_add_errmsg(errlst, gettext(
+				    "Duplicate attributes \"%s\""), atname);
+				ret = 1;
+			}
+		}
+		/*
+		 * Add it to the attribute name to the
+		 * temporary list if not found
+		 */
+		if (atname == NULL) {
+			*atlast++ = att->att_name;
+		}
+	}
+	free(atnames);
+	return (ret);
+}
 
 attrib_t
 *attrib_alloc()

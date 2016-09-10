@@ -44,6 +44,7 @@ extern char *attrib_val_tostring(attrib_val_t *);
 extern attrib_t *attrib_alloc();
 extern attrib_val_t *attrib_val_alloc(int, void *);
 extern void attrib_sort_lst(lst_t *);
+extern int attrib_validate_lst(lst_t *, list_t *);
 
 
 #ifdef  __cplusplus

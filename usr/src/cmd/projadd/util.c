@@ -9,6 +9,14 @@
 #include <stddef.h>
 #include <limits.h>
 
+#include <zone.h>
+#include <project.h>
+#include <pool.h>
+#include <sys/pool_impl.h>
+
+#include <unistd.h>
+#include <stropts.h>
+
 #include "util.h"
 
 
@@ -107,6 +115,53 @@ util_add_errmsg(list_t *errmsgs, char *format, ...)
 }
 
 
+int
+util_pool_exist(char *name)
+{
+	pool_conf_t *conf;
+	pool_t *pool;
+	pool_status_t status;
+	int fd;
+
+	/*
+	 * Determine if pools are enabled using /dev/pool, as
+	 * libpool may not be present.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		return (1);
+	}
+	if ((fd = open("/dev/pool", O_RDONLY)) < 0) {
+		return (1);
+	}
+	if (ioctl(fd, POOL_STATUS, &status) < 0) {
+		(void) close(fd);
+		return (1);
+	}
+	(void) close(fd);
+	if (status.ps_io_state != 1) {
+		return (1);
+	}
+
+
+	/* If pools are enabled, assume libpool is present. */
+	if ((conf = pool_conf_alloc()) == NULL) {
+		return (1);
+	}
+	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDONLY)) {
+		pool_conf_free(conf);
+		return (1);
+	}
+	pool = pool_get_pool(conf, name);
+	if (pool == NULL) {
+		pool_conf_close(conf);
+		pool_conf_free(conf);
+		return (1);
+	}
+
+	pool_conf_close(conf);
+	pool_conf_free(conf);
+	return (0);
+}
 
 char *
 util_str_append(char *str, int nargs, ...)
