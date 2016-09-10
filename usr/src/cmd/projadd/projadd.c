@@ -83,6 +83,7 @@ main(int argc, char **argv)
 	projent_t *ent;
 	char *err = NULL;
 	char *ptr;
+	char *str;
 
 	char *users, *userslist, *groups, *groupslist, *attrslist;
 	userslist = groupslist = attrslist = "";
@@ -121,7 +122,7 @@ main(int argc, char **argv)
 				break;
 			case 'c':
 				g_cflag = B_TRUE;
-				comment = strdup(optarg);
+				comment = optarg;
 				break;
 			case 'U':
 				g_Uflag = B_TRUE;
@@ -163,7 +164,7 @@ main(int argc, char **argv)
 		exit(2);
 	}
 
-	pname = strdup(argv[optind]);
+	pname = argv[optind];
 	if (projent_parse_name(pname, &errlst) == 0 && !g_nflag)
 	    projent_validate_unique_name(plist, pname, &errlst);
 
@@ -190,12 +191,12 @@ main(int argc, char **argv)
 		projent_sort_attributes(attrs);
 	}
 
-	/* debugging code shoudl be removed eventually */
 	if (plist != NULL) {
 		for(ent = list_head(plist); ent != NULL;
 		    ent = list_next(plist, ent)) {
 			maxpjid = (ent->projid > maxpjid) ?
 			    ent->projid : maxpjid;
+			/* debugging code shoudl be removed eventually */
 			projent_print_ent(ent);
 		}
 	}
@@ -209,23 +210,50 @@ main(int argc, char **argv)
 	}
 /* for testing */
 
-	printf("pname = %s projfile = %s\n", pname, projfile);
-	printf("projid = %d maxpjid = %d\n", projid, maxpjid);
-	printf("comment = %s\n", comment);
-	printf("g_Uflag = %d g_Gflag = %d\n", g_Uflag, g_Gflag);
-	printf("userslist = \"%s\"\n", userslist);
-	printf("groupslist = \"%s\"\n", groupslist);
-	if (users)
-		printf("users = \"%s\"\n", users);
-	if (groups)
-		printf("groups = \"%s\"\n", groups);
-	if (attrs) {
-		char *str = projent_attrib_lst_tostring(attrs);
-		if (str) {
-			printf("attrs = \"%s\"\n", str);
-			free(str);
-		}
+
+	/* We have all the required components to build this new projent */
+	ent = util_safe_zmalloc(sizeof(projent_t));
+	list_link_init(&ent->next);
+
+	ent->projname = strdup(pname);
+	ent->projid = (g_pflag) ? projid : maxpjid + 1;
+	ent->comment = strdup(comment);
+	ent->userlist = (users != NULL) ? strdup(users) : strdup("");
+	ent->grouplist = (groups != NULL) ? strdup(groups) : strdup("");
+	if (attrs &&  (str = projent_attrib_lst_tostring(attrs)) != NULL) {
+		ent->attr = str;
+	} else {
+		ent->attr = strdup("");
 	}
+
+
+	/* Validate the projent before addig it to the list */
+	if (projent_validate(ent, attrs, &errlst) != 0 || !list_is_empty(&errlst)) {
+		projent_print_errmsgs(&errlst);
+		list_destroy(&errlst);
+		usage();
+		exit(2);
+	}
+
+
+	/* Now we can add it ot the list */
+	list_insert_tail(plist, ent);
+
+
+	/* Write out the project file */
+
+
+	/* Print some informaotin for debugging */
+	printf("projfile = %s\n", projfile);
+	printf("maxpjid = %d\n", maxpjid);
+	printf("g_Uflag = %d g_Gflag = %d\n", g_Uflag, g_Gflag);
+
+	printf("ent->projname = %s\n", ent->projname);
+	printf("ent->projid = %d\n", ent->projid);
+	printf("ent->comment = \"%s\"\n", ent->comment);
+	printf("ent->userlist = \"%s\"\n", ent->userlist);
+	printf("ent->grouplist = \"%s\"\n", ent->grouplist);
+	printf("ent->att = \"%s\"\n", ent->attr);
 
 	printf("end of main....\n");
 

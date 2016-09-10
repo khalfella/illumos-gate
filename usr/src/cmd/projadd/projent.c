@@ -62,6 +62,73 @@
 #define BYTES_SCALE	1
 #define SCNDS_SCALE	2
 
+int
+projent_validate_name(char *pname, list_t *errlst)
+{
+	/* Do nothing, as any parse-able project name is valid */
+	return (0);
+}
+
+int
+projent_validate_comment(char *comment, list_t *errlst)
+{
+	/* Do nothing, as any parse-able project name is valid */
+	return (0);
+}
+
+int
+projent_validate_users(char *users, list_t *errlst)
+{
+	/* Need to code this */
+	return (0);
+}
+
+int
+projent_validate_groups(char *groups, list_t *errlst)
+{
+	/* Need to code this */
+	return (0);
+}
+
+int
+projent_validate_attributes(lst_t *attrs, list_t *errlst)
+{
+	/* Need to code this */
+	return (0);
+}
+
+char
+*projent_tostring(projent_t *ent)
+{
+	char *ret = NULL;
+	asprintf(&ret, "%s:%d:%s:%s:%s:%s",
+	    ent->projname,
+	    ent->projid,
+	    ent->comment,
+	    ent->userlist,
+	    ent->grouplist,
+	    ent->attr);
+	return (ret);
+}
+
+int
+projent_validate(projent_t *pent, lst_t *attrs, list_t *errlst) {
+	char *str;
+	projent_validate_name(pent->projname, errlst);
+	projent_validate_projid(pent->projid, errlst);
+	projent_validate_comment(pent->comment, errlst);
+	projent_validate_users(pent->userlist, errlst);
+	projent_validate_groups(pent->grouplist, errlst);
+	projent_validate_attributes(attrs, errlst);
+	if ((str = projent_tostring(pent)) != NULL) {
+		if (strlen(str) > (PROJECT_BUFSZ - 2)) {
+			util_add_errmsg(errlst, gettext(
+			    "projent line too long"));
+		}
+		free(str);
+	}
+	return (list_is_empty(errlst) == 0);
+}
 void
 projent_free_attributes(lst_t *attribs)
 {
