@@ -85,8 +85,9 @@ main(int argc, char **argv)
 	char *ptr;
 
 	char *users, *userslist, *groups, *groupslist, *attrslist;
-	users = userslist = groups = groupslist = attrslist = "";
+	userslist = groupslist = attrslist = "";
 
+	users = groups = NULL;
 	lst_t *attrs = NULL;
 
 	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
@@ -120,7 +121,7 @@ main(int argc, char **argv)
 				break;
 			case 'c':
 				g_cflag = B_TRUE;
-				comment = optarg;
+				comment = strdup(optarg);
 				break;
 			case 'U':
 				g_Uflag = B_TRUE;
@@ -162,7 +163,7 @@ main(int argc, char **argv)
 		exit(2);
 	}
 
-	pname = argv[optind];
+	pname = strdup(argv[optind]);
 	if (projent_parse_name(pname, &errlst) == 0 && !g_nflag)
 	    projent_validate_unique_name(plist, pname, &errlst);
 
@@ -227,6 +228,14 @@ main(int argc, char **argv)
 	}
 
 	printf("end of main....\n");
+
+
+	if (plist != NULL) {
+		projent_free_list(plist);
+	}
+	if (attrs) {
+		projent_free_attributes(attrs);
+	}
 
 	free(users);
 	free(groups);

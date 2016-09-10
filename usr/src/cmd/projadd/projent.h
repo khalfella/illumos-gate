@@ -27,6 +27,7 @@ typedef struct projent {
 
 
 extern list_t *projent_get_list(char *, list_t *);
+extern void projent_free_list(list_t *);
 extern void projent_print_ent(projent_t *);
 extern void projent_print_errmsgs(list_t *);
 extern int  projent_parse_name(char *, list_t *);
@@ -38,6 +39,7 @@ extern int  projent_parse_comment(char *, list_t *);
 extern char *projent_parse_usrgrp(char *, char *, list_t *);
 extern lst_t *projent_parse_attributes(char *, list_t *);
 extern void projent_sort_attributes(lst_t *);
+extern void projent_free_attributes(lst_t *);
 extern char *projent_attrib_lst_tostring(lst_t *);
 
 #ifdef  __cplusplus

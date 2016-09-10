@@ -334,7 +334,8 @@ util_tokenize(char *values, list_t *errlst)
 		return (tokens);
 
 	/* assume each character will be a token + NULL terminating value*/
-	ctoken = tokens = util_safe_malloc((strlen(values) * sizeof(char *)) + 1);
+	ctoken = tokens = util_safe_malloc(
+	    (strlen(values) + 1) * sizeof(char *));
 	token = util_safe_malloc(strlen(values) + 1);
 
 	v = values;

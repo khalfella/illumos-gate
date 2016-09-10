@@ -157,6 +157,9 @@ attrib_free(attrib_t *att)
 void
 attrib_free_lst(lst_t *attribs)
 {
+	if (attribs == NULL)
+		return;
+
 	attrib_t *att;
 	while (!lst_is_empty(attribs)) {
 		att = lst_at(attribs, 0);
@@ -255,8 +258,7 @@ attrib_val_t
 	char *prev = "";
 	int parendepth = 0;
 
-	if ((tokens =
-	    util_tokenize(values, errlst)) == NULL) {
+	if ((tokens = util_tokenize(values, errlst)) == NULL) {
 		goto out1;
 	}
 
@@ -410,11 +412,11 @@ attrib_t
 	if (regexec(attrbexp, att, attrbexp->re_nsub + 1 , mat, 0) == 0) {
 		ret->att_name = strdup(att);
 		ret->att_value = ATT_VAL_ALLOC_NULL();
-	} else if (regexec(atvalexp, att, atvalexp->re_nsub + 1, mat, 0) == 0) {
+	} else if (regexec(atvalexp, att,
+	    atvalexp->re_nsub + 1, mat, 0) == 0) {
 		vidx = atvalexp->re_nsub;
 		vlen = mat[vidx].rm_eo - mat[vidx].rm_so;
 		nidx = atvalexp->re_nsub - 3;
-
 		ret->att_name = util_substr(atvalexp, mat, att, nidx); 
 
 		if (vlen > 0) {

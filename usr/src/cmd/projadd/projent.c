@@ -63,6 +63,12 @@
 #define SCNDS_SCALE	2
 
 void
+projent_free_attributes(lst_t *attribs)
+{
+	attrib_free_lst(attribs);
+}
+
+void
 projent_sort_attributes(lst_t *attribs)
 {
 	attrib_sort_lst(attribs);
@@ -79,21 +85,13 @@ lst_t
 
 	ret = util_safe_malloc(sizeof(lst_t));
 	(void) lst_create(ret);
-	
 
 	if (regcomp(&attrbexp, ATTRB_EXP, REG_EXTENDED) != 0)
 		goto out1;
 	if (regcomp(&atvalexp, ATVAL_EXP, REG_EXTENDED) != 0)
 		goto out2;
 
-
-	/**** DEBUG **/
-	printf("projent_parse_attributes:\n"
-	    "\tattrib = %s\n",
-	    attribs);
-
 	sattrs = attrs = strdup(attribs);
-
 	while ((att = strsep(&attrs, ";")) != NULL) {
 		if (*att == '\0')
 			continue;
@@ -302,12 +300,12 @@ projent_free(projent_t *ent)
 
 projent_t
 *projent_parse(char *projstr) {
-	char *s1, *str;
+	char *s1, *str, *sstr;
 
 	if (projstr == NULL)
 		return (NULL);
 
-	str = strdup(projstr);
+	sstr  = str = strdup(projstr);
 
 	projent_t *ent = util_safe_zmalloc(sizeof(projent_t));
 	list_link_init(&ent->next);
@@ -323,11 +321,11 @@ projent_t
 		goto done;
 	}
 
-	free(str);
 	projent_free(ent);
 	free(ent);
 	ent = NULL;
 done:
+	free(sstr);
 	return (ent);
 }
 
