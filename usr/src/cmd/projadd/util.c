@@ -294,7 +294,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 	char *num, *modifier, *unit;
 	char *ptr;
 
-	uint64_t mul64, num64;
+	uint64_t mul64;
 	long double dnum;
 
 	*retnum = *retmod = *retunit = NULL;

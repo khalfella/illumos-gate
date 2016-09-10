@@ -245,7 +245,6 @@ out1:
 char *
 projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 {
-	int ret;
 	char *ulist = NULL;
 	char *susrs, *usrs, *usr;
 	regex_t usernexp;
@@ -475,7 +474,7 @@ list_t
 {
 	FILE *fp;
 	list_t *ret;
-	int read, line = 0;
+	int line = 0;
 	char *buf = NULL, *nlp;
 	size_t cap = 0;
 	projent_t *ent;

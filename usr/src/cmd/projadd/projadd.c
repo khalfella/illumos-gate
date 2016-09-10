@@ -48,7 +48,7 @@ static boolean_t g_Kflag = B_FALSE;
 
 
 
-static char *tmpprojfile, *projfile = PROJF_PATH;
+static char /**tmpprojfile,*/ *projfile = PROJF_PATH;
 static char *pname;
 
 static list_t errlst;
@@ -81,8 +81,6 @@ main(int argc, char **argv)
 	char *comment = "";
 	list_t *plist;
 	projent_t *ent;
-	char *err = NULL;
-	char *ptr;
 	char *str;
 
 	char *users, *userslist, *groups, *groupslist, *attrslist;

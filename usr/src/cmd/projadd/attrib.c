@@ -57,9 +57,9 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 	char *atname = att->att_name;
 	attrib_val_t *atv, *atval = att->att_value;
 	attrib_val_t *priv, *val, *action;
-	char *vpriv, *vval, vaction;
+	char *vpriv, *vval;
 	int atv_type = atval->att_val_type;
-	char *str, *eptr;
+	char *str;
 	int i, j;
 
 	uint8_t rpriv;
@@ -474,7 +474,7 @@ void
 attrib_sort_lst(lst_t *attribs)
 {
 	int i, j, n;
-	attrib_t *atti, *attj, *att;
+	attrib_t *atti, *attj;
 
 	if (attribs == NULL)
 		return;
@@ -549,8 +549,6 @@ attrib_val_t
 	attrib_val_t *ret = NULL;
 	attrib_val_t *at;
 	attrib_val_t *nat;
-	attrib_val_t *mat;
-	attrib_val_t *oat;
 	lst_t stk;
 	char *usedtokens = NULL;
 	int error = 0;
@@ -695,10 +693,7 @@ attrib_t
 	attrib_t *ret = NULL;
 	attrib_val_t *retv, *atv, *atvl;
 	char *values = NULL;
-	int vstart, vend, vlen;
-	int nstart, nend, nlen;
-	int retlen;
-	int vidx, nidx;
+	int vidx, nidx, vlen;
 	int scale;
 
 	char *num, *mod, *unit;
