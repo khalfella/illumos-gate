@@ -8,6 +8,8 @@
 #include <locale.h>
 #include <stddef.h>
 #include <limits.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include <rctl.h>
 
@@ -79,15 +81,75 @@ projent_validate_comment(char *comment, list_t *errlst)
 int
 projent_validate_users(char *users, list_t *errlst)
 {
-	/* Need to code this */
-	return (0);
+	char *susrs, *usrs, *usr;
+	char *u, **ulast, **ulist;
+	int ret = 0;
+	int i;
+
+	susrs = usrs = strdup(users);
+	ulast = ulist = util_safe_zmalloc(
+	    (strlen(users) + 1) * sizeof(char *));
+	while ((usr = strsep(&usrs, ",")) != NULL) {
+		if (*usr == '\0')
+			continue;
+
+		if (getpwnam(usr) == NULL) {
+			util_add_errmsg(errlst, gettext(
+			    "User \"%s\" does not exist"), usr);
+			ret = 1;
+		}
+		for (i = 0; (u = ulist[i]) != NULL; i++) {
+			if (strcmp(u, usr) == 0) {
+				util_add_errmsg(errlst, gettext(
+				    "Duplicate user names \"%s\""), usr);
+			ret = 1;
+			}
+		}
+		/* Add the user to the temporary list if not found */
+		if (u == NULL) {
+			*ulast++ = usr;
+		}
+	}
+	free(ulist);
+	free(susrs);
+	return (ret);
 }
 
 int
 projent_validate_groups(char *groups, list_t *errlst)
 {
-	/* Need to code this */
-	return (0);
+	char *sgrps, *grps, *grp;
+	char *g, **glast, **glist;
+	int ret = 0;
+	int i;
+
+	sgrps = grps = strdup(groups);
+	glast = glist = util_safe_zmalloc(
+	    (strlen(groups) + 1) * sizeof(char *));
+	while ((grp = strsep(&grps, ",")) != NULL) {
+		if (*grp == '\0')
+			continue;
+
+		if (getgrnam(grp) == NULL) {
+			util_add_errmsg(errlst, gettext(
+			    "Group \"%s\" does not exist"), grp);
+			ret = 1;
+		}
+		for (i = 0; (g = glist[i]) != NULL; i++) {
+			if (strcmp(g, grp) == 0) {
+				util_add_errmsg(errlst, gettext(
+				    "Duplicate group names \"%s\""), grp);
+			ret = 1;
+			}
+		}
+		/* Add the group to the temporary list if not found */
+		if (g == NULL) {
+			*glast++ = grp;
+		}
+	}
+	free(glist);
+	free(sgrps);
+	return (ret);
 }
 
 int
