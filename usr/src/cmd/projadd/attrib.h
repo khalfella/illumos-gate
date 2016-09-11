@@ -40,7 +40,7 @@ typedef struct attrib_s {
 extern char *attrib_lst_tostring(lst_t *);
 extern attrib_t *attrib_parse(regex_t *, regex_t *, char *, list_t *);
 extern void attrib_free_lst(lst_t *);
-extern char *attrib_val_tostring(attrib_val_t *);
+extern char *attrib_val_tostring(attrib_val_t *, boolean_t);
 extern attrib_t *attrib_alloc();
 extern attrib_val_t *attrib_val_alloc(int, void *);
 extern void attrib_sort_lst(lst_t *);

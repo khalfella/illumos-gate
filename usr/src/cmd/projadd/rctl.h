@@ -43,6 +43,9 @@ typedef struct sig_s {
         int     mask;
 } sig_t;
 
+#define SIGS_CNT        16
+extern sig_t sigs[SIGS_CNT];
+
 typedef struct rctlrule_s {
         uint64_t rtcl_max;
         uint8_t  rtcl_type;

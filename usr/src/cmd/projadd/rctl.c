@@ -26,7 +26,6 @@
 
 
 
-#define SIGS_CNT	16
 sig_t sigs[SIGS_CNT] = {
 	/* Signal names */
 	{"ABRT", RCTL_SIG_ABRT},
@@ -79,7 +78,7 @@ rctl_get_info(char *name, rctl_info_t *pinfo)
 			if (getrctl(name, blk2, blk1, RCTL_NEXT) != 0) {
 				goto out;
 			}
-			priv = rctlblk_get_value(blk1);
+			priv = rctlblk_get_privilege(blk1);
 		}
 
 

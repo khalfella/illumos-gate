@@ -29,10 +29,17 @@
 #define	MODIF_REG_EXP "([kmgtpe])?"
 #define UNIT__REG_EXP "([bs])?"
 #define TOKEN_REG_EXP "[[:alnum:]_./=+-]*"
+#define SIGAC_REG_EXP "sig(nal)?(=.*)?"
+#define SIGHD_REG_EXP "(signal|sig)"
+#define SIGVL_REG_EXP "(([[:digit:]]+)|((SIG)?([[:upper:]]+)([+-][123])?))"
+
 #define ATTRB_REG_EXP "(" STOCK_REG_EXP IDENT_REG_EXP ")"
 #define ATVAL_REG_EXP ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
 #define VALUE_REG_EXP FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
+#define SIGNL_REG_EXP SIGHD_REG_EXP EQUAL_REG_EXP SIGVL_REG_EXP
+
 #define TO_EXP(X)     BOSTR_REG_EXP X EOSTR_REG_EXP
+
 #define ATTRB_EXP     TO_EXP(ATTRB_REG_EXP)
 #define ATVAL_EXP     TO_EXP(ATVAL_REG_EXP)
 #define VALUE_EXP     TO_EXP(VALUE_REG_EXP)
@@ -41,6 +48,8 @@
 #define USERN_EXP     TO_EXP(USERN_REG_EXP)
 #define POOLN_EXP     TO_EXP(IDENT_REG_EXP)
 #define INTNM_EXP     TO_EXP(INTNM_REG_EXP)
+#define SIGAC_EXP     TO_EXP(SIGAC_REG_EXP)
+#define SIGNL_EXP     TO_EXP(SIGNL_REG_EXP)
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
@@ -57,16 +66,18 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 	char *atname = att->att_name;
 	attrib_val_t *atv, *atval = att->att_value;
 	attrib_val_t *priv, *val, *action;
-	char *vpriv, *vval;
+	char *vpriv, *vval, *vaction, *sigstr;
 	int atv_type = atval->att_val_type;
 	char *str;
-	int i, j;
+	int i, j, k;
 
-	uint8_t rpriv;
+	int nmatch;
+	uint8_t rpriv, raction, sigval;
 	uint64_t rmax;
-	regex_t pintexp;
+	regex_t pintexp, sigacexp, signlexp;
+	regmatch_t *mat;
 
-	int noncount, denycount, sigcount;
+	int nonecount, denycount, sigcount;
 
 	if (regcomp(&pintexp, INTNM_EXP, REG_EXTENDED) != 0) {
 			util_add_errmsg(errlst, gettext(
@@ -74,6 +85,23 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 			ret = 1;
 			goto out1;
 	}
+
+	if (regcomp(&sigacexp, SIGAC_EXP, REG_EXTENDED) != 0) {
+			util_add_errmsg(errlst, gettext(
+			    "Failed to compile regex for sigaction"));
+			ret = 1;
+			goto out2;
+	}
+
+	if (regcomp(&signlexp, SIGNL_EXP, REG_EXTENDED) != 0) {
+			util_add_errmsg(errlst, gettext(
+			    "Failed to compile regex for signal"));
+			ret = 1;
+			goto out3;
+	}
+
+	nmatch = signlexp.re_nsub + 1;
+	mat = util_safe_zmalloc(nmatch * sizeof(regmatch_t));
 
 	if (atv_type == ATT_VAL_TYPE_NULL) {
 		goto out;
@@ -88,7 +116,7 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 	for (i = 0, atv = lst_at(atval->att_val_values, 0); atv != NULL;
 	    i++, atv = lst_at(atval->att_val_values, i)) {
 		if (atv->att_val_type != ATT_VAL_TYPE_LIST) {
-			if ((str = attrib_val_tostring(atv)) != NULL) {
+			if ((str = attrib_val_tostring(atv, B_FALSE)) != NULL) {
 				util_add_errmsg(errlst, gettext(
 				    "rctl \"%s\" value \"%s\" "
 				    "should be in ()"), atname, str);
@@ -130,8 +158,7 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 		} else if (!(
 		    ((rpriv & RCTL_PRIV_PRIVE) && SEQU(vpriv, "priv")) ||
 		    ((rpriv & RCTL_PRIV_PRIVD) && SEQU(vpriv, "privileged")) ||
-		    ((rpriv & RCTL_PRIV_BASIC) && SEQU(vpriv, "basic"))
-		    )) {
+		    ((rpriv & RCTL_PRIV_BASIC) && SEQU(vpriv, "basic")))) {
 			util_add_errmsg(errlst, gettext(
 			    "rctl \"%s\" privilege not allowed \"%s\""),
 			    atname, vpriv);
@@ -158,13 +185,12 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 		}
 
 
-		noncount = 0;
+		nonecount = 0;
 		denycount = 0;
 		sigcount = 0;
 
-		for (j = 2, action = lst_at(atv->att_val_values,2);
-		    action != NULL;
-		    j++, action = lst_at(atv->att_val_values,j)) {
+		for (j = 2; j < lst_numelements(atv->att_val_values); j++) {
+			action = lst_at(atv->att_val_values,j);
 
 			if (action->att_val_type != ATT_VAL_TYPE_VALUE) {
 				util_add_errmsg(errlst, gettext(
@@ -173,11 +199,126 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 				continue;
 			}
 
-			/* TODO: Continue the code to handle actions */
+			vaction = action->att_val_value;
+
+			if (regexec(&sigacexp, vaction, 0, NULL, 0) != 0 &&
+			    !SIN2(vaction, "none", "deny")) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" unknown action \"%s\""),
+				    atname, vaction);
+				ret = 1;
+				continue;
+			}
+
+			raction = rule->rctl_action;
+			if (!(((raction & RCTL_ACTN_SIGN) &&
+			    regexec(&sigacexp, vaction, 0, NULL, 0) == 0) ||
+			    ((raction & RCTL_ACTN_NONE) &&
+			    SEQU(vaction, "none")) ||
+			    ((raction & RCTL_ACTN_DENY) &&
+			    SEQU(vaction, "deny")))) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" action not allowed \"%s\""),
+				    atname, vaction);
+				ret = 1;
+				continue;
+			}
+
+			if (SEQU(vaction, "none")) {
+				if (nonecount >= 1) {
+					util_add_errmsg(errlst, gettext(
+					    "rctl \"%s\" duplicate action "
+					    "none"), atname);
+					ret = 1;
+				}
+				nonecount++;
+				continue;
+			}
+
+			if (SEQU(vaction, "deny")) {
+				if (denycount >= 1) {
+					util_add_errmsg(errlst, gettext(
+					    "rctl \"%s\" duplicate action "
+					    "deny"), atname);
+					ret = 1;
+				}
+				denycount++;
+				continue;
+			}
+
+
+			/* At this point, the action must be signal. */
+			if (sigcount >= 1) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" duplicate action sig"),
+				    atname);
+				ret = 1;
+			}
+			sigcount++;
+
+			/*
+			 * Make sure signal is correct format, on of:
+			 * sig=##
+			 * signal=##
+			 * sig=SIGXXX
+			 * signal=SIGXXX
+			 * sig=XXX
+			 * signal=XXX
+			 */
+
+			if (regexec(&signlexp, vaction, nmatch, mat, 0) != 0 ||
+			    (sigstr = util_substr(&signlexp, mat, vaction, 2))
+			    == NULL) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" invalid signal \"%s\""),
+				    atname, vaction);
+				ret = 1;
+				continue;
+			}
+
+			/* Our version of sigstr =~ s/SIG// */
+			if (strstr(sigstr, "SIG") != NULL)
+				sigstr = strstr(sigstr, "SIG") + 3;
+
+			sigval = 0;
+			for (k = 0; k < SIGS_CNT; k++) {
+				if (SEQU(sigs[k].sig, sigstr))
+					sigval = sigs[k].mask;
+			}
+			free(sigstr);
+
+
+			if (sigval == 0) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" invalid signal \"%s\""),
+				    atname, vaction);
+				ret = 1;
+				continue;
+			}
+
+			if (!(sigval & rule->rctl_sigs)) {
+				util_add_errmsg(errlst, gettext(
+				    "rctl \"%s\" signal not allowed \"%s\""),
+				    atname, vaction);
+				ret = 1;
+				continue;
+			}
+		}
+		if (nonecount > 0 && (denycount > 0 || sigcount > 0)) {
+			util_add_errmsg(errlst, gettext(
+			    "rctl \"%s\" action \"none\" specified with "
+			    "other actions"),
+			    atname);
+			ret = 1;
 		}
 	}
 
 out:
+	free(mat);
+	regfree(&signlexp);
+out3:
+	regfree(&sigacexp);
+out2:
 	regfree(&pintexp);
 out1:
 	return (ret);
@@ -220,7 +361,7 @@ attrib_validate(attrib_t *att, list_t *errlst)
 			    "rcap.max-rss should have single value"));
 			ret = 1;
 		} else if (atv_type == ATT_VAL_TYPE_VALUE) {
-			if ((str = attrib_val_tostring(atv)) != NULL) {
+			if ((str = attrib_val_tostring(atv, B_FALSE)) != NULL) {
 				ll = strtoll(str, &eptr, 0);
 				if (*eptr != '\0') {
 					util_add_errmsg(errlst, gettext(
@@ -258,7 +399,7 @@ attrib_validate(attrib_t *att, list_t *errlst)
 			    "project.pool should have single value"));
 			ret = 1;
 		} else if (atv_type == ATT_VAL_TYPE_VALUE) {
-			if ((str = attrib_val_tostring(atv)) != NULL) {
+			if ((str = attrib_val_tostring(atv, B_FALSE)) != NULL) {
 				if (regexec(&poolnexp, str, 0, NULL, 0) != 0) {
 					util_add_errmsg(errlst, gettext(
 					    "project.pool: invalid pool "
@@ -344,7 +485,7 @@ attrib_val_t
 }
 
 char
-*attrib_val_tostring(attrib_val_t *val)
+*attrib_val_tostring(attrib_val_t *val, boolean_t innerlist)
 {
 	char *ret = NULL;
 	char *vstring;
@@ -358,7 +499,9 @@ char
 			return strdup(val->att_val_value);
 		break;
 		case ATT_VAL_TYPE_LIST:
-			ret = UTIL_STR_APPEND1(ret, "(");
+			/* Only innerlists need to be betweeen ( and ) */
+			if (innerlist)
+				ret = UTIL_STR_APPEND1(ret, "(");
 			for (i = 0, v = lst_at(val->att_val_values, 0);
 			    v != NULL;
 			    i++, v = lst_at(val->att_val_values, i)) {
@@ -366,7 +509,7 @@ char
 					ret = UTIL_STR_APPEND1(ret, ",");
 				}
 				if ((vstring =
-				    attrib_val_tostring(v)) == NULL) {
+				    attrib_val_tostring(v, B_TRUE)) == NULL) {
 					free(ret);
 					ret = NULL;
 					goto out;
@@ -374,7 +517,8 @@ char
 				ret = UTIL_STR_APPEND1(ret, vstring);
 				free(vstring);
 			}
-			ret = UTIL_STR_APPEND1(ret, ")");
+			if (innerlist)
+				ret = UTIL_STR_APPEND1(ret, ")");
 			return (ret);
 		break;
 	}
@@ -389,7 +533,7 @@ char
 	char *ret = NULL, *vstring;
 
 	ret = UTIL_STR_APPEND1(ret, att->att_name);
-	if ((vstring = attrib_val_tostring(att->att_value)) != NULL) {
+	if ((vstring = attrib_val_tostring(att->att_value, B_FALSE)) != NULL) {
 		if (strlen(vstring) > 0)
 			ret = UTIL_STR_APPEND2(ret, "=", vstring);
 		free(vstring);
@@ -740,7 +884,7 @@ attrib_t
 	}
 
 	if (SEQU(ret->att_name, "rcap.max-rss")) {
-		values = attrib_val_tostring(ret->att_value);
+		values = attrib_val_tostring(ret->att_value, B_FALSE);
 		if (util_val2num(values, BYTES_SCALE, errlst,
 		    &num, &mod, &unit) == 0) {
 			attrib_val_free(ret->att_value);
@@ -774,11 +918,7 @@ attrib_t
 		if (retv->att_val_type != ATT_VAL_TYPE_LIST)
 			goto out;
 
-		/*
-		 * More work need to be done to handle these cases
-		 */
 
-		/* TODO: More work is needed here */
 		for (i = 0; i < lst_numelements(retv->att_val_values); i++) {
 			atvl = atv = lst_at(retv->att_val_values, i);
 
@@ -787,12 +927,12 @@ attrib_t
 			 * is not a scaler value
 			 */
 			if (atv->att_val_type != ATT_VAL_TYPE_LIST ||
-			    lst_numelements(atv->att_val_values) < 2 ||
+			    lst_numelements(atv->att_val_values) < 3 ||
 			    (atv = lst_at(atv->att_val_values, 1)) == NULL ||
 			    atv->att_val_type != ATT_VAL_TYPE_VALUE) {
 				continue;
 			}
-			values = attrib_val_tostring(atv);
+			values = attrib_val_tostring(atv, B_FALSE);
 			if (util_val2num(values, scale, errlst,
 			    &num, &mod, &unit) == 0) {
 

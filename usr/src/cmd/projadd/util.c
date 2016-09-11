@@ -38,8 +38,8 @@
 #define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
 
 #define FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
-#define	MODIF_REG_EXP	"([kmgtpe])?"
-#define UNIT__REG_EXP	"([bs])?"
+#define	MODIF_REG_EXP	"([kmgtpeKMGTPE])?"
+#define UNIT__REG_EXP	"([bsBS])?"
 
 #define TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
 
@@ -322,8 +322,8 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 	if ((num == NULL || modifier == NULL || unit == NULL) ||
 	    (strlen(modifier) == 0 && strchr(num, '.') != NULL) ||
 	    (util_scale(modifier, scale, &mul64, errlst) != 0) ||
-	    (scale == BYTES_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "b")) ||
-	    (scale == SCNDS_SCALE && strlen(unit) > 0 && !SEQUAL(unit, "s"))) {
+	    (scale == BYTES_SCALE && *unit != '\0' && tolower(*unit) != 'b') ||
+	    (scale == SCNDS_SCALE && *unit != '\0' && tolower(*unit) != 's')) {
 		util_add_errmsg(errlst, gettext( "Error near: \"%s\""),
 		    value);
 		free(num);
