@@ -95,6 +95,19 @@ util_safe_zmalloc(size_t sz)
 }
 
 void
+util_print_errmsgs(list_t *errmsgs)
+{
+	errmsg_t *msg;
+	while ((msg = list_head(errmsgs)) != NULL) {
+		fprintf(stderr, "%s\n", msg->msg);
+		list_remove(errmsgs, msg);
+		free(msg->msg);
+		free(msg);
+	}
+}
+
+
+void
 util_add_errmsg(list_t *errmsgs, char *format, ...)
 {
 	va_list args;

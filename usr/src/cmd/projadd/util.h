@@ -23,4 +23,5 @@ extern char *util_substr(regex_t *, regmatch_t *, char *, int);
 extern char *util_str_append(char *, int, ...);
 extern int util_val2num(char *, int, list_t *, char **, char **,char **);
 extern void util_add_errmsg(list_t *errmsgs, char *format, ...);
+extern void util_print_errmsgs(list_t *);
 extern int util_pool_exist(char *);

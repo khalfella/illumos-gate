@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <pwd.h>
 #include <grp.h>
+#include <unistd.h>
 
 #include <rctl.h>
 
@@ -173,14 +174,19 @@ char
 }
 
 int
-projent_validate(projent_t *pent, lst_t *attrs, list_t *errlst) {
+projent_validate(projent_t *pent, lst_t *attrs, list_t *errlst)
+{
 	char *str;
+
 	projent_validate_name(pent->projname, errlst);
 	projent_validate_projid(pent->projid, errlst);
 	projent_validate_comment(pent->comment, errlst);
 	projent_validate_users(pent->userlist, errlst);
 	projent_validate_groups(pent->grouplist, errlst);
-	projent_validate_attributes(attrs, errlst);
+
+	if (attrs != NULL)
+		projent_validate_attributes(attrs, errlst);
+
 	if ((str = projent_tostring(pent)) != NULL) {
 		if (strlen(str) > (PROJECT_BUFSZ - 2)) {
 			util_add_errmsg(errlst, gettext(
@@ -393,17 +399,6 @@ out:
 	return (ret);
 }
 
-void projent_print_errmsgs(list_t *errmsgs)
-{
-	errmsg_t *msg;
-	while ((msg = list_head(errmsgs)) != NULL) {
-		fprintf(stderr, "%s\n", msg->msg);
-		list_remove(errmsgs, msg);
-		free(msg->msg);
-		free(msg);
-	}
-}
-
 void
 projent_print_ent(projent_t *ent)
 {
@@ -468,9 +463,49 @@ projent_free_list(list_t *plist) {
 }
 
 
+void
+projent_put_list(char *projfile, list_t *plist, list_t *errlst)
+{
+	char *tmpprojfile;
+	FILE *fp;
+	projent_t *ent;
+	int ret;
+
+	tmpprojfile = NULL;
+	if (asprintf(&tmpprojfile, "%s.%d_tmp", projfile, getpid()) == -1) {
+		util_add_errmsg(errlst, gettext(
+			"Failed to allocate memory"));
+		goto out;
+	}
+	if ((fp = fopen(tmpprojfile, "wx")) == NULL) {
+		util_add_errmsg(errlst, gettext(
+		    "Cannot create %s: %s"),
+		    tmpprojfile, strerror(errno));
+		goto out;
+	}
+
+	for(ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
+		ret = fprintf(fp, "%s:%d:%s:%s:%s:%s\n", ent->projname,
+		    ent->projid, ent->comment, ent->userlist, ent->grouplist,
+		    ent->attr);
+		if (ret < 0) {
+			util_add_errmsg(errlst, gettext(
+			    "Failed to write to  %s: %s"),
+			    tmpprojfile, strerror(errno));
+			goto out1;
+		}
+	}
+
+	/* TODO: Complete the code to get the swap the project files.*/
+
+out1:
+	fclose(fp);
+out:
+	free(tmpprojfile);
+}
 
 list_t
-*projent_get_list(char *projfile, list_t *perrlst)
+*projent_get_list(char *projfile, list_t *errlst)
 {
 	FILE *fp;
 	list_t *ret;
@@ -491,8 +526,8 @@ list_t
 			return (ret);
 		} else {
 			/* Report the error unable to open the file */
-			util_add_errmsg(perrlst,
-			    gettext("Cannot open %s: %s"),
+			util_add_errmsg(errlst, gettext(
+			    "Cannot open %s: %s"),
 			    projfile, strerror(errno));
 
 			/* destory and free the to-be-returned list */
@@ -511,8 +546,8 @@ list_t
 			list_insert_tail(ret, ent);
 		} else {
 			/* Report the error */
-			util_add_errmsg(perrlst,
-			    gettext("Error parsing: %s line: %d: \"%s\""),
+			util_add_errmsg(errlst, gettext(
+			    "Error parsing: %s line: %d: \"%s\""),
 			    projfile, line, buf);
 
 			/* free the allocated resources */
