@@ -11,58 +11,31 @@
 #include <pwd.h>
 #include <grp.h>
 #include <unistd.h>
-
 #include <rctl.h>
-
-
 #include <regex.h>
-
-
 #include <ctype.h>
 
 #include "projent.h"
 #include "attrib.h"
-
 #include "util.h"
 
 
 #define BOSTR_REG_EXP	"^"
 #define EOSTR_REG_EXP	"$"
 #define EQUAL_REG_EXP	"="
-#define STRNG_REG_EXP	".*"
 #define STRN0_REG_EXP	"(.*)"
-
 #define USERN_REG_EXP	"!?[[:alpha:]][[:alnum:]_.-]*"
 #define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
 #define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
-
-#define FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
-#define	MODIF_REG_EXP	"([kmgtpe])?"
-#define UNIT__REG_EXP	"([bs])?"
-
-#define TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
-
 #define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
 #define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
-#define VALUE_REG_EXP	FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
 
 #define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
 
 #define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
 #define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
-#define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
-#define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
 #define PROJN_EXP	TO_EXP(IDENT_REG_EXP)
 #define USERN_EXP	TO_EXP(USERN_REG_EXP)
-
-
-#define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
-
-
-
-
-#define BYTES_SCALE	1
-#define SCNDS_SCALE	2
 
 int
 projent_validate_name(char *pname, list_t *errlst)

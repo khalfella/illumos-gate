@@ -19,34 +19,15 @@
 
 #define BOSTR_REG_EXP	"^"
 #define EOSTR_REG_EXP	"$"
-#define EQUAL_REG_EXP	"="
-#define STRNG_REG_EXP	".*"
-#define STRN0_REG_EXP	"(.*)"
-
-#define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
-#define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
-
 #define FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
 #define	MODIF_REG_EXP	"([kmgtpeKMGTPE])?"
 #define UNIT__REG_EXP	"([bsBS])?"
-
 #define TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
-
-#define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
-#define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
 #define VALUE_REG_EXP	FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
 
 #define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
-
-#define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
-#define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
-#define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
 #define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
-
-
-
-#define SEQUAL(X,Y)	(strcmp((X), (Y)) == 0)
-
+#define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
 
 #define BYTES_SCALE	1
 #define SCNDS_SCALE	2
@@ -78,7 +59,7 @@ util_safe_malloc(size_t sz)
 void *
 util_safe_zmalloc(size_t sz)
 {
-	return memset(util_safe_malloc(sz), 0, sz);
+	return (memset(util_safe_malloc(sz), 0, sz));
 }
 
 void
@@ -221,7 +202,6 @@ util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 		return (0);
 	}
 
-	
 	util_add_errmsg(errlst, gettext(
 	    "Invalid scale: %d"), scale);
 
@@ -249,7 +229,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum,
 	if (regcomp(&valueexp, VALUE_EXP, REG_EXTENDED) != 0) {
 		util_add_errmsg(errlst, gettext(
 		    "Failed to compile regex: '%s'"), VALUE_EXP);
-		goto out1;
+		return (1);
 	}
 
 	nmatch = valueexp.re_nsub + 1;
@@ -258,9 +238,10 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum,
 	if (regexec(&valueexp, value, nmatch, mat, 0) != 0) {
 		util_add_errmsg(errlst, gettext(
 		    "Invalid value: '%s'"), value);
-		goto out2;
+		regfree(&valueexp);
+		return (1);
 	}
-
+	regfree(&valueexp);
 
 	num = util_substr(&valueexp, mat, value, 1);
 	modifier = util_substr(&valueexp, mat, value, 3);
@@ -273,10 +254,7 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum,
 	    (scale == SCNDS_SCALE && *unit != '\0' && tolower(*unit) != 's')) {
 		util_add_errmsg(errlst, gettext( "Error near: \"%s\""),
 		    value);
-		free(num);
-		free(modifier);
-		free(unit);
-		goto out2;
+		goto out;
 	}
 
 	dnum = strtold(num, &ptr);
@@ -285,30 +263,26 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum,
 	    *ptr != '\0' ) {
 		util_add_errmsg(errlst, gettext("Invalid value:  \"%s\""),
 		    value);
-		free(num);
-		free(modifier);
-		free(unit);
-		goto out2;
+		goto out;
 	}
 
 	if (UINT64_MAX / mul64 <= dnum) {
 		util_add_errmsg(errlst, gettext("Too big value:  \"%s\""),
 		    value);
-		free(num);
-		free(modifier);
-		free(unit);
-		goto out2;
+		goto out;
 	}
 
-	asprintf(retnum, "%llu", (unsigned long long)(mul64 * dnum));
+	if (asprintf(retnum, "%llu",
+	    (unsigned long long)(mul64 * dnum)) == -1) {
+		goto out;
+	}
+
 	free(num);
 	*retmod = modifier;
 	*retunit = unit;
-	ret = 0;
-
-out2:
-	regfree(&valueexp);
-out1:
+	return (0);
+out:
+	free(num); free(modifier); free(unit);
 	return (ret);
 }
 
@@ -326,9 +300,7 @@ util_tokenize(char *values, list_t *errlst)
 {
 	char *token, *t;
 	char *v;
-
 	regex_t tokenexp;
-
 	char **ctoken, **tokens = NULL;
 
 	if (regcomp(&tokenexp, TOKEN_EXP, REG_EXTENDED | REG_NOSUB) != 0)

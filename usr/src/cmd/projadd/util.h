@@ -1,7 +1,14 @@
+#ifndef _PROJENT_UTIL_H
+#define _PROJENT_UTIL_H
+
 #include <sys/list.h>
 #include <sys/types.h>
 #include <regex.h>
 #include <sys/varargs.h>
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
 
 /* UTIL_STR_APPEND */
 #define	UTIL_STR_APPEND1(S, S1)		util_str_append((S), 1, (S1))
@@ -31,3 +38,8 @@ extern char *util_str_append(char *, int, ...);
 extern int util_val2num(char *, int, list_t *, char **, char **,char **);
 extern void util_add_errmsg(list_t *errmsgs, char *format, ...);
 extern void util_print_errmsgs(list_t *);
+
+#ifdef  __cplusplus
+}
+#endif
+#endif /* _PROJENT_UTIL_H */

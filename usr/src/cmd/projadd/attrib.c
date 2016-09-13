@@ -19,33 +19,15 @@
 #define	BOSTR_REG_EXP "^"
 #define	EOSTR_REG_EXP "$"
 #define	EQUAL_REG_EXP "="
-#define	STRNG_REG_EXP ".*"
-#define	STRN0_REG_EXP "(.*)"
-#define	USERN_REG_EXP "!?[[:alpha:]][[:alnum:]_.-]*"
 #define	IDENT_REG_EXP "[[:alpha:]][[:alnum:]_.-]*"
-#define	STOCK_REG_EXP "([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
 #define INTNM_REG_EXP "[[:digit:]]+"
-#define	FLTNM_REG_EXP "([[:digit:]]+(\\.[[:digit:]]+)?)"
-#define	MODIF_REG_EXP "([kmgtpe])?"
-#define UNIT__REG_EXP "([bs])?"
-#define TOKEN_REG_EXP "[[:alnum:]_./=+-]*"
 #define SIGAC_REG_EXP "sig(nal)?(=.*)?"
 #define SIGHD_REG_EXP "(signal|sig)"
 #define SIGVL_REG_EXP "(([[:digit:]]+)|((SIG)?([[:upper:]]+)([+-][123])?))"
-
-#define ATTRB_REG_EXP "(" STOCK_REG_EXP IDENT_REG_EXP ")"
-#define ATVAL_REG_EXP ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
-#define VALUE_REG_EXP FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
 #define SIGNL_REG_EXP SIGHD_REG_EXP EQUAL_REG_EXP SIGVL_REG_EXP
 
 #define TO_EXP(X)     BOSTR_REG_EXP X EOSTR_REG_EXP
 
-#define ATTRB_EXP     TO_EXP(ATTRB_REG_EXP)
-#define ATVAL_EXP     TO_EXP(ATVAL_REG_EXP)
-#define VALUE_EXP     TO_EXP(VALUE_REG_EXP)
-#define TOKEN_EXP     TO_EXP(TOKEN_REG_EXP)
-#define PROJN_EXP     TO_EXP(IDENT_REG_EXP)
-#define USERN_EXP     TO_EXP(USERN_REG_EXP)
 #define POOLN_EXP     TO_EXP(IDENT_REG_EXP)
 #define INTNM_EXP     TO_EXP(INTNM_REG_EXP)
 #define SIGAC_EXP     TO_EXP(SIGAC_REG_EXP)
@@ -82,22 +64,22 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 	if (regcomp(&pintexp, INTNM_EXP, REG_EXTENDED) != 0) {
 			util_add_errmsg(errlst, gettext(
 			    "Failed to compile regex for pos. integer"));
-			ret = 1;
-			goto out1;
+			return (1);
 	}
 
 	if (regcomp(&sigacexp, SIGAC_EXP, REG_EXTENDED) != 0) {
 			util_add_errmsg(errlst, gettext(
 			    "Failed to compile regex for sigaction"));
-			ret = 1;
-			goto out2;
+			regfree(&pintexp);
+			return (1);
 	}
 
 	if (regcomp(&signlexp, SIGNL_EXP, REG_EXTENDED) != 0) {
 			util_add_errmsg(errlst, gettext(
 			    "Failed to compile regex for signal"));
-			ret = 1;
-			goto out3;
+			regfree(&pintexp);
+			regfree(&sigacexp);
+			return (1);
 	}
 
 	nmatch = signlexp.re_nsub + 1;
@@ -111,7 +93,6 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 		ret = 1;
 		goto out;
 	}
-
 
 	for (i = 0, atv = lst_at(atval->att_val_values, 0); atv != NULL;
 	    i++, atv = lst_at(atval->att_val_values, i)) {
@@ -144,7 +125,6 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 
 		vpriv = priv->att_val_value;
 		rpriv = rule->rctl_privs;
-
 
 		if (priv->att_val_type != ATT_VAL_TYPE_VALUE) {
 			util_add_errmsg(errlst, gettext(
@@ -183,7 +163,6 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 			    atname, vval);
 			ret = 1;
 		}
-
 
 		nonecount = 0;
 		denycount = 0;
@@ -246,7 +225,6 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 				continue;
 			}
 
-
 			/* At this point, the action must be signal. */
 			if (sigcount >= 1) {
 				util_add_errmsg(errlst, gettext(
@@ -287,7 +265,6 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 			}
 			free(sigstr);
 
-
 			if (sigval == 0) {
 				util_add_errmsg(errlst, gettext(
 				    "rctl \"%s\" invalid signal \"%s\""),
@@ -316,11 +293,8 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 out:
 	free(mat);
 	regfree(&signlexp);
-out3:
 	regfree(&sigacexp);
-out2:
 	regfree(&pintexp);
-out1:
 	return (ret);
 }
 
@@ -341,8 +315,7 @@ attrib_validate(attrib_t *att, list_t *errlst)
 	if (regcomp(&poolnexp, POOLN_EXP, REG_EXTENDED) != 0) {
 			util_add_errmsg(errlst, gettext(
 			    "Failed to compile poolname regular expression:"));
-			ret = 1;
-			goto out;
+			return (1);
 	}
 
 	if (SEQU(atname, "task.final")) {
@@ -427,7 +400,6 @@ attrib_validate(attrib_t *att, list_t *errlst)
 	}
 
 	regfree(&poolnexp);
-out:
 	return (ret);
 }
 
@@ -683,32 +655,25 @@ attrib_val_append(attrib_val_t *atv, char *token)
 attrib_val_t
 *attrib_val_parse(char *values, list_t *errlst)
 {
-	char **tokens = NULL;
-	char *token;
-	int i;
-
 	attrib_val_t *ret = NULL;
 	attrib_val_t *at;
 	attrib_val_t *nat;
 	lst_t stk;
-	char *usedtokens = NULL;
-	int error = 0;
 
+	char **tokens, *token, *usedtokens, *prev;
+	int i, error, parendepth;
 
-	char *prev = "";
-	int parendepth = 0;
+	error = parendepth = 0;
+	prev = "";
 
 	if ((tokens = util_tokenize(values, errlst)) == NULL) {
 		goto out1;
 	}
 
-	ret = ATT_VAL_ALLOC_NULL();
-
-	at = ret;
-
 	lst_create(&stk);
-	usedtokens = UTIL_STR_APPEND1(usedtokens, "");
+	usedtokens = UTIL_STR_APPEND1(NULL, "");
 
+	at = ret = ATT_VAL_ALLOC_NULL();
 
 	for (i = 0; (token = tokens[i]) != NULL; i++) {
 
@@ -838,7 +803,6 @@ attrib_t
 
 	char *num, *mod, *unit;
 	int i;
-
 
 	rctl_info_t rinfo;
 	rctlrule_t rrule;

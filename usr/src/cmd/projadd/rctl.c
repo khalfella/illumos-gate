@@ -8,16 +8,9 @@
 #include <locale.h>
 #include <stddef.h>
 #include <limits.h>
-
 #include <rctl.h>
-
-
 #include <regex.h>
-
-
 #include <ctype.h>
-
-
 #include <zone.h>
 #include <pool.h>
 #include <sys/pool_impl.h>
@@ -26,8 +19,6 @@
 
 #include "util.h"
 #include "rctl.h"
-
-
 
 sig_t sigs[SIGS_CNT] = {
 	/* Signal names */
@@ -51,7 +42,9 @@ sig_t sigs[SIGS_CNT] = {
 	{"30", RCTL_SIG_XCPU},
 };
 
-
+/*
+ * Check the existance of a resource pool in the system
+ */
 int
 rctl_pool_exist(char *name)
 {
@@ -88,8 +81,7 @@ rctl_pool_exist(char *name)
 		return (1);
 	}
 
-	pool = pool_get_pool(conf, name);
-	if (pool == NULL) {
+	if ((pool = pool_get_pool(conf, name)) == NULL) {
 		pool_conf_close(conf);
 		pool_conf_free(conf);
 		return (1);
