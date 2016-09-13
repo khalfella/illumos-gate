@@ -59,7 +59,6 @@
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
 
-#define SEQUAL(X,Y)	(strcmp((X), (Y)) == 0)
 
 
 #define BYTES_SCALE	1
@@ -469,12 +468,20 @@ projent_put_list(char *projfile, list_t *plist, list_t *errlst)
 	char *tmpprojfile;
 	FILE *fp;
 	projent_t *ent;
+	struct stat statbuf;
 	int ret;
 
 	tmpprojfile = NULL;
 	if (asprintf(&tmpprojfile, "%s.%d_tmp", projfile, getpid()) == -1) {
 		util_add_errmsg(errlst, gettext(
 			"Failed to allocate memory"));
+		goto out;
+	}
+
+	if (stat(projfile, &statbuf) != 0) {
+		util_add_errmsg(errlst, gettext(
+		    "Failed to access %s: %s"),
+		    projfile, strerror(errno));
 		goto out;
 	}
 	if ((fp = fopen(tmpprojfile, "wx")) == NULL) {
@@ -492,11 +499,27 @@ projent_put_list(char *projfile, list_t *plist, list_t *errlst)
 			util_add_errmsg(errlst, gettext(
 			    "Failed to write to  %s: %s"),
 			    tmpprojfile, strerror(errno));
+			/* Remove the temporary file and exit */
+			unlink(tmpprojfile);
 			goto out1;
 		}
 	}
 
-	/* TODO: Complete the code to get the swap the project files.*/
+	if (chown(tmpprojfile, statbuf.st_uid, statbuf.st_gid) != 0) {
+		util_add_errmsg(errlst, gettext(
+		    "Cannot set ownership of  %s: %s"),
+		    tmpprojfile, strerror(errno));
+		unlink(tmpprojfile);
+		goto out1;
+	}
+
+	if (rename(tmpprojfile, projfile) != 0) {
+		util_add_errmsg(errlst, gettext(
+		    "Cannot rename %s to %s : %s"),
+		    tmpprojfile, projfile, strerror(errno));
+		unlink(tmpprojfile);
+		goto out1;
+	}
 
 out1:
 	fclose(fp);
