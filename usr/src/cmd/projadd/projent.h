@@ -29,7 +29,6 @@ typedef struct projent {
 extern int projent_validate(projent_t *, lst_t *, list_t *);
 extern list_t *projent_get_list(char *, list_t *);
 extern void projent_free_list(list_t *);
-extern void projent_print_ent(projent_t *);
 extern int  projent_parse_name(char *, list_t *);
 extern int  projent_validate_unique_name(list_t *, char *, list_t *);
 extern int  projent_parse_projid(char *, projid_t *, list_t *);

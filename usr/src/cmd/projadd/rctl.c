@@ -17,9 +17,12 @@
 
 #include <ctype.h>
 
-/*
-#include "projent.h"
-*/
+
+#include <zone.h>
+#include <pool.h>
+#include <sys/pool_impl.h>
+#include <unistd.h>
+#include <stropts.h>
 
 #include "util.h"
 #include "rctl.h"
@@ -49,14 +52,53 @@ sig_t sigs[SIGS_CNT] = {
 };
 
 
-rctlrule_t allrules =  {
-	UINT64_MAX,
-	RCTL_TYPE_UNKWN,
-	RCTL_PRIV_ALLPR,
-	RCTL_ACTN_ALLA,
-	RCTL_SIG_ALL,
-};
+int
+rctl_pool_exist(char *name)
+{
+	pool_conf_t *conf;
+	pool_t *pool;
+	pool_status_t status;
+	int fd;
 
+	/*
+	 * Determine if pools are enabled using /dev/pool, as
+	 * libpool may not be present.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID ||
+	    (fd = open("/dev/pool", O_RDONLY)) < 0) {
+		return (1);
+	}
+
+	if (ioctl(fd, POOL_STATUS, &status) < 0) {
+		(void) close(fd);
+		return (1);
+	}
+
+	(void) close(fd);
+
+	if (status.ps_io_state != 1)
+		return (1);
+
+	/* If pools are enabled, assume libpool is present. */
+	if ((conf = pool_conf_alloc()) == NULL)
+		return (1);
+
+	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDONLY)) {
+		pool_conf_free(conf);
+		return (1);
+	}
+
+	pool = pool_get_pool(conf, name);
+	if (pool == NULL) {
+		pool_conf_close(conf);
+		pool_conf_free(conf);
+		return (1);
+	}
+
+	pool_conf_close(conf);
+	pool_conf_free(conf);
+	return (0);
+}
 
 int
 rctl_get_info(char *name, rctl_info_t *pinfo)
@@ -80,7 +122,6 @@ rctl_get_info(char *name, rctl_info_t *pinfo)
 			}
 			priv = rctlblk_get_privilege(blk1);
 		}
-
 
 		pinfo->value = rctlblk_get_value(blk1);
 		pinfo->flags = rctlblk_get_global_flags(blk1);
@@ -108,7 +149,6 @@ rctl_get_rule(rctl_info_t *pinfo, rctlrule_t* prule)
 		prule->rtcl_type = RCTL_TYPE_UNKWN;
 	}
 
-
 	if (pinfo->flags & RCTL_GLOBAL_NOBASIC) {
 		prule->rctl_privs = RCTL_PRIV_PRIVE | RCTL_PRIV_PRIVD;
 	} else {
@@ -135,5 +175,4 @@ rctl_get_rule(rctl_info_t *pinfo, rctlrule_t* prule)
 			prule->rctl_sigs |= RCTL_SIG_XFSZ;
 		}
 	}
-
 }

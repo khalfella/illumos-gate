@@ -102,7 +102,7 @@ projent_validate_users(char *users, list_t *errlst)
 			if (strcmp(u, usr) == 0) {
 				util_add_errmsg(errlst, gettext(
 				    "Duplicate user names \"%s\""), usr);
-			ret = 1;
+				ret = 1;
 			}
 		}
 		/* Add the user to the temporary list if not found */
@@ -139,7 +139,7 @@ projent_validate_groups(char *groups, list_t *errlst)
 			if (strcmp(g, grp) == 0) {
 				util_add_errmsg(errlst, gettext(
 				    "Duplicate group names \"%s\""), grp);
-			ret = 1;
+				ret = 1;
 			}
 		}
 		/* Add the group to the temporary list if not found */
@@ -207,6 +207,12 @@ projent_sort_attributes(lst_t *attribs)
 	attrib_sort_lst(attribs);
 }
 
+char
+*projent_attrib_lst_tostring(lst_t *lst)
+{
+	return (attrib_lst_tostring(lst));
+}
+
 lst_t
 *projent_parse_attributes(char *attribs, list_t *errlst)
 {
@@ -231,8 +237,7 @@ lst_t
 		if ((natt = attrib_parse(&attrbexp,
 		    &atvalexp, att, errlst)) == NULL) {
 			attrib_free_lst(ret);
-			free(ret);
-			ret = NULL;
+			UTIL_FREE_SNULL(ret);
 			break;
 		}
 
@@ -273,8 +278,7 @@ projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 			util_add_errmsg(errlst, gettext(
 			    "Invalid %s name \"%s\""),
 			    usrgrp, usr);
-			free(ulist);
-			ulist = NULL;
+			UTIL_FREE_SNULL(ulist);
 			break;
 		}
 		/* Append ',' first if required */
@@ -399,17 +403,6 @@ out:
 }
 
 void
-projent_print_ent(projent_t *ent)
-{
-	if (ent->projname) printf("projname = %s\n", ent->projname);
-	printf("projid = %d\n", ent->projid);
-	if (ent->comment) printf("comment = %s\n", ent->comment);
-	if (ent->userlist) printf("userlist = %s\n", ent->userlist);
-	if (ent->grouplist) printf("grouplist = %s\n", ent->grouplist);
-	if (ent->attr) printf("attr = %s\n", ent->attr);
-}
-
-void
 projent_free(projent_t *ent)
 {
 	free(ent->projname);
@@ -443,8 +436,7 @@ projent_t
 	}
 
 	projent_free(ent);
-	free(ent);
-	ent = NULL;
+	UTIL_FREE_SNULL(ent);
 done:
 	free(sstr);
 	return (ent);
@@ -579,8 +571,7 @@ list_t
 			/* free the allocated resources */
 			projent_free_list(ret);
 			list_destroy(ret);
-			free(ret);
-			ret = NULL;
+			UTIL_FREE_SNULL(ret);
 			break;
 		}
 	}
@@ -588,12 +579,4 @@ list_t
 	free(buf);
 	fclose(fp);
 	return (ret);
-}
-
-
-
-char
-*projent_attrib_lst_tostring(lst_t *lst)
-{
-	return (attrib_lst_tostring(lst));
 }

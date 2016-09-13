@@ -405,7 +405,7 @@ attrib_validate(attrib_t *att, list_t *errlst)
 					    "project.pool: invalid pool "
 					    "name \"%s\""), str);
 					ret = 1;
-				} else if (util_pool_exist(str) != 0) {
+				} else if (rctl_pool_exist(str) != 0) {
 					util_add_errmsg(errlst, gettext(
 					    "project.pool: pools not enabled  "
 					    "or pool does not exist: \"%s\""),
@@ -442,8 +442,9 @@ attrib_validate_lst(lst_t *attribs, list_t *errlst)
 
 	atlast = atnames = util_safe_zmalloc(
 	    (lst_numelements(attribs) + 1) * sizeof(char *));
-	for (i = 0, att = lst_at(attribs, 0); att != NULL;
-	    i++, att = lst_at(attribs, i)) {
+	for (i = 0; i < lst_numelements(attribs); i++) {
+		att = lst_at(attribs, i);
+
 		/* Validate this attribute */
 		if(attrib_validate(att, errlst) != 0)
 			ret = 1;
@@ -502,16 +503,15 @@ char
 			/* Only innerlists need to be betweeen ( and ) */
 			if (innerlist)
 				ret = UTIL_STR_APPEND1(ret, "(");
-			for (i = 0, v = lst_at(val->att_val_values, 0);
-			    v != NULL;
-			    i++, v = lst_at(val->att_val_values, i)) {
+			for (i = 0; i < lst_numelements(val->att_val_values);
+			    i++) {
+				v = lst_at(val->att_val_values, i);
 				if (i > 0) {
 					ret = UTIL_STR_APPEND1(ret, ",");
 				}
 				if ((vstring =
 				    attrib_val_tostring(v, B_TRUE)) == NULL) {
-					free(ret);
-					ret = NULL;
+					UTIL_FREE_SNULL(ret);
 					goto out;
 				}
 				ret = UTIL_STR_APPEND1(ret, vstring);
@@ -539,8 +539,7 @@ char
 		free(vstring);
 		return (ret);
 	}
-	free(ret);
-	ret = NULL;
+	UTIL_FREE_SNULL(ret);
 	return (ret);
 }
 
@@ -566,8 +565,7 @@ char
 		}
 
 		free(ret);
-		ret = NULL;
-		return (ret);
+		return (NULL);
 	}
 	return (ret);
 }
@@ -665,7 +663,6 @@ attrib_val_append(attrib_val_t *atv, char *token)
 {
 	attrib_val_t *nat;
 	if (atv->att_val_type == ATT_VAL_TYPE_VALUE) {
-
 		/* convert this to LIST attribute */
 		attrib_val_to_list(atv);
 	}
@@ -822,8 +819,7 @@ out:
 	free(usedtokens);
 	if (error) {
 		attrib_val_free(ret);
-		free(ret);
-		ret = NULL;
+		UTIL_FREE_SNULL(ret);
 	}
 out1:
 	return (ret);
@@ -869,8 +865,7 @@ attrib_t
 				    "Invalid value on attribute \"%s\""),
 				    ret->att_name);
 				attrib_free(ret);
-				free(ret);
-				ret = NULL;
+				UTIL_FREE_SNULL(ret);
 				goto out;
 			}
 		} else {
@@ -893,8 +888,7 @@ attrib_t
 			free(unit);
 		} else {
 			attrib_free(ret);
-			free(ret);
-			ret = NULL;
+			UTIL_FREE_SNULL(ret);
 			goto out;
 		}
 		free(values);
@@ -935,7 +929,6 @@ attrib_t
 			values = attrib_val_tostring(atv, B_FALSE);
 			if (util_val2num(values, scale, errlst,
 			    &num, &mod, &unit) == 0) {
-
 				attrib_val_free(atv);
 				atv = ATT_VAL_ALLOC_VALUE(num);
 				lst_replace_at(atvl->att_val_values, 1, atv);
@@ -945,8 +938,7 @@ attrib_t
 			} else {
 				free(values);
 				attrib_free(ret);
-				free(ret);
-				ret = NULL;
+				UTIL_FREE_SNULL(ret);
 				goto out;
 			}
 			free(values);

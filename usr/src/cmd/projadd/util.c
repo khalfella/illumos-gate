@@ -9,22 +9,11 @@
 #include <stddef.h>
 #include <limits.h>
 
-#include <zone.h>
 #include <project.h>
-#include <pool.h>
-#include <sys/pool_impl.h>
-
-#include <unistd.h>
-#include <stropts.h>
-
-#include "util.h"
-
-
-
-
 
 #include <ctype.h>
 
+#include "util.h"
 
 
 
@@ -62,28 +51,12 @@
 #define BYTES_SCALE	1
 #define SCNDS_SCALE	2
 
-void
-util_free_snull(int nargs, ...)
-{
-	va_list ap;
-	int i;
-	void **p;
-	va_start(ap, nargs);
-	for(i = 0; i < nargs; i++) {
-		p = va_arg(ap, void **);
-		free(*p);
-		*p = NULL;
-	}
-	va_end(ap);
-}
-
 void *
 util_safe_realloc(void *ptr, size_t sz)
 {
 	if ((ptr = realloc(ptr, sz)) == NULL) {
 		(void) fprintf(stderr, gettext(
-		    "projadd: error reallocating %d bytes of memory"),
-		    sz);
+		    "projadd: error reallocating %d bytes of memory"), sz);
 		exit(1);
 	}
 	return (ptr);
@@ -96,8 +69,7 @@ util_safe_malloc(size_t sz)
  	char *ptr;
 	if ((ptr = malloc(sz)) == NULL) {
 		(void) fprintf(stderr, gettext(
-		    "projadd: error allocating %d bytes of memory"),
-		    sz);
+		    "projadd: error allocating %d bytes of memory"), sz);
 		exit(1);
         }
         return (ptr);
@@ -140,55 +112,6 @@ util_add_errmsg(list_t *errmsgs, char *format, ...)
 	msg->msg = errstr;
 	list_link_init(&msg->next);
 	list_insert_tail(errmsgs, msg);
-}
-
-
-int
-util_pool_exist(char *name)
-{
-	pool_conf_t *conf;
-	pool_t *pool;
-	pool_status_t status;
-	int fd;
-
-	/*
-	 * Determine if pools are enabled using /dev/pool, as
-	 * libpool may not be present.
-	 */
-	if (getzoneid() != GLOBAL_ZONEID) {
-		return (1);
-	}
-	if ((fd = open("/dev/pool", O_RDONLY)) < 0) {
-		return (1);
-	}
-	if (ioctl(fd, POOL_STATUS, &status) < 0) {
-		(void) close(fd);
-		return (1);
-	}
-	(void) close(fd);
-	if (status.ps_io_state != 1) {
-		return (1);
-	}
-
-
-	/* If pools are enabled, assume libpool is present. */
-	if ((conf = pool_conf_alloc()) == NULL) {
-		return (1);
-	}
-	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDONLY)) {
-		pool_conf_free(conf);
-		return (1);
-	}
-	pool = pool_get_pool(conf, name);
-	if (pool == NULL) {
-		pool_conf_close(conf);
-		pool_conf_free(conf);
-		return (1);
-	}
-
-	pool_conf_close(conf);
-	pool_conf_free(conf);
-	return (0);
 }
 
 char *
@@ -307,8 +230,8 @@ util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 
 
 int
-util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmod,
-    char **retunit)
+util_val2num(char *value, int scale, list_t *errlst, char **retnum,
+    char **retmod, char **retunit)
 {
 	
 	int ret = 1;
@@ -368,8 +291,6 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 		goto out2;
 	}
 
-
-
 	if (UINT64_MAX / mul64 <= dnum) {
 		util_add_errmsg(errlst, gettext("Too big value:  \"%s\""),
 		    value);
@@ -378,7 +299,6 @@ util_val2num(char *value, int scale, list_t *errlst, char **retnum, char **retmo
 		free(unit);
 		goto out2;
 	}
-
 
 	asprintf(retnum, "%llu", (unsigned long long)(mul64 * dnum));
 	free(num);
@@ -441,8 +361,7 @@ util_tokenize(char *values, list_t *errlst)
 				    "Invalid Character at or near \"%s\""),
 				    token); 
 				util_free_tokens(tokens);
-				free(tokens);
-				tokens = NULL;
+				UTIL_FREE_SNULL(tokens);
 				goto out1;
 			}
 		}

@@ -59,7 +59,7 @@ typedef struct rctl_info_s {
 	int flags;
 } rctl_info_t;
 
-
+extern int rctl_pool_exist(char *);
 extern int rctl_get_info(char *, rctl_info_t *);
 extern void rctl_get_rule(rctl_info_t *, rctlrule_t *);
 
