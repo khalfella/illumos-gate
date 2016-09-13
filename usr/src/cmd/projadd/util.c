@@ -62,6 +62,21 @@
 #define BYTES_SCALE	1
 #define SCNDS_SCALE	2
 
+void
+util_free_snull(int nargs, ...)
+{
+	va_list ap;
+	int i;
+	void **p;
+	va_start(ap, nargs);
+	for(i = 0; i < nargs; i++) {
+		p = va_arg(ap, void **);
+		free(*p);
+		*p = NULL;
+	}
+	va_end(ap);
+}
+
 void *
 util_safe_realloc(void *ptr, size_t sz)
 {
@@ -183,12 +198,10 @@ util_str_append(char *str, int nargs, ...)
 	int i, len;
 	char *s;
 
-	if (str == NULL) {
+	if (str == NULL)
 		str = util_safe_zmalloc(1);
-	}
 
 	len = strlen(str) + 1;
-
 	va_start(ap, nargs);
 	for(i = 0; i < nargs; i++) {
 		s = va_arg(ap, char*);
@@ -197,8 +210,6 @@ util_str_append(char *str, int nargs, ...)
 		strcat(str, s);
 	}
 	va_end(ap);
-
-
 	return str;
 }
 

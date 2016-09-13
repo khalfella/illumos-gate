@@ -453,6 +453,9 @@ done:
 
 void
 projent_free_list(list_t *plist) {
+	if (plist == NULL)
+		return;
+
 	projent_t *ent;
 	while ((ent = list_head(plist)) != NULL) {
 		list_remove(plist, ent);

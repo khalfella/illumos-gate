@@ -31,7 +31,6 @@
 #include "projent.h"
 #include "util.h"
 
-
 /*
  * Print usage
  */
@@ -52,7 +51,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int c;
+	int c, ret = 0;
 
 	extern char *optarg;
 	extern int optind, optopt;
@@ -186,11 +185,11 @@ main(int argc, char **argv)
 
 
 	if (!list_is_empty(&errlst)) {
-		/* free (plist, users, groups, attrs) */
 		util_print_errmsgs(&errlst);
 		list_destroy(&errlst);
 		usage();
-		exit(2);
+		ret = 2;
+		goto out;
 	}
 
 	/* Find the maxprojid */
@@ -220,37 +219,31 @@ main(int argc, char **argv)
 	/* Validate the projent before writing the list to the project file */
 	(void) projent_validate(ent, attrs, &errlst);
 	if (!list_is_empty(&errlst)) {
-		/* free(plist, users, groups, attrs) */
 		util_print_errmsgs(&errlst);
 		list_destroy(&errlst);
 		usage();
-		exit(2);
+		ret = 2;
+		goto out;
 	}
 
 	/* Write out the project file */
 	projent_put_list(projfile, plist, &errlst);
 
 	if (!list_is_empty(&errlst)) {
-		/* free(plist, users, groups, attrs) */
 		util_print_errmsgs(&errlst);
 		list_destroy(&errlst);
 		usage();
-		exit(2);
+		ret = 2;
 	}
 
+out:
 
 	/* Free allocated resources */
 	projent_free_list(plist);
 	list_destroy(plist);
-	free(plist);
-	free(users);
-	free(groups);
+	free(plist); free(users); free(groups);
+	projent_free_attributes(attrs);
+	free(attrs);
 
-	if (attrs != NULL) {
-		projent_free_attributes(attrs);
-		free(attrs);
-	}
-
-
-	return (0);
+	return (ret);
 }

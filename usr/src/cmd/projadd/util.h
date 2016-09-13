@@ -3,8 +3,14 @@
 #include <regex.h>
 #include <sys/varargs.h>
 
+/* UTIL_STR_APPEND */
 #define	UTIL_STR_APPEND1(S, S1)		util_str_append((S), 1, (S1))
 #define	UTIL_STR_APPEND2(S, S1, S2)	util_str_append((S), 2, (S1), (S2))
+
+/* UTIL_FREE_SNULL */
+#define UTIL_FREE_SNULL1(p1)		util_free_snull(1, &p1)
+#define UTIL_FREE_SNULL2(p1, p2)	util_free_snull(2, &p1, &p2)
+#define UTIL_FREE_SNULL3(p1, p2, p3)	util_free_snull(3, &p1, &p2, &p3)
 
 #define	BYTES_SCALE	1
 #define	SCNDS_SCALE	2
