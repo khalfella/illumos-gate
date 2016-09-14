@@ -13,7 +13,7 @@
 #include <ctype.h>
 
 #include "attrib.h"
-#include "rctl.h"
+#include "resctl.h"
 #include "util.h"
 
 #define	BOSTR_REG_EXP "^"
@@ -42,7 +42,7 @@
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
 
 int
-attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
+attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, list_t *errlst)
 {
 	int ret = 0;
 	char *atname = att->att_name;
@@ -124,7 +124,7 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 		/* actions = el[2], el[3], ... */
 
 		vpriv = priv->att_val_value;
-		rpriv = rule->rctl_privs;
+		rpriv = rule->resctl_privs;
 
 		if (priv->att_val_type != ATT_VAL_TYPE_VALUE) {
 			util_add_errmsg(errlst, gettext(
@@ -136,9 +136,9 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 			    atname, vpriv);
 			ret = 1;
 		} else if (!(
-		    ((rpriv & RCTL_PRIV_PRIVE) && SEQU(vpriv, "priv")) ||
-		    ((rpriv & RCTL_PRIV_PRIVD) && SEQU(vpriv, "privileged")) ||
-		    ((rpriv & RCTL_PRIV_BASIC) && SEQU(vpriv, "basic")))) {
+		    ((rpriv & RESCTL_PRIV_PRIVE) && SEQU(vpriv, "priv")) ||
+		    ((rpriv & RESCTL_PRIV_PRIVD) && SEQU(vpriv, "privileged")) ||
+		    ((rpriv & RESCTL_PRIV_BASIC) && SEQU(vpriv, "basic")))) {
 			util_add_errmsg(errlst, gettext(
 			    "rctl \"%s\" privilege not allowed \"%s\""),
 			    atname, vpriv);
@@ -146,7 +146,7 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 		}
 
 		vval = val->att_val_value;
-		rmax = rule->rtcl_max;
+		rmax = rule->resctl_max;
 
 		if (val->att_val_type != ATT_VAL_TYPE_VALUE) {
 			util_add_errmsg(errlst, gettext(
@@ -189,12 +189,12 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 				continue;
 			}
 
-			raction = rule->rctl_action;
-			if (!(((raction & RCTL_ACTN_SIGN) &&
+			raction = rule->resctl_action;
+			if (!(((raction & RESCTL_ACTN_SIGN) &&
 			    regexec(&sigacexp, vaction, 0, NULL, 0) == 0) ||
-			    ((raction & RCTL_ACTN_NONE) &&
+			    ((raction & RESCTL_ACTN_NONE) &&
 			    SEQU(vaction, "none")) ||
-			    ((raction & RCTL_ACTN_DENY) &&
+			    ((raction & RESCTL_ACTN_DENY) &&
 			    SEQU(vaction, "deny")))) {
 				util_add_errmsg(errlst, gettext(
 				    "rctl \"%s\" action not allowed \"%s\""),
@@ -273,7 +273,7 @@ attrib_validate_rctl(attrib_t *att,rctlrule_t *rule, list_t *errlst)
 				continue;
 			}
 
-			if (!(sigval & rule->rctl_sigs)) {
+			if (!(sigval & rule->resctl_sigs)) {
 				util_add_errmsg(errlst, gettext(
 				    "rctl \"%s\" signal not allowed \"%s\""),
 				    atname, vaction);
@@ -308,8 +308,8 @@ attrib_validate(attrib_t *att, list_t *errlst)
 	char *str, *eptr;
 	long long ll;
 
-	rctl_info_t rinfo;
-	rctlrule_t rrule;
+	resctl_info_t rinfo;
+	resctlrule_t rrule;
 
 	regex_t poolnexp;
 	if (regcomp(&poolnexp, POOLN_EXP, REG_EXTENDED) != 0) {
@@ -378,7 +378,7 @@ attrib_validate(attrib_t *att, list_t *errlst)
 					    "project.pool: invalid pool "
 					    "name \"%s\""), str);
 					ret = 1;
-				} else if (rctl_pool_exist(str) != 0) {
+				} else if (resctl_pool_exist(str) != 0) {
 					util_add_errmsg(errlst, gettext(
 					    "project.pool: pools not enabled  "
 					    "or pool does not exist: \"%s\""),
@@ -392,8 +392,8 @@ attrib_validate(attrib_t *att, list_t *errlst)
 				ret = 1;
 			}
 		}
-	} else if (rctl_get_info(atname, &rinfo) == 0) {
-		rctl_get_rule(&rinfo, &rrule);
+	} else if (resctl_get_info(atname, &rinfo) == 0) {
+		resctl_get_rule(&rinfo, &rrule);
 		if (attrib_validate_rctl(att, &rrule, errlst) != 0) {
 			ret = 1;
 		}
@@ -804,8 +804,8 @@ attrib_t
 	char *num, *mod, *unit;
 	int i;
 
-	rctl_info_t rinfo;
-	rctlrule_t rrule;
+	resctl_info_t rinfo;
+	resctlrule_t rrule;
 
 	regmatch_t *mat = util_safe_malloc(nmatch * sizeof(regmatch_t));
 	ret = ATT_ALLOC();
@@ -858,19 +858,19 @@ attrib_t
 		free(values);
 	}
 
-	if (rctl_get_info(ret->att_name, &rinfo) == 0) {
-		rctl_get_rule(&rinfo, &rrule);
+	if (resctl_get_info(ret->att_name, &rinfo) == 0) {
+		resctl_get_rule(&rinfo, &rrule);
 		retv = ret->att_value;
 
 		/*
-		 * Handle the case of RCTL_TYPE_SCNDS
-		 * and RCTL_TYPE_BYTES only
+		 * Handle the case of RESCTL_TYPE_SCNDS
+		 * and RESCTL_TYPE_BYTES only
 		 */
-		if (!(rrule.rtcl_type == RCTL_TYPE_SCNDS ||
-		    rrule.rtcl_type == RCTL_TYPE_BYTES))
+		if (!(rrule.resctl_type == RESCTL_TYPE_SCNDS ||
+		    rrule.resctl_type == RESCTL_TYPE_BYTES))
 			goto out;
 
-		scale = (rrule.rtcl_type == RCTL_TYPE_SCNDS)?
+		scale = (rrule.resctl_type == RESCTL_TYPE_SCNDS)?
 		    SCNDS_SCALE : BYTES_SCALE;
 
 		if (retv->att_val_type != ATT_VAL_TYPE_LIST)

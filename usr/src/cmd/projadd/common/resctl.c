@@ -18,35 +18,35 @@
 #include <stropts.h>
 
 #include "util.h"
-#include "rctl.h"
+#include "resctl.h"
 
 sig_t sigs[SIGS_CNT] = {
 	/* Signal names */
-	{"ABRT", RCTL_SIG_ABRT},
-	{"XRES", RCTL_SIG_XRES},
-	{"HUP",  RCTL_SIG_HUP},
-	{"STOP", RCTL_SIG_STOP},
-	{"TERM", RCTL_SIG_TERM},
-	{"KILL", RCTL_SIG_KILL},
-	{"XFSZ", RCTL_SIG_XFSZ},
-	{"XCPU", RCTL_SIG_XCPU},
+	{"ABRT", RESCTL_SIG_ABRT},
+	{"XRES", RESCTL_SIG_XRES},
+	{"HUP",  RESCTL_SIG_HUP},
+	{"STOP", RESCTL_SIG_STOP},
+	{"TERM", RESCTL_SIG_TERM},
+	{"KILL", RESCTL_SIG_KILL},
+	{"XFSZ", RESCTL_SIG_XFSZ},
+	{"XCPU", RESCTL_SIG_XCPU},
 
 	/* Singnal numbers */
-	{"6",  RCTL_SIG_ABRT},
-	{"38", RCTL_SIG_XRES},
-	{"1",  RCTL_SIG_HUP},
-	{"23", RCTL_SIG_STOP},
-	{"15", RCTL_SIG_TERM},
-	{"9",  RCTL_SIG_KILL},
-	{"31", RCTL_SIG_XFSZ},
-	{"30", RCTL_SIG_XCPU},
+	{"6",  RESCTL_SIG_ABRT},
+	{"38", RESCTL_SIG_XRES},
+	{"1",  RESCTL_SIG_HUP},
+	{"23", RESCTL_SIG_STOP},
+	{"15", RESCTL_SIG_TERM},
+	{"9",  RESCTL_SIG_KILL},
+	{"31", RESCTL_SIG_XFSZ},
+	{"30", RESCTL_SIG_XCPU},
 };
 
 /*
  * Check the existance of a resource pool in the system
  */
 int
-rctl_pool_exist(char *name)
+resctl_pool_exist(char *name)
 {
 	pool_conf_t *conf;
 	pool_t *pool;
@@ -93,7 +93,7 @@ rctl_pool_exist(char *name)
 }
 
 int
-rctl_get_info(char *name, rctl_info_t *pinfo)
+resctl_get_info(char *name, resctl_info_t *pinfo)
 {
 	rctlblk_t *blk1, *blk2, *tmp;
 	rctl_priv_t priv;
@@ -127,44 +127,44 @@ out:
 }
 
 void
-rctl_get_rule(rctl_info_t *pinfo, rctlrule_t* prule)
+resctl_get_rule(resctl_info_t *pinfo, resctlrule_t* prule)
 {
 
-	prule->rtcl_max = pinfo->value;
+	prule->resctl_max = pinfo->value;
 	if (pinfo->flags & RCTL_GLOBAL_BYTES) {
-		prule->rtcl_type = RCTL_TYPE_BYTES;
+		prule->resctl_type = RESCTL_TYPE_BYTES;
 	} else if (pinfo->flags & RCTL_GLOBAL_SECONDS) {
-		prule->rtcl_type = RCTL_TYPE_SCNDS;
+		prule->resctl_type = RESCTL_TYPE_SCNDS;
 	} else if (pinfo->flags & RCTL_GLOBAL_COUNT) {
-		prule->rtcl_type = RCTL_TYPE_COUNT;
+		prule->resctl_type = RESCTL_TYPE_COUNT;
 	} else {
-		prule->rtcl_type = RCTL_TYPE_UNKWN;
+		prule->resctl_type = RESCTL_TYPE_UNKWN;
 	}
 
 	if (pinfo->flags & RCTL_GLOBAL_NOBASIC) {
-		prule->rctl_privs = RCTL_PRIV_PRIVE | RCTL_PRIV_PRIVD;
+		prule->resctl_privs = RESCTL_PRIV_PRIVE | RESCTL_PRIV_PRIVD;
 	} else {
-		prule->rctl_privs = RCTL_PRIV_ALLPR;
+		prule->resctl_privs = RESCTL_PRIV_ALLPR;
 	}
 
 	if (pinfo->flags & RCTL_GLOBAL_DENY_ALWAYS) {
-		prule->rctl_action = RCTL_ACTN_DENY;
+		prule->resctl_action = RESCTL_ACTN_DENY;
 	} else if (pinfo->flags & RCTL_GLOBAL_DENY_NEVER) {
-		prule->rctl_action = RCTL_ACTN_NONE;
+		prule->resctl_action = RESCTL_ACTN_NONE;
 	} else {
-		prule->rctl_action = RCTL_ACTN_NONE | RCTL_ACTN_DENY;
+		prule->resctl_action = RESCTL_ACTN_NONE | RESCTL_ACTN_DENY;
 	}
 
 	if (pinfo->flags & RCTL_GLOBAL_SIGNAL_NEVER) {
-		prule->rctl_sigs = 0;
+		prule->resctl_sigs = 0;
 	} else {
-		prule->rctl_action |= RCTL_ACTN_SIGN;
-		prule->rctl_sigs = RCTL_SIG_CMN;
+		prule->resctl_action |= RESCTL_ACTN_SIGN;
+		prule->resctl_sigs = RESCTL_SIG_CMN;
 		if (pinfo->flags & RCTL_GLOBAL_CPU_TIME) {
-			prule->rctl_sigs |= RCTL_SIG_XCPU;
+			prule->resctl_sigs |= RESCTL_SIG_XCPU;
 		}
 		if (pinfo->flags & RCTL_GLOBAL_FILE_SIZE) {
-			prule->rctl_sigs |= RCTL_SIG_XFSZ;
+			prule->resctl_sigs |= RESCTL_SIG_XFSZ;
 		}
 	}
 }
