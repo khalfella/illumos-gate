@@ -31,18 +31,17 @@
 #include "projent.h"
 #include "util.h"
 
+#define	SEQU(str1, str2)		(strcmp(str1, str2) == 0)
+
 /*
  * Print usage
  */
-
 static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
 	    "Usage:\n"
-	    "projadd [-n] [-f filename] [-p projid [-o]] [-c comment]\n"
-	    "        [-U user[,user...]] [-G group[,group...]]\n"
-	    "        [-K name[=value[,value...]]] project\n"));
+	    "projdel [-f filename] project\n"));
 }
 
 /*
@@ -52,78 +51,35 @@ int
 main(int argc, char **argv)
 {
 	int c, ret = 0;
-
 	extern char *optarg;
 	extern int optind, optopt;
-	projid_t maxpjid = 99;
-	list_t *plist;
-	projent_t *ent;
-	char *str;
+	list_t *plist;			/* Projects list */
+	projent_t *ent, *delent;
+	int del;
+	boolean_t fflag = B_FALSE;	/* Command line flag */
+	char *pname;			/* Project name */
+	list_t errlst;			/* Errors list */
+	char *projfile = PROJF_PATH;	/* Project file "/etc/project" */
 
-	/* Command line options */
-	boolean_t nflag, fflag, pflag, oflag, cflag, Uflag, Gflag, Kflag;
-
-	/* Project entry fields */
-	char *pname;
-	projid_t projid;
-	char *projidstr = "";
-	char *comment = "";
-	char *userslist = "", *groupslist = "" , *attrslist = "";
-	char *users=  NULL, *groups = NULL;
-	lst_t *attrs = NULL;
-
-	list_t errlst;
-
-	/* Project file defaults to system project file "/etc/project" */
-	char *projfile = PROJF_PATH;
-
-	nflag = fflag = pflag = oflag = B_FALSE;
-	cflag = Uflag = Gflag = Kflag = B_FALSE;
-	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
+	list_create(&errlst, sizeof (errmsg_t), offsetof(errmsg_t, next));
 
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
-#define TEXT_DOMAIN "SYS_TEST"		/* Use this only if it wasn't */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it wasn't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
 	/* Parse the command line argument list */
-	while((c = getopt(argc, argv, ":hnf:p:oc:U:G:K:")) != EOF)
-		switch(c) {
+	while ((c = getopt(argc, argv, ":hf:")) != EOF)
+		switch (c) {
 			case 'h':
 				usage();
 				exit(0);
 				break;
-			case 'n':
-				nflag = B_TRUE;
-				break;
 			case 'f':
 				fflag = B_TRUE;
 				projfile = optarg;
-				break;
-			case 'p':
-				pflag = B_TRUE;
-				projidstr = optarg;
-				break;
-			case 'o':
-				oflag = B_TRUE;
-				break;
-			case 'c':
-				cflag = B_TRUE;
-				comment = optarg;
-				break;
-			case 'U':
-				Uflag = B_TRUE;
-				userslist = optarg;
-				break;
-			case 'G':
-				Gflag = B_TRUE;
-				groupslist = optarg;
-				break;
-			case 'K':
-				Kflag = B_TRUE;
-				attrslist = optarg;
 				break;
 			default:
 				util_add_errmsg(&errlst, gettext(
@@ -131,17 +87,13 @@ main(int argc, char **argv)
 				break;
 		}
 
-
-
-	if (oflag && !pflag) {
-		util_add_errmsg(&errlst, gettext(
-		    "-o requires -p projid to be specified"));
-	}
-
 	if (optind != argc -1) {
-		util_add_errmsg(&errlst, gettext(
-		    "No project name specified"));
+		fprintf(stderr, "No project name specified\n");
+		exit(2);
 	}
+
+	/* Name of the project to delete */
+	pname = argv[optind];
 
 	/* Parse the project file to get the list of the projects */
 	plist = projent_get_list(projfile, &errlst);
@@ -153,97 +105,42 @@ main(int argc, char **argv)
 		exit(2);
 	}
 
-	/* Parse and validate new project name */
-	pname = argv[optind];
-	if (projent_parse_name(pname, &errlst) == 0 && !nflag)
-	    projent_validate_unique_name(plist, pname, &errlst);
-
-	/* Parse and validate new project id */
-	if (pflag && projent_parse_projid(projidstr, &projid, &errlst) == 0) {
-		if (!nflag) {
-			projent_validate_projid(projid, &errlst);
-			if (!oflag) {
-				projent_validate_unique_id(plist, projid,
-				    &errlst);
-			} 
+	/* Find the project to be deleted */
+	del = 0;
+	for (ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
+		if (SEQU(ent->projname, pname)) {
+			del++;
+			delent = ent;
 		}
-
 	}
 
-
-	/* Parse comments, userslist, grouplist, and attributes list */
-	if (cflag)
-		(void) projent_parse_comment(comment, &errlst);
-	if (Uflag)
-		users =  projent_parse_usrgrp("user",userslist, &errlst);
-	if (Gflag)
-		groups =  projent_parse_usrgrp("group", groupslist, &errlst);
-	if (Kflag) {
-		attrs = projent_parse_attributes(attrslist, &errlst);
-		projent_sort_attributes(attrs);
-	}
-
-
-	if (!list_is_empty(&errlst)) {
-		util_print_errmsgs(&errlst);
-		list_destroy(&errlst);
+	if (del == 0) {
+		fprintf(stderr, "Project \"%s\" does not exist\n", pname);
+		usage();
+		ret = 2;
+		goto out;
+	} else if (del > 1) {
+		fprintf(stderr, "Duplicate project name \"%s\"", pname);
 		usage();
 		ret = 2;
 		goto out;
 	}
 
-	/* Find the maxprojid */
-	for(ent = list_head(plist); ent != NULL; ent = list_next(plist, ent))
-		maxpjid = (ent->projid > maxpjid) ? ent->projid : maxpjid;
-
-
-	/* We have all the required components to build this new projent */
-	ent = util_safe_zmalloc(sizeof(projent_t));
-	list_link_init(&ent->next);
-
-	/* Populate the new project entry */
-	ent->projname = strdup(pname);
-	ent->projid = (pflag) ? projid : maxpjid + 1;
-	ent->comment = strdup(comment);
-	ent->userlist = strdup((users != NULL) ? users : "");
-	ent->grouplist = strdup((groups != NULL) ? groups : "");
-	if (attrs &&  (str = projent_attrib_lst_tostring(attrs)) != NULL) {
-		ent->attr = str;
-	} else {
-		ent->attr = strdup("");
-	}
-
-	/* Add the new project entry to the list */
-	list_insert_tail(plist, ent);
-
-	/* Validate the projent before writing the list to the project file */
-	(void) projent_validate(ent, attrs, &errlst);
-	if (!list_is_empty(&errlst)) {
-		util_print_errmsgs(&errlst);
-		list_destroy(&errlst);
-		usage();
-		ret = 2;
-		goto out;
-	}
+	/* Remove the project entry from the list */
+	list_remove(plist, delent);
 
 	/* Write out the project file */
 	projent_put_list(projfile, plist, &errlst);
 
 	if (!list_is_empty(&errlst)) {
 		util_print_errmsgs(&errlst);
-		list_destroy(&errlst);
 		usage();
 		ret = 2;
 	}
-
 out:
-
-	/* Free allocated resources */
 	projent_free_list(plist);
 	list_destroy(plist);
-	free(plist); free(users); free(groups);
-	projent_free_attributes(attrs);
-	free(attrs);
-
+	free(plist);
+	list_destroy(&errlst);
 	return (ret);
 }
