@@ -31,10 +31,25 @@
 #include "projent.h"
 #include "util.h"
 
+
+#define	CHECK_ERRORS_FREE_PLIST(perrlst, pplist, attrs, ecode) {	\
+	if (!list_is_empty(perrlst)) {					\
+		util_print_errmsgs(perrlst);				\
+		list_destroy(perrlst);					\
+		if (pplist != NULL) {					\
+			projent_free_list(pplist);			\
+			list_destroy(pplist);				\
+			free(pplist);					\
+		}							\
+		free(attrs);						\
+		usage();						\
+		exit(ecode);						\
+	}								\
+}
+
 /*
  * Print usage
  */
-
 static void
 usage(void)
 {
@@ -56,7 +71,7 @@ main(int argc, char **argv)
 	extern char *optarg;
 	extern int optind, optopt;
 	projid_t maxpjid = 99;
-	list_t *plist;
+	list_t *plist = NULL;
 	projent_t *ent;
 	char *str;
 
@@ -68,9 +83,7 @@ main(int argc, char **argv)
 	projid_t projid;
 	char *projidstr = "";
 	char *comment = "";
-	char *userslist = "", *groupslist = "" , *attrslist = "";
-	char *users=  NULL, *groups = NULL;
-	lst_t *attrs = NULL;
+	char *users = "", *groups = "" , *attrs;
 
 	list_t errlst;
 
@@ -79,6 +92,7 @@ main(int argc, char **argv)
 
 	nflag = fflag = pflag = oflag = B_FALSE;
 	cflag = Uflag = Gflag = Kflag = B_FALSE;
+	attrs = util_safe_zmalloc(1);
 	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
 
 
@@ -115,15 +129,15 @@ main(int argc, char **argv)
 				break;
 			case 'U':
 				Uflag = B_TRUE;
-				userslist = optarg;
+				users = optarg;
 				break;
 			case 'G':
 				Gflag = B_TRUE;
-				groupslist = optarg;
+				groups = optarg;
 				break;
 			case 'K':
 				Kflag = B_TRUE;
-				attrslist = optarg;
+				attrs = UTIL_STR_APPEND2(attrs, ";", optarg);
 				break;
 			default:
 				util_add_errmsg(&errlst, gettext(
@@ -139,24 +153,20 @@ main(int argc, char **argv)
 	}
 
 	if (optind != argc -1) {
-		util_add_errmsg(&errlst, gettext(
-		    "No project name specified"));
+		util_add_errmsg(&errlst, gettext("No project name specified"));
 	}
+
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/* Parse the project file to get the list of the projects */
 	plist = projent_get_list(projfile, &errlst);
-
-	if (!list_is_empty(&errlst)) {
-		util_print_errmsgs(&errlst);
-		list_destroy(&errlst);
-		usage();
-		exit(2);
-	}
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/* Parse and validate new project name */
 	pname = argv[optind];
 	if (projent_parse_name(pname, &errlst) == 0 && !nflag)
-	    projent_validate_unique_name(plist, pname, &errlst);
+		projent_validate_unique_name(plist, pname, &errlst);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/* Parse and validate new project id */
 	if (pflag && projent_parse_projid(projidstr, &projid, &errlst) == 0) {
@@ -167,83 +177,41 @@ main(int argc, char **argv)
 				    &errlst);
 			} 
 		}
-
 	}
-
-
-	/* Parse comments, userslist, grouplist, and attributes list */
-	if (cflag)
-		(void) projent_parse_comment(comment, &errlst);
-	if (Uflag)
-		users =  projent_parse_usrgrp("user",userslist, &errlst);
-	if (Gflag)
-		groups =  projent_parse_usrgrp("group", groupslist, &errlst);
-	if (Kflag) {
-		attrs = projent_parse_attributes(attrslist, &errlst);
-		projent_sort_attributes(attrs);
-	}
-
-
-	if (!list_is_empty(&errlst)) {
-		util_print_errmsgs(&errlst);
-		list_destroy(&errlst);
-		usage();
-		ret = 2;
-		goto out;
-	}
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/* Find the maxprojid */
 	for(ent = list_head(plist); ent != NULL; ent = list_next(plist, ent))
 		maxpjid = (ent->projid > maxpjid) ? ent->projid : maxpjid;
 
-
-	/* We have all the required components to build this new projent */
-	ent = util_safe_zmalloc(sizeof(projent_t));
-	list_link_init(&ent->next);
-
-	/* Populate the new project entry */
-	ent->projname = strdup(pname);
-	ent->projid = (pflag) ? projid : maxpjid + 1;
-	ent->comment = strdup(comment);
-	ent->userlist = strdup((users != NULL) ? users : "");
-	ent->grouplist = strdup((groups != NULL) ? groups : "");
-	if (attrs &&  (str = projent_attrib_lst_tostring(attrs)) != NULL) {
-		ent->attr = str;
-	} else {
-		ent->attr = strdup("");
+	
+	if (!pflag && asprintf(&projidstr, "%ld", maxpjid + 1) == -1) {
+		util_add_errmsg(&errlst, gettext("Failed to allocate memory"));
+		CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 	}
+
+	ent = projent_parse_components(pname, projidstr, comment, users,
+	    groups, attrs, &errlst);
+
+	if (!pflag)
+		free(projidstr);
+
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+
+	/* Sort attributes list */
+	projent_sort_attributes(ent->attrs);
+
 
 	/* Add the new project entry to the list */
 	list_insert_tail(plist, ent);
 
 	/* Validate the projent before writing the list to the project file */
-	(void) projent_validate(ent, attrs, &errlst);
-	if (!list_is_empty(&errlst)) {
-		util_print_errmsgs(&errlst);
-		list_destroy(&errlst);
-		usage();
-		ret = 2;
-		goto out;
-	}
+	(void) projent_validate(ent, &errlst);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/* Write out the project file */
 	projent_put_list(projfile, plist, &errlst);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
-	if (!list_is_empty(&errlst)) {
-		util_print_errmsgs(&errlst);
-		list_destroy(&errlst);
-		usage();
-		ret = 2;
-	}
-
-out:
-
-	/* Free allocated resources */
-	projent_free_list(plist);
-	list_destroy(plist);
-	free(plist); free(users); free(groups);
-	projent_free_attributes(attrs);
-	free(attrs);
-
-	return (ret);
+	return (0);
 }

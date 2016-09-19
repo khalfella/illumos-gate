@@ -9,6 +9,16 @@
 
 #include "lst.h"
 
+#define F_PAR_VLD       0x00000001      /* Run validation after parsing */
+#define F_PAR_SPC       0x00000001      /* Allow spaces between names */
+#define F_PAR_UNT       0x00000001      /* Allow units in attribs values */
+#define F_PAR_RES       0x00000001      /* Allow projid < 100 */
+#define F_PAR_DUP       0x00000001      /* Allow duplicate projids */
+
+#define F_MOD_ADD       0x00000100
+#define F_MOD_REM       0x00000200
+#define F_MOD_SUB       0x00000400
+#define F_MOD_REP       0x00000800
 
 #ifdef  __cplusplus
 extern "C" {
@@ -21,12 +31,14 @@ typedef struct projent {
 	char *comment;
 	char *userlist;
 	char *grouplist;
-	char *attr;
+	lst_t *attrs;
 	list_node_t next;
 } projent_t;
 
 
-extern int projent_validate(projent_t *, lst_t *, list_t *);
+extern projent_t *projent_parse_components(char *, char * , char *, char *,
+    char *, char *, list_t *);
+extern int projent_validate(projent_t *, list_t *);
 extern list_t *projent_get_list(char *, list_t *);
 extern void projent_free_list(list_t *);
 extern int  projent_parse_name(char *, list_t *);

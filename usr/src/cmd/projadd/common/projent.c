@@ -135,18 +135,20 @@ char
 *projent_tostring(projent_t *ent)
 {
 	char *ret = NULL;
+	char *attrs = attrib_lst_tostring(ent->attrs);
 	asprintf(&ret, "%s:%d:%s:%s:%s:%s",
 	    ent->projname,
 	    ent->projid,
 	    ent->comment,
 	    ent->userlist,
 	    ent->grouplist,
-	    ent->attr);
+	    attrs);
+	free(attrs);
 	return (ret);
 }
 
 int
-projent_validate(projent_t *pent, lst_t *attrs, list_t *errlst)
+projent_validate(projent_t *pent, list_t *errlst)
 {
 	char *str;
 
@@ -155,17 +157,14 @@ projent_validate(projent_t *pent, lst_t *attrs, list_t *errlst)
 	projent_validate_comment(pent->comment, errlst);
 	projent_validate_users(pent->userlist, errlst);
 	projent_validate_groups(pent->grouplist, errlst);
+	projent_validate_attributes(pent->attrs, errlst);
 
-	if (attrs != NULL)
-		projent_validate_attributes(attrs, errlst);
-
-	if ((str = projent_tostring(pent)) != NULL) {
-		if (strlen(str) > (PROJECT_BUFSZ - 2)) {
-			util_add_errmsg(errlst, gettext(
-			    "projent line too long"));
-		}
-		free(str);
+	str = projent_tostring(pent);
+	if (strlen(str) > (PROJECT_BUFSZ - 2)) {
+		util_add_errmsg(errlst, gettext(
+		    "projent line too long"));
 	}
+	free(str);
 	return (list_is_empty(errlst) == 0);
 }
 void
@@ -240,6 +239,7 @@ projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 	}
 
 	susrs = usrs = strdup(nlist);
+	ulist = util_safe_zmalloc(1);
 
 	while ((usr = strsep(&usrs, " ,")) != NULL) {
 		if (*usr == '\0')
@@ -255,7 +255,7 @@ projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 			break;
 		}
 		/* Append ',' first if required */
-		if (ulist)
+		if (*ulist != '\0')
 			ulist = UTIL_STR_APPEND1(ulist, ",");
 		ulist = UTIL_STR_APPEND1(ulist, usr);
 	}
@@ -311,23 +311,28 @@ int
 projent_parse_projid(char *projidstr, projid_t *pprojid, list_t *errlst)
 {
 	char *ptr;
+	projid_t id;
 
-	*pprojid = strtol(projidstr, &ptr, 10);
+	id = strtol(projidstr, &ptr, 10);
 
 	/* projid should be a positive number */
-	if (errno == EINVAL || errno == ERANGE || *ptr != '\0' ) {
+	if (id == 0 && (errno == EINVAL || errno == ERANGE || *ptr != '\0') ) {
 		util_add_errmsg(errlst, gettext("Invalid project id:  %s"),
 		    projidstr);
 		return (1);
 	}
 
 	/* projid should be less than UID_MAX */
-	if (*pprojid > INT_MAX) {
+	if (id > INT_MAX) {
 		util_add_errmsg(errlst, gettext(
 		    "Invalid projid \"%s\": must be <= %d"),
-		    projidstr, INT_MAX);
+		    id, INT_MAX);
 		return (1);
 	}
+
+	if (pprojid != NULL)
+		*pprojid = id;
+
 	return (0);
 }
 
@@ -382,42 +387,78 @@ projent_free(projent_t *ent)
 	free(ent->comment);
 	free(ent->userlist);
 	free(ent->grouplist);
-	free(ent->attr);
+	attrib_free_lst(ent->attrs);
+	free(ent->attrs);
 }
 
 projent_t
-*projent_parse(char *projstr) {
+*projent_parse_components(char *projname, char * idstr, char *comment,
+    char *users, char *groups, char *attr, list_t *errlst)
+{
+	projent_t *ent;
+	int reterr = 0;
+
+	ent = util_safe_zmalloc(sizeof(projent_t));
+
+
+	ent->projname = strdup(projname);
+	ent->comment = strdup(comment);
+
+	reterr += projent_parse_name(ent->projname, errlst);
+	reterr += projent_parse_projid(idstr, &ent->projid, errlst);
+	reterr += projent_parse_comment(ent->comment, errlst);
+	ent->userlist = projent_parse_usrgrp("user", users, errlst);
+	ent->grouplist = projent_parse_usrgrp("group", groups, errlst);
+	ent->attrs = projent_parse_attributes(attr, errlst);
+
+	if (reterr > 0 || ent->userlist == NULL ||
+	    ent->grouplist == NULL || ent->attrs == NULL) {
+		projent_free(ent);
+		UTIL_FREE_SNULL(ent);
+	}
+
+	return (ent);
+}
+projent_t
+*projent_parse(char *projstr, list_t *errlst) {
 	char *s1, *str, *sstr;
+	char *projname, *idstr, *comment, *users, *groups, *attrstr;
+	projid_t id;
+	projent_t *ent;
 
 	if (projstr == NULL)
 		return (NULL);
 
+	projname = idstr = comment = users = groups = attrstr = NULL;
+	ent = NULL;
+
 	sstr  = str = strdup(projstr);
 
-	projent_t *ent = util_safe_zmalloc(sizeof(projent_t));
-	list_link_init(&ent->next);
-
-	if ((ent->projname = strdup(strsep(&str, ":"))) != NULL &&
-	    (s1 = strsep(&str, ":")) != NULL &&
-	    ((ent->projid = atoi(s1)) != 0 || errno != EINVAL) &&
-	    (ent->comment = strdup(strsep(&str, ":"))) != NULL &&
-	    (ent->userlist = strdup(strsep(&str, ":"))) != NULL &&
-	    (ent->grouplist = strdup(strsep(&str, ":"))) != NULL &&
-	    (ent->attr = strdup(strsep(&str, ":"))) != NULL &&
-	    strsep(&str, ":") == NULL) {
-		goto done;
+	if ((projname = strdup(strsep(&str, ":"))) == NULL ||
+	    (idstr = strdup(strsep(&str, ":"))) == NULL ||
+	    (comment = strdup(strsep(&str, ":"))) == NULL ||
+	    (users = strdup(strsep(&str, ":"))) == NULL ||
+	    (groups = strdup(strsep(&str, ":"))) == NULL ||
+	    (attrstr = strdup(strsep(&str, ":"))) == NULL ||
+	    strsep(&str, ":") != NULL){
+		util_add_errmsg(errlst, gettext(
+		    "Incorrect number of fields.  Should have 5 \":\"'s."));
+		goto out;
 	}
 
-	projent_free(ent);
-	UTIL_FREE_SNULL(ent);
-done:
+	ent = projent_parse_components(projname, idstr, comment, users, groups,
+	    attrstr, errlst);
+out:
 	free(sstr);
+	free(projname); free(idstr); free(comment);
+	free(users); free(groups); free(attrstr);
 	return (ent);
 }
 
 
 void
-projent_free_list(list_t *plist) {
+projent_free_list(list_t *plist)
+{
 	if (plist == NULL)
 		return;
 
@@ -433,7 +474,7 @@ projent_free_list(list_t *plist) {
 void
 projent_put_list(char *projfile, list_t *plist, list_t *errlst)
 {
-	char *tmpprojfile;
+	char *tmpprojfile, *attrs;
 	FILE *fp;
 	projent_t *ent;
 	struct stat statbuf;
@@ -460,9 +501,11 @@ projent_put_list(char *projfile, list_t *plist, list_t *errlst)
 	}
 
 	for(ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
+		attrs = attrib_lst_tostring(ent->attrs);
 		ret = fprintf(fp, "%s:%d:%s:%s:%s:%s\n", ent->projname,
 		    ent->projid, ent->comment, ent->userlist, ent->grouplist,
-		    ent->attr);
+		    attrs);
+		free(attrs);
 		if (ret < 0) {
 			util_add_errmsg(errlst, gettext(
 			    "Failed to write to  %s: %s"),
@@ -533,7 +576,7 @@ list_t
 		if ((nlp = strchr(buf, '\n')) != NULL)
 			*nlp = '\0';
 
-		if ((ent = projent_parse(buf)) != NULL) {
+		if ((ent = projent_parse(buf, errlst)) != NULL) {
 			list_insert_tail(ret, ent);
 		} else {
 			/* Report the error */
