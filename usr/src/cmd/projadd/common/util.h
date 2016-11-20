@@ -29,6 +29,7 @@ typedef struct errmsg {
 	list_node_t next;
 } errmsg_t;
 
+extern void *util_safe_realloc(void* , size_t);
 extern void *util_safe_malloc(size_t);
 extern void *util_safe_zmalloc(size_t);
 extern char **util_tokenize(char *, list_t *);

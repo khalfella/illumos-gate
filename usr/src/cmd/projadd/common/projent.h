@@ -10,10 +10,10 @@
 #include "lst.h"
 
 #define F_PAR_VLD       0x00000001      /* Run validation after parsing */
-#define F_PAR_SPC       0x00000001      /* Allow spaces between names */
-#define F_PAR_UNT       0x00000001      /* Allow units in attribs values */
-#define F_PAR_RES       0x00000001      /* Allow projid < 100 */
-#define F_PAR_DUP       0x00000001      /* Allow duplicate projids */
+#define F_PAR_SPC       0x00000002      /* Allow spaces between names */
+#define F_PAR_UNT       0x00000004      /* Allow units in attribs values */
+#define F_PAR_RES       0x00000008      /* Allow projid < 100 */
+#define F_PAR_DUP       0x00000010      /* Allow duplicate projids */
 
 #define F_MOD_ADD       0x00000100
 #define F_MOD_REM       0x00000200
@@ -37,18 +37,18 @@ typedef struct projent {
 
 
 extern projent_t *projent_parse_components(char *, char * , char *, char *,
-    char *, char *, list_t *);
-extern int projent_validate(projent_t *, list_t *);
-extern list_t *projent_get_list(char *, list_t *);
+    char *, char *, int, list_t *);
+extern int projent_validate(projent_t *, int, list_t *);
+extern list_t *projent_get_list(char *, int, list_t *);
 extern void projent_free_list(list_t *);
 extern int  projent_parse_name(char *, list_t *);
 extern int  projent_validate_unique_name(list_t *, char *, list_t *);
 extern int  projent_parse_projid(char *, projid_t *, list_t *);
-extern int  projent_validate_projid(projid_t, list_t *);
+extern int  projent_validate_projid(projid_t, int, list_t *);
 extern int  projent_validate_unique_id(list_t *, projid_t ,list_t *);
 extern int  projent_parse_comment(char *, list_t *);
-extern char *projent_parse_usrgrp(char *, char *, list_t *);
-extern lst_t *projent_parse_attributes(char *, list_t *);
+/*extern char *projent_parse_usrgrp(char *, char *, list_t *);*/
+/*extern lst_t *projent_parse_attributes(char *, list_t *); */
 extern void projent_sort_attributes(lst_t *);
 extern void projent_free_attributes(lst_t *);
 extern char *projent_attrib_lst_tostring(lst_t *);

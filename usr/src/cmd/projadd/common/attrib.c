@@ -791,7 +791,7 @@ out1:
 }
 
 attrib_t
-*attrib_parse(regex_t *attrbexp, regex_t *atvalexp, char *att,
+*attrib_parse(regex_t *attrbexp, regex_t *atvalexp, char *att, int flags,
     list_t *errlst)
 {
 	int nmatch = MAX_OF(attrbexp->re_nsub, atvalexp->re_nsub) + 1;
@@ -841,6 +841,9 @@ attrib_t
 		    "Invalid attribute \"%s\""), att);
 		goto out;
 	}
+
+	if (!(flags & F_PAR_UNT))
+		goto out;
 
 	if (SEQU(ret->att_name, "rcap.max-rss")) {
 		values = attrib_val_tostring(ret->att_value, B_FALSE);

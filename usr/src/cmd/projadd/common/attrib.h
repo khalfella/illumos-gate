@@ -8,6 +8,7 @@
 #include <project.h>
 #include <sys/varargs.h>
 
+#include "projent.h"
 #include "lst.h"
 
 #ifdef  __cplusplus
@@ -38,7 +39,7 @@ typedef struct attrib_s {
 #define ATT_VAL_ALLOC_LIST(L)	ATT_VAL_ALLOC(ATT_VAL_TYPE_LIST, (L))
 
 extern char *attrib_lst_tostring(lst_t *);
-extern attrib_t *attrib_parse(regex_t *, regex_t *, char *, list_t *);
+extern attrib_t *attrib_parse(regex_t *, regex_t *, char *, int, list_t *);
 extern void attrib_free_lst(lst_t *);
 extern char *attrib_val_tostring(attrib_val_t *, boolean_t);
 extern attrib_t *attrib_alloc();

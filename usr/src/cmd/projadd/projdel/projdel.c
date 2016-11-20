@@ -51,6 +51,7 @@ int
 main(int argc, char **argv)
 {
 	int c, ret = 0;
+	int flags;
 	extern char *optarg;
 	extern int optind, optopt;
 	list_t *plist;			/* Projects list */
@@ -95,8 +96,10 @@ main(int argc, char **argv)
 	/* Name of the project to delete */
 	pname = argv[optind];
 
+	flags = F_PAR_VLD | F_PAR_RES | F_PAR_DUP;
+
 	/* Parse the project file to get the list of the projects */
-	plist = projent_get_list(projfile, &errlst);
+	plist = projent_get_list(projfile, flags, &errlst);
 
 	if (!list_is_empty(&errlst)) {
 		util_print_errmsgs(&errlst);

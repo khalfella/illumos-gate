@@ -148,12 +148,12 @@ char
 }
 
 int
-projent_validate(projent_t *pent, list_t *errlst)
+projent_validate(projent_t *pent, int flags, list_t *errlst)
 {
 	char *str;
 
 	projent_validate_name(pent->projname, errlst);
-	projent_validate_projid(pent->projid, errlst);
+	projent_validate_projid(pent->projid, flags, errlst);
 	projent_validate_comment(pent->comment, errlst);
 	projent_validate_users(pent->userlist, errlst);
 	projent_validate_groups(pent->grouplist, errlst);
@@ -167,6 +167,53 @@ projent_validate(projent_t *pent, list_t *errlst)
 	free(str);
 	return (list_is_empty(errlst) == 0);
 }
+
+int
+projent_validate_list(list_t *plist, int flags, list_t *errlst)
+{
+	int i, idx;
+	projent_t *ent;
+	char *pnames = NULL;
+	projid_t *pids = NULL;
+	int ret = 0;
+
+	idx = 0;
+	for (ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
+		/* Check for duplicate projname */
+		if (pnames != NULL && strstr(pnames, ent->projname) != NULL) {
+			util_add_errmsg(errlst, gettext(
+			    "Duplicate project name %s"), ent->projname);
+			ret++;
+		}
+
+		/* Check for duplicate projid if DUP is not allowed */
+		if (!(flags & F_PAR_DUP) && pids != NULL) {
+			for (i = 0; i < idx; i++) {
+				if (ent->projid == pids[i]) {
+					util_add_errmsg(errlst, gettext(
+					    "Duplicate proid %d"), ent->projid);
+					ret++;
+					break;
+				}
+			}
+		}
+
+		/* Add the projname an projid to out temp list */
+		pnames = UTIL_STR_APPEND2(pnames, "|", ent->projname);
+		pids = util_safe_realloc(pids, (idx + 1) * sizeof(projid_t));
+		pids[idx] = ent->projid;
+		idx++;
+
+		/* Validate the projet */
+		ret += projent_validate(ent, flags, errlst);
+	}
+
+	free(pnames);
+	free(pids);
+
+	return (ret);
+}
+
 void
 projent_free_attributes(lst_t *attribs)
 {
@@ -186,7 +233,7 @@ char
 }
 
 lst_t
-*projent_parse_attributes(char *attribs, list_t *errlst)
+*projent_parse_attributes(char *attribs, int flags, list_t *errlst)
 {
 	char *sattrs, *attrs, *att;
 	regex_t attrbexp, atvalexp;
@@ -207,7 +254,7 @@ lst_t
 		if (*att == '\0')
 			continue;
 		if ((natt = attrib_parse(&attrbexp,
-		    &atvalexp, att, errlst)) == NULL) {
+		    &atvalexp, att, flags, errlst)) == NULL) {
 			attrib_free_lst(ret);
 			UTIL_FREE_SNULL(ret);
 			break;
@@ -225,10 +272,11 @@ out1:
 }
 
 char *
-projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
+projent_parse_usrgrp(char *usrgrp, char *nlist, int flags, list_t *errlst)
 {
 	char *ulist = NULL;
 	char *susrs, *usrs, *usr;
+	char *sep;
 	regex_t usernexp;
 
 	if (regcomp(&usernexp, USERN_EXP, REG_EXTENDED) != 0) {
@@ -238,10 +286,11 @@ projent_parse_usrgrp(char *usrgrp, char *nlist, list_t *errlst)
 		goto out;
 	}
 
+	sep = (flags & F_PAR_SPC) ? " ," : ",";
 	susrs = usrs = strdup(nlist);
 	ulist = util_safe_zmalloc(1);
 
-	while ((usr = strsep(&usrs, " ,")) != NULL) {
+	while ((usr = strsep(&usrs, sep)) != NULL) {
 		if (*usr == '\0')
 			continue;
 
@@ -295,9 +344,13 @@ projent_validate_unique_id(list_t *plist, projid_t projid,list_t *errlst)
 	return (0);
 }
 int
-projent_validate_projid(projid_t projid, list_t *errlst)
+projent_validate_projid(projid_t projid, int flags, list_t *errlst)
 {
-	if (projid < 0) {
+	projid_t maxprojid;
+		
+	maxprojid = (flags & F_PAR_RES) ? 0 : 100;
+
+	if (projid < maxprojid) {
 		util_add_errmsg(errlst, gettext(
 		    "Invalid projid \"%d\": "
 		    "must be >= 100"),
@@ -393,7 +446,7 @@ projent_free(projent_t *ent)
 
 projent_t
 *projent_parse_components(char *projname, char * idstr, char *comment,
-    char *users, char *groups, char *attr, list_t *errlst)
+    char *users, char *groups, char *attr, int flags, list_t *errlst)
 {
 	projent_t *ent;
 	int reterr = 0;
@@ -407,9 +460,9 @@ projent_t
 	reterr += projent_parse_name(ent->projname, errlst);
 	reterr += projent_parse_projid(idstr, &ent->projid, errlst);
 	reterr += projent_parse_comment(ent->comment, errlst);
-	ent->userlist = projent_parse_usrgrp("user", users, errlst);
-	ent->grouplist = projent_parse_usrgrp("group", groups, errlst);
-	ent->attrs = projent_parse_attributes(attr, errlst);
+	ent->userlist = projent_parse_usrgrp("user", users, flags, errlst);
+	ent->grouplist = projent_parse_usrgrp("group", groups, flags, errlst);
+	ent->attrs = projent_parse_attributes(attr, flags, errlst);
 
 	if (reterr > 0 || ent->userlist == NULL ||
 	    ent->grouplist == NULL || ent->attrs == NULL) {
@@ -420,10 +473,9 @@ projent_t
 	return (ent);
 }
 projent_t
-*projent_parse(char *projstr, list_t *errlst) {
-	char *s1, *str, *sstr;
+*projent_parse(char *projstr, int flags, list_t *errlst) {
+	char *str, *sstr;
 	char *projname, *idstr, *comment, *users, *groups, *attrstr;
-	projid_t id;
 	projent_t *ent;
 
 	if (projstr == NULL)
@@ -447,7 +499,7 @@ projent_t
 	}
 
 	ent = projent_parse_components(projname, idstr, comment, users, groups,
-	    attrstr, errlst);
+	    attrstr, flags, errlst);
 out:
 	free(sstr);
 	free(projname); free(idstr); free(comment);
@@ -539,17 +591,17 @@ out:
 }
 
 list_t
-*projent_get_list(char *projfile, list_t *errlst)
+*projent_get_list(char *projfile, int flags, list_t *errlst)
 {
 	FILE *fp;
-	list_t *ret;
+	list_t *plist;
 	int line = 0;
 	char *buf = NULL, *nlp;
 	size_t cap = 0;
 	projent_t *ent;
 
-	ret = util_safe_malloc(sizeof(list_t));
-	list_create(ret, sizeof(projent_t), offsetof(projent_t, next));
+	plist = util_safe_malloc(sizeof(list_t));
+	list_create(plist, sizeof(projent_t), offsetof(projent_t, next));
 
 	if ((fp = fopen(projfile, "r")) == NULL) {
 		if (errno == ENOENT) {
@@ -557,7 +609,7 @@ list_t
 			 * There is no project file,
 			 * return an empty list
 			 */
-			return (ret);
+			return (plist);
 		} else {
 			/* Report the error unable to open the file */
 			util_add_errmsg(errlst, gettext(
@@ -565,8 +617,8 @@ list_t
 			    projfile, strerror(errno));
 
 			/* destory and free the to-be-returned list */
-			list_destroy(ret);
-			free(ret);
+			list_destroy(plist);
+			free(plist);
 			return (NULL);
 		}
 	}
@@ -576,8 +628,8 @@ list_t
 		if ((nlp = strchr(buf, '\n')) != NULL)
 			*nlp = '\0';
 
-		if ((ent = projent_parse(buf, errlst)) != NULL) {
-			list_insert_tail(ret, ent);
+		if ((ent = projent_parse(buf, flags, errlst)) != NULL) {
+			list_insert_tail(plist, ent);
 		} else {
 			/* Report the error */
 			util_add_errmsg(errlst, gettext(
@@ -585,14 +637,22 @@ list_t
 			    projfile, line, buf);
 
 			/* free the allocated resources */
-			projent_free_list(ret);
-			list_destroy(ret);
-			UTIL_FREE_SNULL(ret);
+			projent_free_list(plist);
+			list_destroy(plist);
+			UTIL_FREE_SNULL(plist);
 			break;
+		}
+	}
+
+	if (flags & F_PAR_VLD && plist != NULL) {
+		if (projent_validate_list(plist, flags, errlst) != 0) {
+			projent_free_list(plist);
+			list_destroy(plist);
+			UTIL_FREE_SNULL(plist);
 		}
 	}
 
 	free(buf);
 	fclose(fp);
-	return (ret);
+	return (plist);
 }

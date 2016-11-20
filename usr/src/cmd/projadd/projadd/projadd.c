@@ -66,14 +66,14 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int c, ret = 0;
+	int c;
 
 	extern char *optarg;
 	extern int optind, optopt;
 	projid_t maxpjid = 99;
 	list_t *plist = NULL;
+	int flags = 0;
 	projent_t *ent;
-	char *str;
 
 	/* Command line options */
 	boolean_t nflag, fflag, pflag, oflag, cflag, Uflag, Gflag, Kflag;
@@ -158,20 +158,19 @@ main(int argc, char **argv)
 
 	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
+	if (!nflag)
+		flags |= F_PAR_VLD;
+	flags |= F_PAR_RES | F_PAR_DUP;
+
 	/* Parse the project file to get the list of the projects */
-	plist = projent_get_list(projfile, &errlst);
+	plist = projent_get_list(projfile, flags, &errlst);
 	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
-	/* Parse and validate new project name */
-	pname = argv[optind];
-	if (projent_parse_name(pname, &errlst) == 0 && !nflag)
-		projent_validate_unique_name(plist, pname, &errlst);
-	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/* Parse and validate new project id */
 	if (pflag && projent_parse_projid(projidstr, &projid, &errlst) == 0) {
 		if (!nflag) {
-			projent_validate_projid(projid, &errlst);
+			projent_validate_projid(projid, 0, &errlst);
 			if (!oflag) {
 				projent_validate_unique_id(plist, projid,
 				    &errlst);
@@ -190,11 +189,14 @@ main(int argc, char **argv)
 		CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 	}
 
+	pname = argv[optind];
 	ent = projent_parse_components(pname, projidstr, comment, users,
-	    groups, attrs, &errlst);
-
+	    groups, attrs, F_PAR_SPC | F_PAR_UNT, &errlst);
 	if (!pflag)
 		free(projidstr);
+
+	if (!nflag)
+		projent_validate_unique_name(plist, pname, &errlst);
 
 	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
@@ -206,7 +208,7 @@ main(int argc, char **argv)
 	list_insert_tail(plist, ent);
 
 	/* Validate the projent before writing the list to the project file */
-	(void) projent_validate(ent, &errlst);
+	(void) projent_validate(ent, flags, &errlst);
 	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/* Write out the project file */
