@@ -19,7 +19,305 @@
  * CDDL HEADER END
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <libintl.h>
+#include <locale.h>
+#include <errno.h>
+#include <string.h>
+#include <stddef.h>
+#include <sys/types.h>
+
+
+#include <sys/debug.h>
+
+
+#include "projent.h"
+#include "util.h"
+
+#define SEQU(str1, str2)                (strcmp(str1, str2) == 0)
+
+#define	CHECK_ERRORS_FREE_PLIST(perrlst, pplist, attrs, ecode) {	\
+	if (!list_is_empty(perrlst)) {					\
+		util_print_errmsgs(perrlst);				\
+		list_destroy(perrlst);					\
+		if (pplist != NULL) {					\
+			projent_free_list(pplist);			\
+			list_destroy(pplist);				\
+			free(pplist);					\
+		}							\
+		free(attrs);						\
+		usage();						\
+		exit(ecode);						\
+	}								\
+}
+
+
+/*
+ * Print usage
+ */
+static void
+usage(void)
+{
+	(void) fprintf(stderr, gettext(
+	    "Usage:\n"
+	    "projmod [-n] [-A|-f filename] [-p projid [-o]] [-c comment]\n"
+	    "        [-a|-s|-r] [-U user[,user...]] [-G group[,group...]]\n"
+	    "        [-K name[=value[,value...]]] [-l new_projectname]\n"
+	    "        project\n"));
+}
+
+
+/*
+ * main()
+ */
 int
-main() {
+main(int argc, char **argv)
+{
+	int c;
+
+	extern char *optarg;
+	extern int optind, optopt;
+	list_t *plist = NULL;
+	int flags = 0;
+	projent_t *ent, *modent;
+
+	/* Command line options */
+	boolean_t fflag, nflag, cflag, oflag, pflag, lflag;
+	boolean_t sflag, rflag, aflag;
+	boolean_t Uflag, Gflag, Kflag, Aflag;
+	boolean_t modify;
+
+	/* Project entry fields */
+	char *pname = NULL;
+	char *npname = NULL;
+	/*projid_t projid; */
+	char *projidstr = "";
+	char *comment = "";
+	char *users = "", *groups = "" , *attrs;
+	char *pusers, *pgroups;
+
+	lst_t *pattribs;
+
+	list_t errlst;
+
+	/* Project file defaults to system project file "/etc/project" */
+	char *projfile = PROJF_PATH;
+
+	fflag = nflag = cflag = oflag = pflag = lflag = B_FALSE;
+	sflag = rflag = aflag = B_FALSE;
+	Uflag = Gflag = Kflag = Aflag = B_FALSE;
+
+	modify = B_FALSE;
+
+
+
+	attrs = util_safe_zmalloc(1);
+	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
+
+
+	(void) setlocale(LC_ALL, "");
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define TEXT_DOMAIN "SYS_TEST"		/* Use this only if it wasn't */
+#endif
+	(void) textdomain(TEXT_DOMAIN);
+
+	/* Parse the command line argument list */
+	while((c = getopt(argc, argv, ":hf:nc:op:l:sraU:G:K:A")) != EOF)
+		switch(c) {
+			case 'h':
+				usage();
+				exit(0);
+				break;
+			case 'f':
+				fflag = B_TRUE;
+				projfile = optarg;
+				break;
+			case 'n':
+				nflag = B_TRUE;
+				break;
+			case 'c':
+				cflag = B_TRUE;
+				comment = optarg;
+				break;
+			case 'o':
+				oflag = B_TRUE;
+				break;
+			case 'p':
+				pflag = B_TRUE;
+				projidstr = optarg;
+				break;
+			case 'l':
+				lflag = B_TRUE;
+				npname = optarg;
+				break;
+			case 's':
+				sflag = B_TRUE;
+				break;
+			case 'r':
+				rflag = B_TRUE;
+				break;
+			case 'a':
+				aflag = B_TRUE;
+				break;
+			case 'U':
+				Uflag = B_TRUE;
+				users = optarg;
+				break;
+			case 'G':
+				Gflag = B_TRUE;
+				groups = optarg;
+				break;
+			case 'K':
+				Kflag = B_TRUE;
+				attrs = UTIL_STR_APPEND2(attrs, ";", optarg);
+				break;
+			case 'A':
+				Aflag = B_TRUE;
+				break;
+			default:
+				util_add_errmsg(&errlst, gettext(
+				    "Invalid option: -%c"), optopt);
+				break;
+		}
+
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+
+	if (optind == argc - 1) {
+		pname = argv[optind];
+	}
+
+	if (cflag || Gflag || lflag || pflag || Uflag || Kflag || Aflag) {
+		modify = B_TRUE;
+		if (pname == NULL) {
+			util_add_errmsg(&errlst, gettext(
+			    "No project name specified"));
+		}
+	} else if (pname != NULL) {
+		util_add_errmsg(&errlst, gettext(
+		    "missing -c, -G, -l, -p, -U, or -K"));
+	}
+
+	if (Aflag && fflag) {
+		util_add_errmsg(&errlst, gettext(
+		    "-A and -f are mutually exclusive"));
+	}
+
+	if (oflag && !pflag) {
+		util_add_errmsg(&errlst, gettext(
+		    "-o requires -p projid to be specified"));
+	}
+
+	if ((aflag && (rflag || sflag)) || (rflag && (aflag || sflag)) ||
+	    (sflag && (aflag || rflag))) {
+		util_add_errmsg(&errlst, gettext(
+		    "-a, -r, and -s are mutually exclusive"));
+	}
+
+	if ((aflag || rflag || sflag) && !(Uflag || Gflag || Kflag)) {
+		util_add_errmsg(&errlst, gettext(
+		    "-a, -r, and -s require -U users, -G groups "
+		    "or -K attributes to be specified"));
+	}
+
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+
+	if (aflag) {
+		flags |= F_MOD_ADD;
+	} else if (rflag) {
+		flags |= F_MOD_REM;
+	} else if (sflag) {
+		flags |= F_MOD_SUB;
+	} else {
+		flags |= F_MOD_REP;
+	}
+	if (!nflag) {
+		flags |= F_PAR_VLD;
+	}
+	flags |= F_PAR_RES | F_PAR_DUP;
+
+	plist = projent_get_list(projfile, flags, &errlst);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+
+	modent = NULL;
+	if (pname != NULL) {
+		for (ent = list_head(plist); ent != NULL;
+		    ent = list_next(plist, ent)) {
+			if (SEQU(ent->projname, pname)) {
+				modent = ent;
+			}
+		}
+		if (modent == NULL) {
+			util_add_errmsg(&errlst, gettext(
+			    "Project \"%s\" does not exist"), pname);
+		}
+	}
+
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+
+	/*
+	 * If there is no modification options, simply reading the file, which
+	 * includes parsing and verifying, is sufficient.
+	 */
+	if (!modify) {
+		exit(0);
+	}
+
+	VERIFY(modent != NULL);
+
+	if (lflag && projent_parse_name(pname, &errlst) == 0 &&
+	    projent_validate_unique_name(plist, npname, &errlst) == 0) {
+		free(modent->projname);
+		modent->projname = strdup(npname);
+	}
+
+	if (cflag && projent_parse_comment(comment, &errlst) == 0) {
+		free(modent->comment);
+		modent->comment = strdup(comment);
+	}
+
+	if (Uflag) {
+		pusers = projent_parse_usrgrp("user", users, F_PAR_SPC,
+		    &errlst);
+		if (pusers != NULL) {
+			projent_merge_usrgrp("user", &modent->userlist,
+			    pusers, flags, &errlst);
+			free(pusers);
+		}
+	}
+
+	if (Gflag) {
+		pgroups = projent_parse_usrgrp("group", groups, F_PAR_SPC,
+		    &errlst);
+		if (pgroups != NULL) {
+			projent_merge_usrgrp("group", &modent->grouplist,
+			    pgroups, flags, &errlst);
+			free(pgroups);
+		}
+	}
+
+	if (Kflag) {
+		pattribs = projent_parse_attributes(attrs, F_PAR_UNT, &errlst);
+		if (pattribs != NULL) {
+			projent_merge_attributes(&modent->attrs,
+			    pattribs, flags, &errlst);
+			projent_sort_attributes(modent->attrs);
+			projent_free_attributes(pattribs);
+		}
+	}
+
+	if (!nflag) {
+		(void) projent_validate(modent, flags, &errlst);
+	}
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+
+	if (modify) {
+		projent_put_list(projfile, plist, &errlst);
+	}
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+
+
+
+
 	return (0);
 }

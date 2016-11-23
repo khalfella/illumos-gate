@@ -47,8 +47,10 @@ extern int  projent_parse_projid(char *, projid_t *, list_t *);
 extern int  projent_validate_projid(projid_t, int, list_t *);
 extern int  projent_validate_unique_id(list_t *, projid_t ,list_t *);
 extern int  projent_parse_comment(char *, list_t *);
-/*extern char *projent_parse_usrgrp(char *, char *, list_t *);*/
-/*extern lst_t *projent_parse_attributes(char *, list_t *); */
+extern void projent_merge_usrgrp(char *, char **, char *, int, list_t *);
+extern char *projent_parse_usrgrp(char *, char *, int, list_t *);
+extern void projent_merge_attributes(lst_t **, lst_t *, int, list_t *);
+extern lst_t *projent_parse_attributes(char *, int, list_t *);
 extern void projent_sort_attributes(lst_t *);
 extern void projent_free_attributes(lst_t *);
 extern char *projent_attrib_lst_tostring(lst_t *);

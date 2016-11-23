@@ -59,7 +59,7 @@ $(PROG): $(OBJS) $(COMMON_OBJS)
 	$(POST_PROCESS_O)
 
 clean:
-	-$(RM) $(OBJS) $(COMMON_OBJS)
+	-$(RM) $(PROG) $(OBJS) $(COMMON_OBJS)
 
 lint: lint_SRCS
 

@@ -232,6 +232,11 @@ char
 	return (attrib_lst_tostring(lst));
 }
 
+void
+projent_merge_attributes(lst_t **eattrs, lst_t *nattrs, int flags,
+    list_t *errlst) {
+}
+
 lst_t
 *projent_parse_attributes(char *attribs, int flags, list_t *errlst)
 {
@@ -269,6 +274,117 @@ out2:
 	regfree(&attrbexp);
 out1:
 	return (ret);
+}
+
+void
+projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
+    int flags, list_t *errlst) {
+	char *res = NULL;
+	char *seusrs, *eusrs, *eusr;
+	char *snusrs, *nusrs, *nusr;
+	char *sn1usrs, *n1usrs, *n1usr;
+	char *sep;
+
+	int i,j;
+
+	sep = (flags & F_PAR_SPC) ? " ," : ",";
+
+	if (flags & F_MOD_ADD) {
+		res = strdup(*elist);
+
+		snusrs = nusrs = strdup(nlist);
+		while ((nusr = strsep(&nusrs, sep)) != NULL) {
+			if (*nusr == '\0')
+				continue;
+			seusrs = eusrs = strdup(*elist);
+			while ((eusr = strsep(&eusrs, sep)) != NULL) {
+				if (*eusr == '\0')
+					continue;
+				if (strcmp(eusr, nusr) == 0) {
+					util_add_errmsg(errlst, gettext(
+					    "Project already contains"
+					    " %s \"%s\""), usrgrp, nusr);
+					UTIL_FREE_SNULL(res);
+					free(seusrs);
+					free(snusrs);
+					goto out;
+				}
+			}
+			free(seusrs);
+			/* Append nusr to the result */
+			if (*res != '\0')
+				res = UTIL_STR_APPEND1(res, ",");
+			res = UTIL_STR_APPEND1(res, nusr);
+		}
+		free(snusrs);
+	} else if (flags & F_MOD_REM) {
+
+		snusrs = nusrs = strdup(nlist);
+		for (i = 0; (nusr = strsep(&nusrs, sep)) != NULL; i++) {
+			if (*nusr == '\0')
+				continue;
+			sn1usrs = n1usrs = strdup(nlist);
+			for (j = 0; (n1usr = strsep(&n1usrs, sep)) != NULL;
+			    j++) {
+				if(i != j && strcmp(nusr, n1usr) == 0) {
+					util_add_errmsg(errlst, gettext(
+					    "Duplicate %s name \"%s\""),
+					    usrgrp, nusr);
+					free(sn1usrs);
+					free(snusrs);
+					goto out;
+				}
+			}
+			free(sn1usrs);
+
+			seusrs = eusrs = strdup(*elist);
+			while ((eusr = strsep(&eusrs, sep)) != NULL) {
+				if (strcmp(nusr, eusr) == 0) {
+					break;
+				}
+			}
+			free(seusrs);
+
+			if (eusr == NULL) {
+				util_add_errmsg(errlst, gettext(
+				    "Project does not contain %s name \"%s\""),
+				    usrgrp, nusr);
+				free(snusrs);
+				goto out;
+			}
+		}
+		free(snusrs);
+
+
+		res = util_safe_zmalloc(1);
+		seusrs = eusrs = strdup(*elist);
+		while ((eusr = strsep(&eusrs, sep)) != NULL) {
+			if (*eusr == '\0')
+				continue;
+			snusrs = nusrs = strdup(nlist);
+			while ((nusr = strsep(&nusrs, sep)) != NULL) {
+				if (strcmp(eusr, nusr) == 0) {
+					break;
+				}
+			}
+			free(snusrs);
+
+			if (nusr == NULL) {
+				if (*res != '\0')
+					res = UTIL_STR_APPEND1(res, ",");
+				res = UTIL_STR_APPEND1(res, eusr);
+			}
+		}
+		free(seusrs);
+	} else if (flags & F_MOD_SUB || flags & F_MOD_REP) {
+		res = strdup(nlist);
+	}
+
+out:
+	if (res != NULL) {
+		free(*elist);
+		*elist = res;
+	}
 }
 
 char *
