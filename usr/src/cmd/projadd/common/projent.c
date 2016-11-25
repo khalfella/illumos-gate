@@ -235,6 +235,7 @@ char
 void
 projent_merge_attributes(lst_t **eattrs, lst_t *nattrs, int flags,
     list_t *errlst) {
+	attrib_merge_attrib_lst(eattrs, nattrs, flags, errlst);
 }
 
 lst_t

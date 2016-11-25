@@ -916,3 +916,9 @@ out:
 	free(mat);
 	return (ret);
 }
+
+
+void
+attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
+    list_t *errlst) {
+}

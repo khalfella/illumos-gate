@@ -46,6 +46,7 @@ extern attrib_t *attrib_alloc();
 extern attrib_val_t *attrib_val_alloc(int, void *);
 extern void attrib_sort_lst(lst_t *);
 extern int attrib_validate_lst(lst_t *, list_t *);
+extern void attrib_merge_attrib_lst(lst_t **, lst_t *, int, list_t *);
 
 
 #ifdef  __cplusplus
