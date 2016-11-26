@@ -757,6 +757,7 @@ list_t
 			projent_free_list(plist);
 			list_destroy(plist);
 			UTIL_FREE_SNULL(plist);
+			goto out;
 			break;
 		}
 	}
@@ -769,6 +770,7 @@ list_t
 		}
 	}
 
+out:
 	free(buf);
 	fclose(fp);
 	return (plist);

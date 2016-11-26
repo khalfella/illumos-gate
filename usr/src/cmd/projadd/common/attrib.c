@@ -12,6 +12,8 @@
 #include <regex.h>
 #include <ctype.h>
 
+#include <sys/debug.h>
+
 #include "attrib.h"
 #include "resctl.h"
 #include "util.h"
@@ -709,6 +711,7 @@ attrib_val_t
 				case ATT_VAL_TYPE_LIST:
 					/* Allocate NULL node */
 					nat = ATT_VAL_ALLOC_NULL();
+					attrib_val_to_list(nat);
 					lst_insert_tail(
 					    at->att_val_values, nat);
 					/* push at down one level */
@@ -839,6 +842,8 @@ attrib_t
 	} else {
 		util_add_errmsg(errlst, gettext(
 		    "Invalid attribute \"%s\""), att);
+		attrib_free(ret);
+		UTIL_FREE_SNULL(ret);
 		goto out;
 	}
 
@@ -917,8 +922,409 @@ out:
 	return (ret);
 }
 
+attrib_val_t
+*attrib_val_duplicate(attrib_val_t *atv) {
+	int i;
+	lst_t *values;
+	attrib_val_t *val;
+	attrib_val_t *natv;
+
+	switch(atv->att_val_type) {
+		case ATT_VAL_TYPE_NULL:
+			natv = ATT_VAL_ALLOC_NULL();
+		break;
+		case ATT_VAL_TYPE_VALUE:
+			natv = ATT_VAL_ALLOC_VALUE(strdup(atv->att_val_value));
+		break;
+		case ATT_VAL_TYPE_LIST:
+			values = util_safe_malloc(sizeof(lst_t));
+			lst_create(values);
+			for (i = 0; i < lst_numelements(atv->att_val_values);
+			    i++) {
+				val = lst_at(atv->att_val_values, i);
+				lst_insert_tail(values,
+				    attrib_val_duplicate(val));
+			}
+			natv = ATT_VAL_ALLOC_LIST(values);
+		break;
+	}
+
+	return natv;
+}
+
+attrib_t
+*attrib_duplicate(attrib_t *att) {
+	attrib_t *natt = ATT_ALLOC();
+	natt->att_name = strdup(att->att_name);
+	natt->att_value = attrib_val_duplicate(att->att_value);
+	return (natt);
+}
+
+attrib_t
+*attrib_merge_add(attrib_t *eatt, attrib_t *natt)
+{
+	int i;
+	attrib_t *att;
+	attrib_val_t *atv, *eatv, *natv;
+	lst_t *values;
+
+	eatv = eatt->att_value;
+	natv = natt->att_value;
+	att = ATT_ALLOC();
+	att->att_name = strdup(eatt->att_name);
+
+	if (eatv->att_val_type == ATT_VAL_TYPE_NULL) {
+
+		/* NULL + X -> X */
+		atv = attrib_val_duplicate(natv);
+
+	} else if (natv->att_val_type == ATT_VAL_TYPE_NULL) {
+
+		/* X + NULL -> X */
+		atv = attrib_val_duplicate(eatv);
+
+	} else if (eatv->att_val_type == ATT_VAL_TYPE_VALUE &&
+	    natv->att_val_type == ATT_VAL_TYPE_VALUE) {
+
+		/* VALUE + VALUE -> LIST */
+		values = util_safe_malloc(sizeof(lst_t));
+		lst_create(values);
+		lst_insert_tail(values, attrib_val_duplicate(eatv));
+		lst_insert_tail(values, attrib_val_duplicate(natv));
+		atv = ATT_VAL_ALLOC_LIST(values);
+
+	} else if (eatv->att_val_type == ATT_VAL_TYPE_VALUE &&
+	    natv->att_val_type == ATT_VAL_TYPE_LIST) {
+
+		/* VALUE + LIST -> LIST */
+		atv = attrib_val_duplicate(natv);
+		lst_insert_head(atv->att_val_values,
+		    attrib_val_duplicate(eatv));
+
+	} else if (eatv->att_val_type == ATT_VAL_TYPE_LIST &&
+	    natv->att_val_type == ATT_VAL_TYPE_VALUE) {
+
+		/* LIST + VALUE -> LIST */
+		atv = attrib_val_duplicate(eatv);
+		lst_insert_tail(atv->att_val_values,
+		    attrib_val_duplicate(natv));
+
+	} else if (eatv->att_val_type == ATT_VAL_TYPE_LIST &&
+	    natv->att_val_type == ATT_VAL_TYPE_LIST) {
+
+		/* LIST + LIST -> LIST */
+		atv = attrib_val_duplicate(eatv);
+		for (i = 0; i < lst_numelements(natv->att_val_values); i++) {
+			lst_insert_tail(atv->att_val_values,
+			    attrib_val_duplicate(
+			    lst_at(natv->att_val_values,i)));
+		}
+	}
+
+	att->att_value = atv;
+	return (att);
+}
+
+int
+attrib_val_equal(attrib_val_t *xatv,attrib_val_t *yatv)
+{
+	int i;
+	attrib_val_t *xv, *yv;
+
+	if (xatv->att_val_type != yatv->att_val_type)
+		return (1);
+
+	switch (xatv->att_val_type) {
+		case ATT_VAL_TYPE_NULL:
+			return (0);
+		break;
+		case ATT_VAL_TYPE_VALUE:
+			if (SEQU(xatv->att_val_value, yatv->att_val_value)) {
+				return (0);
+			}
+			return (1);
+		break;
+		case ATT_VAL_TYPE_LIST:
+			if (lst_numelements(xatv->att_val_values) !=
+			    lst_numelements(yatv->att_val_values))
+				return (1);
+			for (i = 0; i < lst_numelements(xatv->att_val_values);
+			    i++) {
+				xv = lst_at(xatv->att_val_values, i);
+				yv = lst_at(yatv->att_val_values, i);
+				if (attrib_val_equal(xv, yv) != 0) {
+					return (1);
+					break;
+				}
+			}
+		break;
+	}
+	return (0);
+}
+
+attrib_t
+*attrib_merge_remove(attrib_t *eatt, attrib_t *natt, list_t *errlst)
+{
+
+	int i, j;
+	attrib_t *att = NULL;
+	attrib_val_t *eatv, *natv;
+	attrib_val_t *ev, *nv1, *nv2;
+	lst_t *values;
+	boolean_t found;
+
+	eatv = eatt->att_value;
+	natv = natt->att_value;
+
+	if (eatv->att_val_type == ATT_VAL_TYPE_NULL &&
+	    natv->att_val_type == ATT_VAL_TYPE_NULL) {
+
+		/* NULL - NULL -> EMPTY */
+		att = attrib_duplicate(eatt);
+		strcpy(att->att_name, "");
+
+	} else if (eatv->att_val_type == ATT_VAL_TYPE_NULL ||
+	    (eatv->att_val_type == ATT_VAL_TYPE_VALUE &&
+	    natv->att_val_type == ATT_VAL_TYPE_LIST) ||
+	    (eatv->att_val_type == ATT_VAL_TYPE_LIST &&
+	    natv->att_val_type == ATT_VAL_TYPE_VALUE)) {
+
+		/* NULL - X -> ERR, VALUE - LIST -> ERR, LIST - VALUE -> ERR */
+		util_add_errmsg(errlst, gettext(
+		    "Can not remove attribute \"%s\""),
+		    eatt->att_name);
+
+	} else if (natv->att_val_type == ATT_VAL_TYPE_NULL) {
+
+		/* X - NULL -> X */
+		att = attrib_duplicate(eatt);
+
+	} else if (eatv->att_val_type == ATT_VAL_TYPE_VALUE &&
+	    natv->att_val_type == ATT_VAL_TYPE_VALUE) {
+
+		/* VALUE - VALUE -> {EMPTY | ERR} */
+		if (attrib_val_equal(eatv, natv) == 0) {
+			att = ATT_ALLOC();
+			att->att_name = strdup("");
+			att->att_value = ATT_VAL_ALLOC_NULL();
+		} else {
+			util_add_errmsg(errlst, gettext(
+			    "Can not remove attribute \"%s\""),
+			    eatt->att_name);
+		}
+
+	} else if (eatv->att_val_type == ATT_VAL_TYPE_LIST &&
+	    natv->att_val_type == ATT_VAL_TYPE_LIST) {
+		/* LIST - LIST -> {EMPTY | ERR | LIST} */
+		if (attrib_val_equal(eatv, natv) == 0) {
+			att = ATT_ALLOC();
+			att->att_name = strdup("");
+			att->att_value = ATT_VAL_ALLOC_NULL();
+			goto out;
+		}
+
+		for (i = 0; i < lst_numelements(natv->att_val_values); i++) {
+			nv1 = lst_at(natv->att_val_values, i);
+			for (j = 0; j < lst_numelements(natv->att_val_values);
+			    j++) {
+				nv2 = lst_at(natv->att_val_values, j);
+				if (i != j && attrib_val_equal(nv1, nv2) == 0) {
+					util_add_errmsg(errlst, gettext(
+					    "Duplicate values, can not remove"
+					    " attribute \"%s\""),
+					    eatt->att_name);
+					goto out;
+				}
+			}
+
+			found = B_FALSE;
+			for (j = 0; j < lst_numelements(eatv->att_val_values);
+			    j++) {
+				ev = lst_at(eatv->att_val_values, j);
+				if (attrib_val_equal(nv1, ev) == 0) {
+					found = B_TRUE;
+					break;
+				}
+			}
+
+			if (!found) {
+				util_add_errmsg(errlst, gettext(
+				    "Value not found, can not remove"
+				    " attribute \"%s\""),
+				    eatt->att_name);
+				goto out;
+			}
+		}
+
+		values = util_safe_malloc(sizeof(lst_t));
+		lst_create(values);
+		for (i = 0; i < lst_numelements(eatv->att_val_values); i++) {
+			ev = lst_at(eatv->att_val_values, i);
+			found = B_FALSE;
+			for (j = 0; j < lst_numelements(natv->att_val_values);
+			    j++) {
+				nv1 = lst_at(natv->att_val_values, j);
+				if (attrib_val_equal(ev, nv1) == 0) {
+					found = B_TRUE;
+					break;
+				}
+			}
+
+			if (!found) {
+				lst_insert_tail(values,
+				    attrib_val_duplicate(ev));
+			}
+		}
+		att = ATT_ALLOC();
+		att->att_name = strdup(eatt->att_name);
+		att->att_value = ATT_VAL_ALLOC_LIST(values);
+	}
+
+out:
+	return (att);
+}
+
+attrib_t
+*attrib_merge(attrib_t *eatt, attrib_t *natt, int flags, list_t *errlst)
+{
+	attrib_t *att = NULL;
+
+	VERIFY(SEQU(eatt->att_name, natt->att_name));
+
+	if (flags & F_MOD_ADD) {
+		att = attrib_merge_add(eatt, natt);
+	} else if (flags & F_MOD_REM) {
+		att = attrib_merge_remove(eatt, natt, errlst);
+	}
+
+	return att;
+}
 
 void
 attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
     list_t *errlst) {
+
+	lst_t* attrs = NULL;
+	int i, j;
+	attrib_t *att, *natt, *eatt;
+	boolean_t found;
+
+	if (flags & F_MOD_ADD) {
+		attrs = util_safe_malloc(sizeof(lst_t));
+		(void) lst_create(attrs);
+
+		for (i = 0; i < lst_numelements(*eattrs); i++) {
+			eatt = lst_at(*eattrs, i);
+			found = B_FALSE;
+			for (j = 0; j < lst_numelements(nattrs); j++) {
+				natt = lst_at(nattrs, j);
+				if (SEQU(eatt->att_name, natt->att_name)) {
+					found = B_TRUE;
+					break;
+				}
+			}
+
+			att = found ? attrib_merge(eatt, natt, flags, errlst) :
+			    attrib_duplicate(eatt);
+			if (att == NULL) {
+				attrib_free_lst(attrs);
+				UTIL_FREE_SNULL(attrs);
+				goto out;
+			}
+			lst_insert_tail(attrs, att);
+		}
+
+		for (i = 0; i < lst_numelements(nattrs); i++) {
+			natt = lst_at(nattrs, i);
+			found = B_FALSE;
+			for (j = 0; j < lst_numelements(*eattrs); j++) {
+				eatt = lst_at(*eattrs, j);
+				if (SEQU(natt->att_name, eatt->att_name)) {
+					found = B_TRUE;
+					break;
+				}
+			}
+			if (found)
+				continue;
+			lst_insert_tail(attrs,attrib_duplicate(natt));
+		}
+
+	} else if (flags & (F_MOD_REM | F_MOD_SUB)) {
+
+		for (i = 0; i < lst_numelements(nattrs); i++) {
+			natt = lst_at(nattrs, i);
+			for (j = 0; j < lst_numelements(nattrs); j++) {
+				att = lst_at(nattrs, j);
+				if (SEQU(natt->att_name, att->att_name) &&
+				    i != j) {
+					util_add_errmsg(errlst, gettext(
+					    "Duplicate Attributes \"%s\""),
+					    natt->att_name);
+					goto out;
+				}
+			}
+
+			found = B_FALSE;
+			for (j = 0; j < lst_numelements(*eattrs); j++) {
+				eatt = lst_at(*eattrs, j);
+				if (SEQU(eatt->att_name, natt->att_name)) {
+					found = B_TRUE;
+					break;
+				}
+			}
+			if (!found) {
+				util_add_errmsg(errlst, gettext(
+				    "Project does not contain \"%s\""),
+				    natt->att_name);
+				goto out;
+			}
+		}
+
+		attrs = util_safe_malloc(sizeof(lst_t));
+		(void) lst_create(attrs);
+
+		for (i = 0; i < lst_numelements(*eattrs); i++) {
+			eatt = lst_at(*eattrs, i);
+			found = B_FALSE;
+			for (j = 0; j < lst_numelements(nattrs); j++) {
+				natt = lst_at(nattrs, j);
+				if (SEQU(eatt->att_name, natt->att_name)) {
+					found = B_TRUE;
+					break;
+				}
+			}
+
+			if (flags & F_MOD_REM) {
+				att = found ?
+				    attrib_merge(eatt, natt, flags, errlst) :
+				    attrib_duplicate(eatt);
+			} else if (flags & F_MOD_SUB) {
+				att = attrib_duplicate(found ? natt : eatt);
+			}
+
+			if (att == NULL) {
+				attrib_free_lst(attrs);
+				UTIL_FREE_SNULL(attrs);
+				goto out;
+			} else if (SEQU(att->att_name,"")) {
+				attrib_free(att);
+			} else {
+				lst_insert_tail(attrs, att);
+			}
+		}
+
+	} else if (flags & F_MOD_REP) {
+		attrs = util_safe_malloc(sizeof(lst_t));
+		(void) lst_create(attrs);
+		for (i = 0; i < lst_numelements(nattrs); i++) {
+			natt = lst_at(nattrs, i);
+			lst_insert_tail(attrs, attrib_duplicate(natt));
+		}
+	}
+out:
+	if (attrs != NULL) {
+		attrib_free_lst(*eattrs);
+		free(*eattrs);
+		*eattrs = attrs;
+	}
 }
