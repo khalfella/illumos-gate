@@ -227,6 +227,12 @@ projent_sort_attributes(lst_t *attribs)
 }
 
 char
+*projent_attrib_tostring(void *attrib)
+{
+	return (attrib_tostring((attrib_t *)attrib));
+}
+
+char
 *projent_attrib_lst_tostring(lst_t *lst)
 {
 	return (attrib_lst_tostring(lst));

@@ -27,7 +27,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <sys/types.h>
-
+#include <sys/task.h>
 
 #include <sys/debug.h>
 
@@ -74,7 +74,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int c;
+	int c, error;
 
 	extern char *optarg;
 	extern int optind, optopt;
@@ -103,6 +103,9 @@ main(int argc, char **argv)
 
 	/* Project file defaults to system project file "/etc/project" */
 	char *projfile = PROJF_PATH;
+	struct project proj, *projp;
+	char buf[PROJECT_BUFSZ];
+	char *str;
 
 	fflag = nflag = cflag = oflag = pflag = lflag = B_FALSE;
 	sflag = rflag = aflag = B_FALSE;
@@ -303,6 +306,7 @@ main(int argc, char **argv)
 			    pattribs, flags, &errlst);
 			projent_sort_attributes(modent->attrs);
 			projent_free_attributes(pattribs);
+			UTIL_FREE_SNULL(pattribs);
 		}
 	}
 
@@ -316,8 +320,77 @@ main(int argc, char **argv)
 	}
 	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
+	if (Aflag && (error = setproject(pname, "root",
+	    TASK_FINAL|TASK_PROJ_PURGE)) != 0) {
+		if (error == SETPROJ_ERR_TASK) {
+			if (errno == EAGAIN) {
+				util_add_errmsg(&errlst, gettext(
+				    "resource control limit has been reached"));
+			} else if (errno == ESRCH) {
+				util_add_errmsg(&errlst, gettext(
+				    "user \"%s\" is not a member "
+				    "of project \"%s\""), "root", pname);
+			} else {
+				util_add_errmsg(&errlst, gettext(
+				    "could not join project \"%s\""), pname);
+			}
+		} else if (error == SETPROJ_ERR_POOL) {
+			if (errno == EACCES) {
+				util_add_errmsg(&errlst, gettext(
+				    "no resource pool accepting default "
+				    "bindings exists for project \"%s\""),
+				    pname);
+			} else if (errno == ESRCH) {
+				util_add_errmsg(&errlst, gettext(
+				    "specified resource pool does not exist "
+				    "for project \"%s\""), pname);
+			} else {
+				util_add_errmsg(&errlst, gettext(
+				    "could not bind to default resource pool "
+				    "for project \"%s\""), pname);
+			}
+		} else {
+			/*
+			 * error represents the position - within the
+			 * semi-colon delimited attribute - that generated
+			 * the error.
+			 */
+			if (error <= 0) {
+				util_add_errmsg(&errlst, gettext(
+				    "setproject failed for project \"%s\""),
+				    pname);
+			} else {
+				/* To be completed */
+				projp = getprojbyname(pname, &proj, buf,
+				    sizeof(buf));
+				pattribs = (projp != NULL) ?
+				    projent_parse_attributes(projp->pj_attr,
+				    0, &errlst) : NULL;
+				if (projp != NULL && pattribs != NULL &&
+				    (str = projent_attrib_tostring(
+				    lst_at(pattribs, error - 1))) != NULL) {
+					util_add_errmsg(&errlst, gettext(
+					    "warning, \"%s\" resource control "
+					    "assignment failed for project "
+					    "\"%s\""), str, pname);
+					free(str);
+				} else {
+					util_add_errmsg(&errlst, gettext(
+					    "warning, resource control "
+					    "assignment failed for project "
+					    "\"%s\" attribute %d"), pname,
+					    error);
+				}
 
+				if (pattribs != NULL) {
+					projent_free_attributes(pattribs);
+					UTIL_FREE_SNULL(pattribs);
+				}
+			}
+		}
+	}
 
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	return (0);
 }

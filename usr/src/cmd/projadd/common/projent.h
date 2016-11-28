@@ -53,6 +53,7 @@ extern void projent_merge_attributes(lst_t **, lst_t *, int, list_t *);
 extern lst_t *projent_parse_attributes(char *, int, list_t *);
 extern void projent_sort_attributes(lst_t *);
 extern void projent_free_attributes(lst_t *);
+extern char *projent_attrib_tostring(void *);
 extern char *projent_attrib_lst_tostring(lst_t *);
 extern void projent_put_list(char *, list_t *, list_t *);
 
