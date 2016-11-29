@@ -32,14 +32,13 @@
 #include "util.h"
 
 
-#define	CHECK_ERRORS_FREE_PLIST(perrlst, pplist, attrs, ecode) {	\
+#define	CHECK_ERRORS_FREE_PLST(perrlst, plst, attrs, ecode) {	\
 	if (!list_is_empty(perrlst)) {					\
 		util_print_errmsgs(perrlst);				\
 		list_destroy(perrlst);					\
-		if (pplist != NULL) {					\
-			projent_free_list(pplist);			\
-			list_destroy(pplist);				\
-			free(pplist);					\
+		if (plst != NULL) {					\
+			projent_free_lst(plst);				\
+			free(plst);					\
 		}							\
 		free(attrs);						\
 		usage();						\
@@ -66,12 +65,12 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int c;
+	int e, c;
 
 	extern char *optarg;
 	extern int optind, optopt;
 	projid_t maxpjid = 99;
-	list_t *plist = NULL;
+	lst_t *plst = NULL;
 	int flags = 0;
 	projent_t *ent;
 
@@ -156,15 +155,15 @@ main(int argc, char **argv)
 		util_add_errmsg(&errlst, gettext("No project name specified"));
 	}
 
-	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 
 	if (!nflag)
 		flags |= F_PAR_VLD;
 	flags |= F_PAR_RES | F_PAR_DUP;
 
 	/* Parse the project file to get the list of the projects */
-	plist = projent_get_list(projfile, flags, &errlst);
-	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+	plst = projent_get_lst(projfile, flags, &errlst);
+	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 
 
 	/* Parse and validate new project id */
@@ -172,21 +171,23 @@ main(int argc, char **argv)
 		if (!nflag) {
 			projent_validate_projid(projid, 0, &errlst);
 			if (!oflag) {
-				projent_validate_unique_id(plist, projid,
+				projent_validate_unique_id(plst, projid,
 				    &errlst);
 			} 
 		}
 	}
-	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 
 	/* Find the maxprojid */
-	for(ent = list_head(plist); ent != NULL; ent = list_next(plist, ent))
+	for (e = 0; e < lst_numelements(plst); e++) {
+		ent = lst_at(plst, e);
 		maxpjid = (ent->projid > maxpjid) ? ent->projid : maxpjid;
+	}
 
 	
 	if (!pflag && asprintf(&projidstr, "%ld", maxpjid + 1) == -1) {
 		util_add_errmsg(&errlst, gettext("Failed to allocate memory"));
-		CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+		CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 	}
 
 	pname = argv[optind];
@@ -196,24 +197,24 @@ main(int argc, char **argv)
 		free(projidstr);
 
 	if (!nflag)
-		projent_validate_unique_name(plist, pname, &errlst);
+		projent_validate_unique_name(plst, pname, &errlst);
 
-	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 
 	/* Sort attributes list */
 	projent_sort_attributes(ent->attrs);
 
 
 	/* Add the new project entry to the list */
-	list_insert_tail(plist, ent);
+	lst_insert_tail(plst, ent);
 
 	/* Validate the projent before writing the list to the project file */
 	(void) projent_validate(ent, flags, &errlst);
-	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 
 	/* Write out the project file */
-	projent_put_list(projfile, plist, &errlst);
-	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
+	projent_put_lst(projfile, plst, &errlst);
+	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 
 	return (0);
 }

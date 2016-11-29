@@ -169,16 +169,17 @@ projent_validate(projent_t *pent, int flags, list_t *errlst)
 }
 
 int
-projent_validate_list(list_t *plist, int flags, list_t *errlst)
+projent_validate_lst(lst_t *plst, int flags, list_t *errlst)
 {
-	int i, idx;
+	int e, i, idx;
 	projent_t *ent;
 	char *pnames = NULL;
 	projid_t *pids = NULL;
 	int ret = 0;
 
 	idx = 0;
-	for (ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
+	for (e = 0; e < lst_numelements(plst); e++) {
+		ent = lst_at(plst, e);
 		/* Check for duplicate projname */
 		if (pnames != NULL && strstr(pnames, ent->projname) != NULL) {
 			util_add_errmsg(errlst, gettext(
@@ -453,11 +454,12 @@ projent_parse_comment(char *comment, list_t *errlst)
 }
 
 int
-projent_validate_unique_id(list_t *plist, projid_t projid,list_t *errlst)
+projent_validate_unique_id(lst_t *plst, projid_t projid,list_t *errlst)
 {
+	int e;
 	projent_t *ent;
-	for (ent = list_head(plist); ent != NULL;
-	    ent = list_next(plist, ent)) {
+	for (e = 0; e < lst_numelements(plst); e++) {
+		ent = lst_at(plst, e);
 		if (ent->projid == projid) {
 			util_add_errmsg(errlst, gettext(
 			    "Duplicate projid \"%d\""), projid);
@@ -513,11 +515,12 @@ projent_parse_projid(char *projidstr, projid_t *pprojid, list_t *errlst)
 }
 
 int
-projent_validate_unique_name(list_t *plist, char *pname, list_t *errlst)
+projent_validate_unique_name(lst_t *plst, char *pname, list_t *errlst)
 {
+	int e;
 	projent_t *ent;
-	for (ent = list_head(plist); ent != NULL;
-	    ent = list_next(plist, ent)) {
+	for (e = 0; e < lst_numelements(plst); e++) {
+		ent = lst_at(plst, e);
 		if (strcmp(ent->projname, pname) == 0) {
 			util_add_errmsg(errlst, gettext(
 			    "Duplicate project name \"%s\""), pname);
@@ -632,14 +635,15 @@ out:
 
 
 void
-projent_free_list(list_t *plist)
+projent_free_lst(lst_t *plst)
 {
-	if (plist == NULL)
+	if (plst == NULL)
 		return;
 
 	projent_t *ent;
-	while ((ent = list_head(plist)) != NULL) {
-		list_remove(plist, ent);
+	while(!lst_is_empty(plst)) {
+		ent = lst_at(plst, 0);
+		lst_remove(plst, ent);
 		projent_free(ent);
 		free(ent);
 	}
@@ -647,13 +651,13 @@ projent_free_list(list_t *plist)
 
 
 void
-projent_put_list(char *projfile, list_t *plist, list_t *errlst)
+projent_put_lst(char *projfile, lst_t *plst, list_t *errlst)
 {
 	char *tmpprojfile, *attrs;
 	FILE *fp;
 	projent_t *ent;
 	struct stat statbuf;
-	int ret;
+	int e, ret;
 
 	tmpprojfile = NULL;
 	if (asprintf(&tmpprojfile, "%s.%d_tmp", projfile, getpid()) == -1) {
@@ -675,7 +679,8 @@ projent_put_list(char *projfile, list_t *plist, list_t *errlst)
 		goto out;
 	}
 
-	for(ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
+	for (e = 0; e < lst_numelements(plst); e++) {
+		ent = lst_at(plst, e);
 		attrs = attrib_lst_tostring(ent->attrs);
 		ret = fprintf(fp, "%s:%d:%s:%s:%s:%s\n", ent->projname,
 		    ent->projid, ent->comment, ent->userlist, ent->grouplist,
@@ -713,35 +718,33 @@ out:
 	free(tmpprojfile);
 }
 
-list_t
-*projent_get_list(char *projfile, int flags, list_t *errlst)
+lst_t
+*projent_get_lst(char *projfile, int flags, list_t *errlst)
 {
 	FILE *fp;
-	list_t *plist;
+	lst_t *plst;
 	int line = 0;
 	char *buf = NULL, *nlp;
 	size_t cap = 0;
 	projent_t *ent;
 
-	plist = util_safe_malloc(sizeof(list_t));
-	list_create(plist, sizeof(projent_t), offsetof(projent_t, next));
+	plst = util_safe_malloc(sizeof(lst_t));
+	lst_create(plst);
 
 	if ((fp = fopen(projfile, "r")) == NULL) {
 		if (errno == ENOENT) {
 			/*
 			 * There is no project file,
-			 * return an empty list
+			 * return an empty lst
 			 */
-			return (plist);
+			return (plst);
 		} else {
 			/* Report the error unable to open the file */
 			util_add_errmsg(errlst, gettext(
 			    "Cannot open %s: %s"),
 			    projfile, strerror(errno));
 
-			/* destory and free the to-be-returned list */
-			list_destroy(plist);
-			free(plist);
+			free(plst);
 			return (NULL);
 		}
 	}
@@ -752,7 +755,7 @@ list_t
 			*nlp = '\0';
 
 		if ((ent = projent_parse(buf, flags, errlst)) != NULL) {
-			list_insert_tail(plist, ent);
+			lst_insert_tail(plst, ent);
 		} else {
 			/* Report the error */
 			util_add_errmsg(errlst, gettext(
@@ -760,24 +763,22 @@ list_t
 			    projfile, line, buf);
 
 			/* free the allocated resources */
-			projent_free_list(plist);
-			list_destroy(plist);
-			UTIL_FREE_SNULL(plist);
+			projent_free_lst(plst);
+			UTIL_FREE_SNULL(plst);
 			goto out;
 			break;
 		}
 	}
 
-	if (flags & F_PAR_VLD && plist != NULL) {
-		if (projent_validate_list(plist, flags, errlst) != 0) {
-			projent_free_list(plist);
-			list_destroy(plist);
-			UTIL_FREE_SNULL(plist);
+	if (flags & F_PAR_VLD && plst != NULL) {
+		if (projent_validate_lst(plst, flags, errlst) != 0) {
+			projent_free_lst(plst);
+			UTIL_FREE_SNULL(plst);
 		}
 	}
 
 out:
 	free(buf);
 	fclose(fp);
-	return (plist);
+	return (plst);
 }
