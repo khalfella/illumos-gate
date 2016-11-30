@@ -50,7 +50,7 @@ util_safe_malloc(size_t sz)
  	char *ptr;
 	if ((ptr = malloc(sz)) == NULL) {
 		(void) fprintf(stderr, gettext(
-		    "projadd: error allocating %d bytes of memory"), sz);
+		    "error allocating %d bytes of memory\n"), sz);
 		exit(1);
         }
         return (ptr);
@@ -63,36 +63,33 @@ util_safe_zmalloc(size_t sz)
 }
 
 void
-util_print_errmsgs(list_t *errmsgs)
+util_print_errmsgs(lst_t *errlst)
 {
-	errmsg_t *msg;
-	while ((msg = list_head(errmsgs)) != NULL) {
-		fprintf(stderr, "%s\n", msg->msg);
-		list_remove(errmsgs, msg);
-		free(msg->msg);
-		free(msg);
+	char *errmsg;
+	while(!lst_is_empty(errlst)) {
+		errmsg = lst_at(errlst, 0);
+		lst_remove(errlst, errmsg);
+		fprintf(stderr, "%s\n", errmsg);
+		free(errmsg);
 	}
 }
 
 
 void
-util_add_errmsg(list_t *errmsgs, char *format, ...)
+util_add_errmsg(lst_t *errlst, char *format, ...)
 {
 	va_list args;
-	char *errstr;
-	errmsg_t *msg;
-
-	if (errmsgs == NULL || format == NULL)
-		return;
+	char *errmsg;
 
 	va_start(args, format);
-	vasprintf(&errstr, format, args);
+	if(vasprintf(&errmsg, format, args) < 0) {
+		va_end(args);
+		(void) fprintf(stderr, gettext(
+		   "error allocating memory\n"));
+		exit(1);
+	}
 	va_end(args);
-
-	msg = util_safe_malloc(sizeof(errmsg_t));
-	msg->msg = errstr;
-	list_link_init(&msg->next);
-	list_insert_tail(errmsgs, msg);
+	lst_insert_tail(errlst, errmsg);
 }
 
 char *
@@ -136,7 +133,7 @@ util_substr(regex_t *reg, regmatch_t *mat, char *str, int idx)
 }
 
 int
-util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
+util_scale(char *unit, int scale, uint64_t *res, lst_t *errlst)
 {
 	if (scale == BYTES_SCALE) {
 
@@ -210,7 +207,7 @@ util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 
 
 int
-util_val2num(char *value, int scale, list_t *errlst, char **retnum,
+util_val2num(char *value, int scale, lst_t *errlst, char **retnum,
     char **retmod, char **retunit)
 {
 	
@@ -296,7 +293,7 @@ util_free_tokens(char **tokens)
 }
 
 char **
-util_tokenize(char *values, list_t *errlst)
+util_tokenize(char *values, lst_t *errlst)
 {
 	char *token, *t;
 	char *v;

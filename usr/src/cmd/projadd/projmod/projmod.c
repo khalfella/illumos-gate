@@ -37,10 +37,9 @@
 
 #define SEQU(str1, str2)                (strcmp(str1, str2) == 0)
 
-#define	CHECK_ERRORS_FREE_PLST(perrlst, plst, attrs, ecode) {	\
-	if (!list_is_empty(perrlst)) {					\
-		util_print_errmsgs(perrlst);				\
-		list_destroy(perrlst);					\
+#define	CHECK_ERRORS_FREE_PLST(errlst, plst, attrs, ecode) {	\
+	if (!lst_is_empty(errlst)) {					\
+		util_print_errmsgs(errlst);				\
 		if (plst != NULL) {					\
 			projent_free_lst(plst);				\
 			free(plst);					\
@@ -98,7 +97,7 @@ main(int argc, char **argv)
 
 	lst_t *pattribs;
 
-	list_t errlst;
+	lst_t errlst;
 
 	/* Project file defaults to system project file "/etc/project" */
 	char *projfile = PROJF_PATH;
@@ -115,7 +114,7 @@ main(int argc, char **argv)
 
 
 	attrs = util_safe_zmalloc(1);
-	list_create(&errlst, sizeof(errmsg_t), offsetof(errmsg_t, next));
+	lst_create(&errlst);
 
 
 	(void) setlocale(LC_ALL, "");

@@ -2,7 +2,6 @@
 #define _PROJENT_ATTRIB_H
 
 
-#include <sys/list.h>
 #include <sys/types.h>
 #include <regex.h>
 #include <project.h>
@@ -39,15 +38,15 @@ typedef struct attrib_s {
 #define ATT_VAL_ALLOC_LIST(L)	ATT_VAL_ALLOC(ATT_VAL_TYPE_LIST, (L))
 
 extern char *attrib_lst_tostring(lst_t *);
-extern attrib_t *attrib_parse(regex_t *, regex_t *, char *, int, list_t *);
+extern attrib_t *attrib_parse(regex_t *, regex_t *, char *, int, lst_t *);
 extern void attrib_free_lst(lst_t *);
 extern char *attrib_tostring(attrib_t *);
 extern char *attrib_val_tostring(attrib_val_t *, boolean_t);
 extern attrib_t *attrib_alloc();
 extern attrib_val_t *attrib_val_alloc(int, void *);
 extern void attrib_sort_lst(lst_t *);
-extern int attrib_validate_lst(lst_t *, list_t *);
-extern void attrib_merge_attrib_lst(lst_t **, lst_t *, int, list_t *);
+extern int attrib_validate_lst(lst_t *, lst_t *);
+extern void attrib_merge_attrib_lst(lst_t **, lst_t *, int, lst_t *);
 
 
 #ifdef  __cplusplus

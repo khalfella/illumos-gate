@@ -44,7 +44,7 @@
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
 
 int
-attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, list_t *errlst)
+attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 {
 	int ret = 0;
 	char *atname = att->att_name;
@@ -301,7 +301,7 @@ out:
 }
 
 int
-attrib_validate(attrib_t *att, list_t *errlst)
+attrib_validate(attrib_t *att, lst_t *errlst)
 {
 	int ret = 0;
 	char *atname = att->att_name;
@@ -406,7 +406,7 @@ attrib_validate(attrib_t *att, list_t *errlst)
 }
 
 int
-attrib_validate_lst(lst_t *attribs, list_t *errlst)
+attrib_validate_lst(lst_t *attribs, lst_t *errlst)
 {
 	int i, j;
 	attrib_t *att;
@@ -655,7 +655,7 @@ attrib_val_append(attrib_val_t *atv, char *token)
 }
 
 attrib_val_t
-*attrib_val_parse(char *values, list_t *errlst)
+*attrib_val_parse(char *values, lst_t *errlst)
 {
 	attrib_val_t *ret = NULL;
 	attrib_val_t *at;
@@ -795,7 +795,7 @@ out1:
 
 attrib_t
 *attrib_parse(regex_t *attrbexp, regex_t *atvalexp, char *att, int flags,
-    list_t *errlst)
+    lst_t *errlst)
 {
 	int nmatch = MAX_OF(attrbexp->re_nsub, atvalexp->re_nsub) + 1;
 	attrib_t *ret = NULL;
@@ -1063,7 +1063,7 @@ attrib_val_equal(attrib_val_t *xatv,attrib_val_t *yatv)
 }
 
 attrib_t
-*attrib_merge_remove(attrib_t *eatt, attrib_t *natt, list_t *errlst)
+*attrib_merge_remove(attrib_t *eatt, attrib_t *natt, lst_t *errlst)
 {
 
 	int i, j;
@@ -1185,7 +1185,7 @@ out:
 }
 
 attrib_t
-*attrib_merge(attrib_t *eatt, attrib_t *natt, int flags, list_t *errlst)
+*attrib_merge(attrib_t *eatt, attrib_t *natt, int flags, lst_t *errlst)
 {
 	attrib_t *att = NULL;
 
@@ -1202,7 +1202,7 @@ attrib_t
 
 void
 attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
-    list_t *errlst) {
+    lst_t *errlst) {
 
 	lst_t* attrs = NULL;
 	int i, j;
