@@ -66,6 +66,7 @@ int lst_remove(lst_t *plst, void *rdata)
 		if (--plst->csz == 0) {
 			plst->tsz = 0;
 			free(plst->buf);
+			plst->buf = NULL;
 		}
 		return (0);
 	}
