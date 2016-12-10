@@ -178,7 +178,7 @@ main(int argc, char **argv)
 	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
 
 	/* Find the maxprojid */
-	for (e = 0; e < lst_numelements(plst); e++) {
+	for (e = 0; e < lst_size(plst); e++) {
 		ent = lst_at(plst, e);
 		maxpjid = (ent->projid > maxpjid) ? ent->projid : maxpjid;
 	}

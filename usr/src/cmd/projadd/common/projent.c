@@ -178,7 +178,7 @@ projent_validate_lst(lst_t *plst, int flags, lst_t *errlst)
 	int ret = 0;
 
 	idx = 0;
-	for (e = 0; e < lst_numelements(plst); e++) {
+	for (e = 0; e < lst_size(plst); e++) {
 		ent = lst_at(plst, e);
 		/* Check for duplicate projname */
 		if (pnames != NULL && strstr(pnames, ent->projname) != NULL) {
@@ -458,7 +458,7 @@ projent_validate_unique_id(lst_t *plst, projid_t projid,lst_t *errlst)
 {
 	int e;
 	projent_t *ent;
-	for (e = 0; e < lst_numelements(plst); e++) {
+	for (e = 0; e < lst_size(plst); e++) {
 		ent = lst_at(plst, e);
 		if (ent->projid == projid) {
 			util_add_errmsg(errlst, gettext(
@@ -519,7 +519,7 @@ projent_validate_unique_name(lst_t *plst, char *pname, lst_t *errlst)
 {
 	int e;
 	projent_t *ent;
-	for (e = 0; e < lst_numelements(plst); e++) {
+	for (e = 0; e < lst_size(plst); e++) {
 		ent = lst_at(plst, e);
 		if (strcmp(ent->projname, pname) == 0) {
 			util_add_errmsg(errlst, gettext(
@@ -679,7 +679,7 @@ projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
 		goto out;
 	}
 
-	for (e = 0; e < lst_numelements(plst); e++) {
+	for (e = 0; e < lst_size(plst); e++) {
 		ent = lst_at(plst, e);
 		attrs = attrib_lst_tostring(ent->attrs);
 		ret = fprintf(fp, "%s:%d:%s:%s:%s:%s\n", ent->projname,

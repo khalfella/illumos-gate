@@ -242,7 +242,7 @@ main(int argc, char **argv)
 
 	modent = NULL;
 	if (pname != NULL) {
-		for (e = 0; e < lst_numelements(plst); e++) {
+		for (e = 0; e < lst_size(plst); e++) {
 			ent = lst_at(plst, e);
 			if (SEQU(ent->projname, pname)) {
 				modent = ent;

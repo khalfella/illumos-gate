@@ -99,7 +99,7 @@ void
 }
 
 int
-lst_numelements(lst_t *plst)
+lst_size(lst_t *plst)
 {
 	return (plst->csz);
 }

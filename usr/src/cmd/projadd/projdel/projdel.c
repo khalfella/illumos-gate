@@ -109,7 +109,7 @@ main(int argc, char **argv)
 
 	/* Find the project to be deleted */
 	del = 0;
-	for (e = 0; e < lst_numelements(plst); e++) {
+	for (e = 0; e < lst_size(plst); e++) {
 		ent = lst_at(plst, e);
 		if (SEQU(ent->projname, pname)) {
 			del++;

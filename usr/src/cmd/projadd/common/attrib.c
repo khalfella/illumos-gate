@@ -96,7 +96,7 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 		goto out;
 	}
 
-	for (i = 0; i < lst_numelements(atval->att_val_values); i++) {
+	for (i = 0; i < lst_size(atval->att_val_values); i++) {
 		atv = lst_at(atval->att_val_values, i);
 		if (atv->att_val_type != ATT_VAL_TYPE_LIST) {
 			if ((str = attrib_val_tostring(atv, B_FALSE)) != NULL) {
@@ -113,7 +113,7 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 			continue;
 		}
 		/* Values should be in the form (priv, val, actions) */
-		if (lst_numelements(atv->att_val_values) < 3) {
+		if (lst_size(atv->att_val_values) < 3) {
 			util_add_errmsg(errlst, gettext(
 			    "rctl \"%s\" value should be in the form "
 			    "(priv, val, action[,...])[,....]"), atname);
@@ -170,7 +170,7 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 		denycount = 0;
 		sigcount = 0;
 
-		for (j = 2; j < lst_numelements(atv->att_val_values); j++) {
+		for (j = 2; j < lst_size(atv->att_val_values); j++) {
 			action = lst_at(atv->att_val_values,j);
 
 			if (action->att_val_type != ATT_VAL_TYPE_VALUE) {
@@ -415,8 +415,8 @@ attrib_validate_lst(lst_t *attribs, lst_t *errlst)
 	int ret = 0;
 
 	atlast = atnames = util_safe_zmalloc(
-	    (lst_numelements(attribs) + 1) * sizeof(char *));
-	for (i = 0; i < lst_numelements(attribs); i++) {
+	    (lst_size(attribs) + 1) * sizeof(char *));
+	for (i = 0; i < lst_size(attribs); i++) {
 		att = lst_at(attribs, i);
 
 		/* Validate this attribute */
@@ -477,7 +477,7 @@ char
 			/* Only innerlists need to be betweeen ( and ) */
 			if (innerlist)
 				ret = UTIL_STR_APPEND1(ret, "(");
-			for (i = 0; i < lst_numelements(val->att_val_values);
+			for (i = 0; i < lst_size(val->att_val_values);
 			    i++) {
 				v = lst_at(val->att_val_values, i);
 				if (i > 0) {
@@ -526,7 +526,7 @@ char
 	char *str;
 
 	ret = UTIL_STR_APPEND1(ret, "");
-	for (i = 0; i < lst_numelements(attrs); i++) {
+	for (i = 0; i < lst_size(attrs); i++) {
 		att = lst_at(attrs, i);
 
 		if ((str = attrib_tostring(att)) != NULL) {
@@ -595,7 +595,7 @@ attrib_sort_lst(lst_t *attribs)
 	if (attribs == NULL)
 		return;
 
-	n = lst_numelements(attribs);
+	n = lst_size(attribs);
 	for (i = 0; i < n - 1; i++) {
 		for (j = i + 1; j < n; j++) {
 			atti = lst_at(attribs, i);
@@ -885,7 +885,7 @@ attrib_t
 			goto out;
 
 
-		for (i = 0; i < lst_numelements(retv->att_val_values); i++) {
+		for (i = 0; i < lst_size(retv->att_val_values); i++) {
 			atvl = atv = lst_at(retv->att_val_values, i);
 
 			/*
@@ -893,7 +893,7 @@ attrib_t
 			 * is not a scaler value
 			 */
 			if (atv->att_val_type != ATT_VAL_TYPE_LIST ||
-			    lst_numelements(atv->att_val_values) < 3 ||
+			    lst_size(atv->att_val_values) < 3 ||
 			    (atv = lst_at(atv->att_val_values, 1)) == NULL ||
 			    atv->att_val_type != ATT_VAL_TYPE_VALUE) {
 				continue;
@@ -939,7 +939,7 @@ attrib_val_t
 		case ATT_VAL_TYPE_LIST:
 			values = util_safe_malloc(sizeof(lst_t));
 			lst_create(values);
-			for (i = 0; i < lst_numelements(atv->att_val_values);
+			for (i = 0; i < lst_size(atv->att_val_values);
 			    i++) {
 				val = lst_at(atv->att_val_values, i);
 				lst_insert_tail(values,
@@ -1014,7 +1014,7 @@ attrib_t
 
 		/* LIST + LIST -> LIST */
 		atv = attrib_val_duplicate(eatv);
-		for (i = 0; i < lst_numelements(natv->att_val_values); i++) {
+		for (i = 0; i < lst_size(natv->att_val_values); i++) {
 			lst_insert_tail(atv->att_val_values,
 			    attrib_val_duplicate(
 			    lst_at(natv->att_val_values,i)));
@@ -1045,10 +1045,10 @@ attrib_val_equal(attrib_val_t *xatv,attrib_val_t *yatv)
 			return (1);
 		break;
 		case ATT_VAL_TYPE_LIST:
-			if (lst_numelements(xatv->att_val_values) !=
-			    lst_numelements(yatv->att_val_values))
+			if (lst_size(xatv->att_val_values) !=
+			    lst_size(yatv->att_val_values))
 				return (1);
-			for (i = 0; i < lst_numelements(xatv->att_val_values);
+			for (i = 0; i < lst_size(xatv->att_val_values);
 			    i++) {
 				xv = lst_at(xatv->att_val_values, i);
 				yv = lst_at(yatv->att_val_values, i);
@@ -1123,9 +1123,9 @@ attrib_t
 			goto out;
 		}
 
-		for (i = 0; i < lst_numelements(natv->att_val_values); i++) {
+		for (i = 0; i < lst_size(natv->att_val_values); i++) {
 			nv1 = lst_at(natv->att_val_values, i);
-			for (j = 0; j < lst_numelements(natv->att_val_values);
+			for (j = 0; j < lst_size(natv->att_val_values);
 			    j++) {
 				nv2 = lst_at(natv->att_val_values, j);
 				if (i != j && attrib_val_equal(nv1, nv2) == 0) {
@@ -1138,7 +1138,7 @@ attrib_t
 			}
 
 			found = B_FALSE;
-			for (j = 0; j < lst_numelements(eatv->att_val_values);
+			for (j = 0; j < lst_size(eatv->att_val_values);
 			    j++) {
 				ev = lst_at(eatv->att_val_values, j);
 				if (attrib_val_equal(nv1, ev) == 0) {
@@ -1158,10 +1158,10 @@ attrib_t
 
 		values = util_safe_malloc(sizeof(lst_t));
 		lst_create(values);
-		for (i = 0; i < lst_numelements(eatv->att_val_values); i++) {
+		for (i = 0; i < lst_size(eatv->att_val_values); i++) {
 			ev = lst_at(eatv->att_val_values, i);
 			found = B_FALSE;
-			for (j = 0; j < lst_numelements(natv->att_val_values);
+			for (j = 0; j < lst_size(natv->att_val_values);
 			    j++) {
 				nv1 = lst_at(natv->att_val_values, j);
 				if (attrib_val_equal(ev, nv1) == 0) {
@@ -1213,10 +1213,10 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 		attrs = util_safe_malloc(sizeof(lst_t));
 		(void) lst_create(attrs);
 
-		for (i = 0; i < lst_numelements(*eattrs); i++) {
+		for (i = 0; i < lst_size(*eattrs); i++) {
 			eatt = lst_at(*eattrs, i);
 			found = B_FALSE;
-			for (j = 0; j < lst_numelements(nattrs); j++) {
+			for (j = 0; j < lst_size(nattrs); j++) {
 				natt = lst_at(nattrs, j);
 				if (SEQU(eatt->att_name, natt->att_name)) {
 					found = B_TRUE;
@@ -1234,10 +1234,10 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 			lst_insert_tail(attrs, att);
 		}
 
-		for (i = 0; i < lst_numelements(nattrs); i++) {
+		for (i = 0; i < lst_size(nattrs); i++) {
 			natt = lst_at(nattrs, i);
 			found = B_FALSE;
-			for (j = 0; j < lst_numelements(*eattrs); j++) {
+			for (j = 0; j < lst_size(*eattrs); j++) {
 				eatt = lst_at(*eattrs, j);
 				if (SEQU(natt->att_name, eatt->att_name)) {
 					found = B_TRUE;
@@ -1251,9 +1251,9 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 
 	} else if (flags & (F_MOD_REM | F_MOD_SUB)) {
 
-		for (i = 0; i < lst_numelements(nattrs); i++) {
+		for (i = 0; i < lst_size(nattrs); i++) {
 			natt = lst_at(nattrs, i);
-			for (j = 0; j < lst_numelements(nattrs); j++) {
+			for (j = 0; j < lst_size(nattrs); j++) {
 				att = lst_at(nattrs, j);
 				if (SEQU(natt->att_name, att->att_name) &&
 				    i != j) {
@@ -1265,7 +1265,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 			}
 
 			found = B_FALSE;
-			for (j = 0; j < lst_numelements(*eattrs); j++) {
+			for (j = 0; j < lst_size(*eattrs); j++) {
 				eatt = lst_at(*eattrs, j);
 				if (SEQU(eatt->att_name, natt->att_name)) {
 					found = B_TRUE;
@@ -1283,10 +1283,10 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 		attrs = util_safe_malloc(sizeof(lst_t));
 		(void) lst_create(attrs);
 
-		for (i = 0; i < lst_numelements(*eattrs); i++) {
+		for (i = 0; i < lst_size(*eattrs); i++) {
 			eatt = lst_at(*eattrs, i);
 			found = B_FALSE;
-			for (j = 0; j < lst_numelements(nattrs); j++) {
+			for (j = 0; j < lst_size(nattrs); j++) {
 				natt = lst_at(nattrs, j);
 				if (SEQU(eatt->att_name, natt->att_name)) {
 					found = B_TRUE;
@@ -1316,7 +1316,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 	} else if (flags & F_MOD_REP) {
 		attrs = util_safe_malloc(sizeof(lst_t));
 		(void) lst_create(attrs);
-		for (i = 0; i < lst_numelements(nattrs); i++) {
+		for (i = 0; i < lst_size(nattrs); i++) {
 			natt = lst_at(nattrs, i);
 			lst_insert_tail(attrs, attrib_duplicate(natt));
 		}
