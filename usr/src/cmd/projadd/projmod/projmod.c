@@ -90,7 +90,6 @@ main(int argc, char **argv)
 	char *pname = NULL;
 	char *npname = NULL;
 	/*projid_t projid; */
-	char *projidstr = "";
 	char *comment = "";
 	char *users = "", *groups = "" , *attrs;
 	char *pusers, *pgroups;
@@ -146,7 +145,6 @@ main(int argc, char **argv)
 				break;
 			case 'p':
 				pflag = B_TRUE;
-				projidstr = optarg;
 				break;
 			case 'l':
 				lflag = B_TRUE;

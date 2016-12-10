@@ -30,6 +30,7 @@
 #define PROJN_EXP	TO_EXP(IDENT_REG_EXP)
 #define USERN_EXP	TO_EXP(USERN_REG_EXP)
 
+/*ARGSUSED*/
 int
 projent_validate_name(char *pname, lst_t *errlst)
 {
@@ -37,6 +38,7 @@ projent_validate_name(char *pname, lst_t *errlst)
 	return (0);
 }
 
+/*ARGSUSED*/
 int
 projent_validate_comment(char *comment, lst_t *errlst)
 {
@@ -129,7 +131,7 @@ char
 {
 	char *ret = NULL;
 	char *attrs = attrib_lst_tostring(ent->attrs);
-	asprintf(&ret, "%s:%d:%s:%s:%s:%s",
+	(void) asprintf(&ret, "%s:%ld:%s:%s:%s:%s",
 	    ent->projname,
 	    ent->projid,
 	    ent->comment,
@@ -145,12 +147,12 @@ projent_validate(projent_t *pent, int flags, lst_t *errlst)
 {
 	char *str;
 
-	projent_validate_name(pent->projname, errlst);
-	projent_validate_projid(pent->projid, flags, errlst);
-	projent_validate_comment(pent->comment, errlst);
-	projent_validate_users(pent->userlist, errlst);
-	projent_validate_groups(pent->grouplist, errlst);
-	projent_validate_attributes(pent->attrs, errlst);
+	(void) projent_validate_name(pent->projname, errlst);
+	(void) projent_validate_projid(pent->projid, flags, errlst);
+	(void) projent_validate_comment(pent->comment, errlst);
+	(void) projent_validate_users(pent->userlist, errlst);
+	(void) projent_validate_groups(pent->grouplist, errlst);
+	(void) projent_validate_attributes(pent->attrs, errlst);
 
 	str = projent_tostring(pent);
 	if (strlen(str) > (PROJECT_BUFSZ - 2)) {
@@ -597,13 +599,14 @@ out:
 void
 projent_free_lst(lst_t *plst)
 {
+	projent_t *ent;
+
 	if (plst == NULL)
 		return;
 
-	projent_t *ent;
 	while(!lst_is_empty(plst)) {
 		ent = lst_at(plst, 0);
-		lst_remove(plst, ent);
+		(void) lst_remove(plst, ent);
 		projent_free(ent);
 		free(ent);
 	}
@@ -620,7 +623,7 @@ projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
 	int e, ret;
 
 	tmpprojfile = NULL;
-	if (asprintf(&tmpprojfile, "%s.%d_tmp", projfile, getpid()) == -1) {
+	if (asprintf(&tmpprojfile, "%s.%ld_tmp", projfile, getpid()) == -1) {
 		util_add_errmsg(errlst, gettext(
 			"Failed to allocate memory"));
 		goto out;
@@ -642,7 +645,7 @@ projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
 	for (e = 0; e < lst_size(plst); e++) {
 		ent = lst_at(plst, e);
 		attrs = attrib_lst_tostring(ent->attrs);
-		ret = fprintf(fp, "%s:%d:%s:%s:%s:%s\n", ent->projname,
+		ret = fprintf(fp, "%s:%ld:%s:%s:%s:%s\n", ent->projname,
 		    ent->projid, ent->comment, ent->userlist, ent->grouplist,
 		    attrs);
 		free(attrs);
@@ -651,7 +654,7 @@ projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
 			    "Failed to write to  %s: %s"),
 			    tmpprojfile, strerror(errno));
 			/* Remove the temporary file and exit */
-			unlink(tmpprojfile);
+			(void) unlink(tmpprojfile);
 			goto out1;
 		}
 	}
@@ -660,7 +663,7 @@ projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
 		util_add_errmsg(errlst, gettext(
 		    "Cannot set ownership of  %s: %s"),
 		    tmpprojfile, strerror(errno));
-		unlink(tmpprojfile);
+		(void) unlink(tmpprojfile);
 		goto out1;
 	}
 
@@ -668,12 +671,12 @@ projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
 		util_add_errmsg(errlst, gettext(
 		    "Cannot rename %s to %s : %s"),
 		    tmpprojfile, projfile, strerror(errno));
-		unlink(tmpprojfile);
+		(void) unlink(tmpprojfile);
 		goto out1;
 	}
 
 out1:
-	fclose(fp);
+	(void) fclose(fp);
 out:
 	free(tmpprojfile);
 }
@@ -726,7 +729,6 @@ lst_t
 			projent_free_lst(plst);
 			UTIL_FREE_SNULL(plst);
 			goto out;
-			break;
 		}
 	}
 
@@ -738,7 +740,7 @@ lst_t
 	}
 
 out:
+	(void) fclose(fp);
 	free(buf);
-	fclose(fp);
 	return (plst);
 }

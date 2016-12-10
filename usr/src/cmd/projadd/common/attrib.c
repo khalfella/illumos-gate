@@ -61,6 +61,7 @@
 
 typedef struct attrib_val_s {
 	int att_val_type;
+	/*LINTED*/
 	union {
 		char *att_val_value;
 		lst_t *att_val_values;
@@ -503,10 +504,8 @@ char
 	switch(val->att_val_type) {
 		case ATT_VAL_TYPE_NULL:
 			return strdup("");
-		break;
 		case ATT_VAL_TYPE_VALUE:
 			return strdup(val->att_val_value);
-		break;
 		case ATT_VAL_TYPE_LIST:
 			/* Only innerlists need to be betweeen ( and ) */
 			if (innerlist)
@@ -528,7 +527,6 @@ char
 			if (innerlist)
 				ret = UTIL_STR_APPEND1(ret, ")");
 			return (ret);
-		break;
 	}
 
 out:
@@ -590,7 +588,7 @@ attrib_val_free(attrib_val_t *atv)
 	} else if (atv->att_val_type == ATT_VAL_TYPE_LIST) {
 		while (!lst_is_empty(atv->att_val_values)) {
 			val = lst_at(atv->att_val_values, 0);
-			lst_remove(atv->att_val_values, val);
+			(void) lst_remove(atv->att_val_values, val);
 			attrib_val_free(val);
 			free(val);
 		}
@@ -610,13 +608,14 @@ attrib_free(attrib_t *att)
 void
 attrib_free_lst(lst_t *attribs)
 {
+	attrib_t *att;
+
 	if (attribs == NULL)
 		return;
 
-	attrib_t *att;
 	while (!lst_is_empty(attribs)) {
 		att = lst_at(attribs, 0);
-		lst_remove(attribs, att);
+		(void) lst_remove(attribs, att);
 		attrib_free(att);
 		free(att);
 	}
@@ -637,14 +636,14 @@ attrib_sort_lst(lst_t *attribs)
 			atti = lst_at(attribs, i);
 			attj = lst_at(attribs, j);
 			if (strcmp(attj->att_name, atti->att_name) < 0) {
-				lst_replace_at(attribs, i, attj);
-				lst_replace_at(attribs, j, atti);
+				(void) lst_replace_at(attribs, i, attj);
+				(void) lst_replace_at(attribs, j, atti);
 			}
 		}
 	}
 }
 
-int
+void
 attrib_val_to_list(attrib_val_t *atv)
 {
 	void *val;
@@ -652,7 +651,7 @@ attrib_val_to_list(attrib_val_t *atv)
 	attrib_val_t *mat;
 
 	if (atv->att_val_type == ATT_VAL_TYPE_LIST)
-		return (0);
+		return;
 
 	val = atv->att_val_value;
 	type = atv->att_val_type;
@@ -665,10 +664,9 @@ attrib_val_to_list(attrib_val_t *atv)
 		mat = ATT_VAL_ALLOC_VALUE(val);
 		lst_insert_tail(atv->att_val_values, mat);
 	}
-	return (0);
 }
 
-int
+void
 attrib_val_append(attrib_val_t *atv, char *token)
 {
 	attrib_val_t *nat;
@@ -686,8 +684,6 @@ attrib_val_append(attrib_val_t *atv, char *token)
 		nat = ATT_VAL_ALLOC_VALUE(strdup(token));
 		lst_insert_tail(atv->att_val_values, nat);
 	}
-
-	return (0);
 }
 
 attrib_val_t
@@ -738,12 +734,11 @@ attrib_val_t
 					    usedtokens, token); 
 					error = 1;
 					goto out;
-				break;
 				case ATT_VAL_TYPE_NULL:
 					/* Make is a LIST attrib */
 					attrib_val_to_list(at);
 					/*break; */
-					/*fallthrough*/
+					/*FALLTHROUGH*/
 				case ATT_VAL_TYPE_LIST:
 					/* Allocate NULL node */
 					nat = ATT_VAL_ALLOC_NULL();
@@ -770,7 +765,7 @@ attrib_val_t
 
 			if (!lst_is_empty(&stk)) {
 				at = lst_at(&stk, 0);
-				lst_remove(&stk, at);
+				(void) lst_remove(&stk, at);
 			}
 			parendepth--;
 			prev = ")";
@@ -804,7 +799,6 @@ attrib_val_t
 				    usedtokens); 
 				error = 1;
 				goto out;
-			break;
 			case ATT_VAL_TYPE_VALUE:
 			case ATT_VAL_TYPE_LIST:
 				attrib_val_append(at, "");
@@ -815,7 +809,7 @@ attrib_val_t
 out:
 	while (!lst_is_empty(&stk)) {
                 at = lst_at(&stk, 0);
-                lst_remove(&stk, at);
+                (void) lst_remove(&stk, at);
         }
 
 	util_free_tokens(tokens);
@@ -939,7 +933,8 @@ attrib_t
 			    &num, &mod, &unit) == 0) {
 				attrib_val_free(atv);
 				atv = ATT_VAL_ALLOC_VALUE(num);
-				lst_replace_at(atvl->att_val_values, 1, atv);
+				(void) lst_replace_at(atvl->att_val_values, 1,
+				    atv);
 				free(mod);
 				free(unit);
 
@@ -968,7 +963,7 @@ lst_t
 	lst_t *ret = NULL;
 
 	ret = util_safe_malloc(sizeof(lst_t));
-	(void) lst_create(ret);
+	lst_create(ret);
 
 	if (regcomp(&attrbexp, ATTRB_EXP, REG_EXTENDED) != 0)
 		goto out1;
@@ -1112,13 +1107,11 @@ attrib_val_equal(attrib_val_t *xatv,attrib_val_t *yatv)
 	switch (xatv->att_val_type) {
 		case ATT_VAL_TYPE_NULL:
 			return (0);
-		break;
 		case ATT_VAL_TYPE_VALUE:
 			if (SEQU(xatv->att_val_value, yatv->att_val_value)) {
 				return (0);
 			}
 			return (1);
-		break;
 		case ATT_VAL_TYPE_LIST:
 			if (lst_size(xatv->att_val_values) !=
 			    lst_size(yatv->att_val_values))
@@ -1129,7 +1122,6 @@ attrib_val_equal(attrib_val_t *xatv,attrib_val_t *yatv)
 				yv = lst_at(yatv->att_val_values, i);
 				if (attrib_val_equal(xv, yv) != 0) {
 					return (1);
-					break;
 				}
 			}
 		break;
@@ -1156,7 +1148,7 @@ attrib_t
 
 		/* NULL - NULL -> EMPTY */
 		att = attrib_duplicate(eatt);
-		strcpy(att->att_name, "");
+		(void) strcpy(att->att_name, "");
 
 	} else if (eatv->att_val_type == ATT_VAL_TYPE_NULL ||
 	    (eatv->att_val_type == ATT_VAL_TYPE_VALUE &&
@@ -1286,7 +1278,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 
 	if (flags & F_MOD_ADD) {
 		attrs = util_safe_malloc(sizeof(lst_t));
-		(void) lst_create(attrs);
+		lst_create(attrs);
 
 		for (i = 0; i < lst_size(*eattrs); i++) {
 			eatt = lst_at(*eattrs, i);
@@ -1356,7 +1348,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 		}
 
 		attrs = util_safe_malloc(sizeof(lst_t));
-		(void) lst_create(attrs);
+		lst_create(attrs);
 
 		for (i = 0; i < lst_size(*eattrs); i++) {
 			eatt = lst_at(*eattrs, i);
@@ -1390,7 +1382,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 
 	} else if (flags & F_MOD_REP) {
 		attrs = util_safe_malloc(sizeof(lst_t));
-		(void) lst_create(attrs);
+		lst_create(attrs);
 		for (i = 0; i < lst_size(nattrs); i++) {
 			natt = lst_at(nattrs, i);
 			lst_insert_tail(attrs, attrib_duplicate(natt));

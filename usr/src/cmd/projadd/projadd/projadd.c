@@ -74,7 +74,7 @@ main(int argc, char **argv)
 	projent_t *ent;
 
 	/* Command line options */
-	boolean_t nflag, fflag, pflag, oflag, cflag, Uflag, Gflag, Kflag;
+	boolean_t nflag, pflag, oflag;
 
 	/* Project entry fields */
 	char *pname;
@@ -88,8 +88,7 @@ main(int argc, char **argv)
 	/* Project file defaults to system project file "/etc/project" */
 	char *projfile = PROJF_PATH;
 
-	nflag = fflag = pflag = oflag = B_FALSE;
-	cflag = Uflag = Gflag = Kflag = B_FALSE;
+	nflag = pflag = oflag = B_FALSE;
 	attrs = util_safe_zmalloc(1);
 	lst_create(&errlst);
 
@@ -111,7 +110,6 @@ main(int argc, char **argv)
 				nflag = B_TRUE;
 				break;
 			case 'f':
-				fflag = B_TRUE;
 				projfile = optarg;
 				break;
 			case 'p':
@@ -122,19 +120,15 @@ main(int argc, char **argv)
 				oflag = B_TRUE;
 				break;
 			case 'c':
-				cflag = B_TRUE;
 				comment = optarg;
 				break;
 			case 'U':
-				Uflag = B_TRUE;
 				users = optarg;
 				break;
 			case 'G':
-				Gflag = B_TRUE;
 				groups = optarg;
 				break;
 			case 'K':
-				Kflag = B_TRUE;
 				attrs = UTIL_STR_APPEND2(attrs, ";", optarg);
 				break;
 			default:

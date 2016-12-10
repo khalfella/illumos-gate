@@ -1,17 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libintl.h>
-
 #include "lst.h"
 #include "util.h"
 
 
-int lst_create(lst_t *plst)
+void
+lst_create(lst_t *plst)
 {
 	plst->csz = 0;
 	plst->tsz = 0;
 	plst->buf = NULL;
-	return (0);
 }
 
 int
@@ -20,7 +19,8 @@ lst_is_empty(lst_t *plst)
 	return (plst->csz == 0);
 }
 
-int lst_insert_head(lst_t *plst, void *ndata)
+void
+lst_insert_head(lst_t *plst, void *ndata)
 {
 	int i;
 	if (plst->csz == plst->tsz) {
@@ -34,11 +34,11 @@ int lst_insert_head(lst_t *plst, void *ndata)
 
 	plst->buf[0] = ndata;
 	plst->csz++;
-	return (0);
 }
 
 
-int lst_insert_tail(lst_t *plst, void *ndata)
+void
+lst_insert_tail(lst_t *plst, void *ndata)
 {
 	if (plst->csz == plst->tsz) {
 		plst->tsz = (plst->tsz == 0) ? 1 : plst->tsz * 2;
@@ -47,7 +47,6 @@ int lst_insert_tail(lst_t *plst, void *ndata)
 	}
 
 	plst->buf[plst->csz++] = ndata;
-	return (0);
 }
 
 int lst_remove(lst_t *plst, void *rdata)

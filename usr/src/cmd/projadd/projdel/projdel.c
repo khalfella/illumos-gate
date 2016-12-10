@@ -57,7 +57,6 @@ main(int argc, char **argv)
 	lst_t *plst;			/* Projects list */
 	projent_t *ent, *delent;
 	int del;
-	boolean_t fflag = B_FALSE;	/* Command line flag */
 	char *pname;			/* Project name */
 	lst_t errlst;			/* Errors list */
 	char *projfile = PROJF_PATH;	/* Project file "/etc/project" */
@@ -79,7 +78,6 @@ main(int argc, char **argv)
 				exit(0);
 				break;
 			case 'f':
-				fflag = B_TRUE;
 				projfile = optarg;
 				break;
 			default:
@@ -89,7 +87,7 @@ main(int argc, char **argv)
 		}
 
 	if (optind != argc -1) {
-		fprintf(stderr, gettext("No project name specified\n"));
+		(void) fprintf(stderr, gettext("No project name specified\n"));
 		exit(2);
 	}
 
@@ -118,13 +116,13 @@ main(int argc, char **argv)
 	}
 
 	if (del == 0) {
-		fprintf(stderr, gettext(
+		(void) fprintf(stderr, gettext(
 		    "Project \"%s\" does not exist\n"), pname);
 		usage();
 		ret = 2;
 		goto out;
 	} else if (del > 1) {
-		fprintf(stderr, gettext(
+		(void) fprintf(stderr, gettext(
 		    "Duplicate project name \"%s\""), pname);
 		usage();
 		ret = 2;
@@ -132,7 +130,7 @@ main(int argc, char **argv)
 	}
 
 	/* Remove the project entry from the list */
-	lst_remove(plst, delent);
+	(void) lst_remove(plst, delent);
 
 	/* Write out the project file */
 	projent_put_lst(projfile, plst, &errlst);

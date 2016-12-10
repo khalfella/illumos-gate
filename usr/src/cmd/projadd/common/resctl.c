@@ -49,7 +49,6 @@ int
 resctl_pool_exist(char *name)
 {
 	pool_conf_t *conf;
-	pool_t *pool;
 	pool_status_t status;
 	int fd;
 
@@ -81,13 +80,13 @@ resctl_pool_exist(char *name)
 		return (1);
 	}
 
-	if ((pool = pool_get_pool(conf, name)) == NULL) {
-		pool_conf_close(conf);
+	if (pool_get_pool(conf, name) == NULL) {
+		(void) pool_conf_close(conf);
 		pool_conf_free(conf);
 		return (1);
 	}
 
-	pool_conf_close(conf);
+	(void) pool_conf_close(conf);
 	pool_conf_free(conf);
 	return (0);
 }
@@ -97,11 +96,11 @@ resctl_get_info(char *name, resctl_info_t *pinfo)
 {
 	rctlblk_t *blk1, *blk2, *tmp;
 	rctl_priv_t priv;
+	int ret = 1;
 
 	blk1 = blk2 = tmp = NULL;
 	blk1 = util_safe_malloc(rctlblk_size());
 	blk2 = util_safe_malloc(rctlblk_size());
-	int ret = 1;
 
 	if (getrctl(name, NULL, blk1, RCTL_FIRST) == 0) {
 		priv = rctlblk_get_privilege(blk1);

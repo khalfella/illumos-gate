@@ -68,8 +68,8 @@ util_print_errmsgs(lst_t *errlst)
 	char *errmsg;
 	while(!lst_is_empty(errlst)) {
 		errmsg = lst_at(errlst, 0);
-		lst_remove(errlst, errmsg);
-		fprintf(stderr, "%s\n", errmsg);
+		(void) lst_remove(errlst, errmsg);
+		(void) fprintf(stderr, "%s\n", errmsg);
 		free(errmsg);
 	}
 }
@@ -108,7 +108,7 @@ util_str_append(char *str, int nargs, ...)
 		s = va_arg(ap, char*);
 		len += strlen(s);
 		str = util_safe_realloc(str, len);
-		strcat(str, s);
+		(void) strcat(str, s);
 	}
 	va_end(ap);
 	return str;
@@ -128,7 +128,7 @@ util_substr(regex_t *reg, regmatch_t *mat, char *str, int idx)
 	ret = util_safe_malloc(mat_len + 1);
 	*ret = '\0';
 
-	strlcpy(ret, str + mat[idx].rm_so, mat_len + 1);
+	(void) strlcpy(ret, str + mat[idx].rm_so, mat_len + 1);
 	return (ret);
 }
 
