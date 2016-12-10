@@ -18,22 +18,28 @@
 #include "resctl.h"
 #include "util.h"
 
-#define	BOSTR_REG_EXP "^"
-#define	EOSTR_REG_EXP "$"
-#define	EQUAL_REG_EXP "="
-#define	IDENT_REG_EXP "[[:alpha:]][[:alnum:]_.-]*"
-#define INTNM_REG_EXP "[[:digit:]]+"
-#define SIGAC_REG_EXP "sig(nal)?(=.*)?"
-#define SIGHD_REG_EXP "(signal|sig)"
-#define SIGVL_REG_EXP "(([[:digit:]]+)|((SIG)?([[:upper:]]+)([+-][123])?))"
-#define SIGNL_REG_EXP SIGHD_REG_EXP EQUAL_REG_EXP SIGVL_REG_EXP
+#define	BOSTR_REG_EXP	"^"
+#define	EOSTR_REG_EXP	"$"
+#define	EQUAL_REG_EXP	"="
+#define STRN0_REG_EXP	"(.*)"
+#define	IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
+#define INTNM_REG_EXP	"[[:digit:]]+"
+#define SIGAC_REG_EXP	"sig(nal)?(=.*)?"
+#define SIGHD_REG_EXP	"(signal|sig)"
+#define SIGVL_REG_EXP	"(([[:digit:]]+)|((SIG)?([[:upper:]]+)([+-][123])?))"
+#define SIGNL_REG_EXP	SIGHD_REG_EXP EQUAL_REG_EXP SIGVL_REG_EXP
+#define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
+#define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
+#define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
 
-#define TO_EXP(X)     BOSTR_REG_EXP X EOSTR_REG_EXP
+#define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
 
-#define POOLN_EXP     TO_EXP(IDENT_REG_EXP)
-#define INTNM_EXP     TO_EXP(INTNM_REG_EXP)
-#define SIGAC_EXP     TO_EXP(SIGAC_REG_EXP)
-#define SIGNL_EXP     TO_EXP(SIGNL_REG_EXP)
+#define POOLN_EXP	TO_EXP(IDENT_REG_EXP)
+#define INTNM_EXP	TO_EXP(INTNM_REG_EXP)
+#define SIGAC_EXP	TO_EXP(SIGAC_REG_EXP)
+#define SIGNL_EXP	TO_EXP(SIGNL_REG_EXP)
+#define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
+#define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
 
 #define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
 
@@ -42,6 +48,34 @@
 #define	SIN1(X, S1)		((SEQU((X), (S1))))
 #define	SIN2(X, S1, S2)		((SEQU((X), (S1))) || (SIN1((X), (S2))))
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
+
+#define	ATT_VAL_TYPE_NULL	0
+#define ATT_VAL_TYPE_VALUE	1
+#define ATT_VAL_TYPE_LIST	2
+
+#define ATT_ALLOC()		attrib_alloc()
+#define ATT_VAL_ALLOC(T, V)	attrib_val_alloc((T), (V))
+#define ATT_VAL_ALLOC_NULL()	ATT_VAL_ALLOC(ATT_VAL_TYPE_NULL, NULL)
+#define ATT_VAL_ALLOC_VALUE(V)	ATT_VAL_ALLOC(ATT_VAL_TYPE_VALUE, (V))
+#define ATT_VAL_ALLOC_LIST(L)	ATT_VAL_ALLOC(ATT_VAL_TYPE_LIST, (L))
+
+typedef struct attrib_val_s {
+	int att_val_type;
+	union {
+		char *att_val_value;
+		lst_t *att_val_values;
+        };
+} attrib_val_t;
+
+typedef struct attrib_s {
+	char *att_name;
+	attrib_val_t *att_value;
+} attrib_t;
+
+
+attrib_t *attrib_alloc();
+attrib_val_t *attrib_val_alloc(int, void *);
+char *attrib_val_tostring(attrib_val_t *, boolean_t);
 
 int
 attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
@@ -502,10 +536,12 @@ out:
 }
 
 char
-*attrib_tostring(attrib_t *att)
+*attrib_tostring(void *at)
 {
+	attrib_t *att;
 	char *ret = NULL, *vstring;
 
+	att = (attrib_t *)at;
 	ret = UTIL_STR_APPEND1(ret, att->att_name);
 	if ((vstring = attrib_val_tostring(att->att_value, B_FALSE)) != NULL) {
 		if (strlen(vstring) > 0)
@@ -919,6 +955,45 @@ attrib_t
 
 out:
 	free(mat);
+	return (ret);
+}
+
+lst_t
+*attrib_parse_attributes(char *attribs, int flags, lst_t *errlst)
+{
+	char *sattrs, *attrs, *att;
+	regex_t attrbexp, atvalexp;
+
+	attrib_t *natt = NULL;
+	lst_t *ret = NULL;
+
+	ret = util_safe_malloc(sizeof(lst_t));
+	(void) lst_create(ret);
+
+	if (regcomp(&attrbexp, ATTRB_EXP, REG_EXTENDED) != 0)
+		goto out1;
+	if (regcomp(&atvalexp, ATVAL_EXP, REG_EXTENDED) != 0)
+		goto out2;
+
+	sattrs = attrs = strdup(attribs);
+	while ((att = strsep(&attrs, ";")) != NULL) {
+		if (*att == '\0')
+			continue;
+		if ((natt = attrib_parse(&attrbexp,
+		    &atvalexp, att, flags, errlst)) == NULL) {
+			attrib_free_lst(ret);
+			UTIL_FREE_SNULL(ret);
+			break;
+		}
+
+		lst_insert_tail(ret, natt);
+	}
+
+	free(sattrs);
+	regfree(&atvalexp);
+out2:
+	regfree(&attrbexp);
+out1:
 	return (ret);
 }
 

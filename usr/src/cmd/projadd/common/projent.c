@@ -22,18 +22,11 @@
 
 #define BOSTR_REG_EXP	"^"
 #define EOSTR_REG_EXP	"$"
-#define EQUAL_REG_EXP	"="
-#define STRN0_REG_EXP	"(.*)"
 #define USERN_REG_EXP	"!?[[:alpha:]][[:alnum:]_.-]*"
 #define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
-#define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
-#define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
-#define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
 
 #define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
 
-#define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
-#define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
 #define PROJN_EXP	TO_EXP(IDENT_REG_EXP)
 #define USERN_EXP	TO_EXP(USERN_REG_EXP)
 
@@ -230,7 +223,7 @@ projent_sort_attributes(lst_t *attribs)
 char
 *projent_attrib_tostring(void *attrib)
 {
-	return (attrib_tostring((attrib_t *)attrib));
+	return (attrib_tostring(attrib));
 }
 
 char
@@ -248,40 +241,7 @@ projent_merge_attributes(lst_t **eattrs, lst_t *nattrs, int flags,
 lst_t
 *projent_parse_attributes(char *attribs, int flags, lst_t *errlst)
 {
-	char *sattrs, *attrs, *att;
-	regex_t attrbexp, atvalexp;
-
-	attrib_t *natt = NULL;
-	lst_t *ret = NULL;
-
-	ret = util_safe_malloc(sizeof(lst_t));
-	(void) lst_create(ret);
-
-	if (regcomp(&attrbexp, ATTRB_EXP, REG_EXTENDED) != 0)
-		goto out1;
-	if (regcomp(&atvalexp, ATVAL_EXP, REG_EXTENDED) != 0)
-		goto out2;
-
-	sattrs = attrs = strdup(attribs);
-	while ((att = strsep(&attrs, ";")) != NULL) {
-		if (*att == '\0')
-			continue;
-		if ((natt = attrib_parse(&attrbexp,
-		    &atvalexp, att, flags, errlst)) == NULL) {
-			attrib_free_lst(ret);
-			UTIL_FREE_SNULL(ret);
-			break;
-		}
-
-		lst_insert_tail(ret, natt);
-	}
-
-	free(sattrs);
-	regfree(&atvalexp);
-out2:
-	regfree(&attrbexp);
-out1:
-	return (ret);
+	return (attrib_parse_attributes(attribs, flags, errlst));
 }
 
 void
