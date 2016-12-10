@@ -89,7 +89,7 @@ main(int argc, char **argv)
 		}
 
 	if (optind != argc -1) {
-		fprintf(stderr, "No project name specified\n");
+		fprintf(stderr, gettext("No project name specified\n"));
 		exit(2);
 	}
 
@@ -118,12 +118,14 @@ main(int argc, char **argv)
 	}
 
 	if (del == 0) {
-		fprintf(stderr, "Project \"%s\" does not exist\n", pname);
+		fprintf(stderr, gettext(
+		    "Project \"%s\" does not exist\n"), pname);
 		usage();
 		ret = 2;
 		goto out;
 	} else if (del > 1) {
-		fprintf(stderr, "Duplicate project name \"%s\"", pname);
+		fprintf(stderr, gettext(
+		    "Duplicate project name \"%s\""), pname);
 		usage();
 		ret = 2;
 		goto out;
