@@ -96,8 +96,8 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 		goto out;
 	}
 
-	for (i = 0, atv = lst_at(atval->att_val_values, 0); atv != NULL;
-	    i++, atv = lst_at(atval->att_val_values, i)) {
+	for (i = 0; i < lst_numelements(atval->att_val_values); i++) {
+		atv = lst_at(atval->att_val_values, i);
 		if (atv->att_val_type != ATT_VAL_TYPE_LIST) {
 			if ((str = attrib_val_tostring(atv, B_FALSE)) != NULL) {
 				util_add_errmsg(errlst, gettext(
@@ -526,8 +526,8 @@ char
 	char *str;
 
 	ret = UTIL_STR_APPEND1(ret, "");
-	for (i = 0, att = lst_at(attrs, 0); att != NULL;
-	    i++, att = lst_at(attrs, i)) {
+	for (i = 0; i < lst_numelements(attrs); i++) {
+		att = lst_at(attrs, i);
 
 		if ((str = attrib_tostring(att)) != NULL) {
 			if (i > 0)

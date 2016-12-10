@@ -1,147 +1,107 @@
+#include <stdio.h>
 #include <stdlib.h>
-
+#include <libintl.h>
 
 #include "lst.h"
+#include "util.h"
 
-
-lst_node_t
-*lst_node_allocate(lst_t *plst)
-{
-	lst_node_t *node;
-	if ((node = malloc(sizeof(lst_node_t))) == NULL)
-		return (NULL);
-	node->lst = plst;
-	node->data = NULL;
-	node->next = NULL;
-	return (node);
-}
 
 int lst_create(lst_t *plst)
 {
-	plst->numelements = 0;
-	plst->head = NULL;
+	plst->csz = 0;
+	plst->tsz = 0;
+	plst->buf = NULL;
 	return (0);
 }
 
 int
 lst_is_empty(lst_t *plst)
 {
-	return (plst->numelements == 0);
+	return (plst->csz == 0);
 }
 
 int lst_insert_head(lst_t *plst, void *ndata)
 {
-	lst_node_t *nnode;
+	int i;
+	if (plst->csz == plst->tsz) {
+		plst->tsz = (plst->tsz == 0) ? 1 : plst->tsz * 2;
+		plst->buf = util_safe_realloc(plst->buf,
+		    plst->tsz * sizeof(void *));
+	}
 
-	if ((nnode = lst_node_allocate(plst)) == NULL)
-		return (-1);
-	nnode->data = ndata;
-	nnode->next = plst->head;
-	plst->head = nnode;
-	plst->numelements++;
+	for (i = plst->csz; i > 0; i--)
+		plst->buf[i] = plst->buf[i - 1];
+
+	plst->buf[0] = ndata;
+	plst->csz++;
 	return (0);
 }
 
+
 int lst_insert_tail(lst_t *plst, void *ndata)
 {
-	lst_node_t *n;
-	lst_node_t *nnode;
-
-	if (lst_is_empty(plst)) {
-		return (lst_insert_head(plst, ndata));
+	if (plst->csz == plst->tsz) {
+		plst->tsz = (plst->tsz == 0) ? 1 : plst->tsz * 2;
+		plst->buf = util_safe_realloc(plst->buf,
+		    plst->tsz * sizeof(void *));
 	}
-	if ((nnode = lst_node_allocate(plst)) == NULL)
-		return (-1);
 
-	nnode->data = ndata;
-	n = plst->head;
-	while(n->next != NULL) {
-		n = n->next;
-	}
-	n->next = nnode;
-	plst->numelements++;
+	plst->buf[plst->csz++] = ndata;
 	return (0);
 }
 
 int lst_remove(lst_t *plst, void *rdata)
 {
-	lst_node_t *rnode, *prev;
-
-	if (lst_is_empty(plst))
-		return (-1);
-
-	for (prev = rnode = plst->head; rnode != NULL; rnode = rnode->next) {
-		if (rnode->data == rdata) {
-
-			/* Is this the head of the list?*/
-			if (prev == rnode) {
-				plst->head = plst->head->next;
-				plst->numelements--;
-				free(rnode);
-				return (0);
-			}
-
-			/*It is an element in the middle of the list */
-			prev->next = rnode->next;
-			free(rnode);
-			plst->numelements--;
-			return (0);
+	int i, idx = -1;
+	for (i = 0; i < plst->csz; i++) {
+		if (plst->buf[i] == rdata) {
+			idx = i;
+			break;
 		}
-		prev = rnode;
 	}
+	if (idx >= 0) {
+		for (i = idx; i < plst->csz - 1; i++)
+			plst->buf[i] = plst->buf[i + 1];
 
-	/* element was not found in this lst */
+		if (--plst->csz == 0) {
+			plst->tsz = 0;
+			free(plst->buf);
+		}
+		return (0);
+	}
 	return (-1);
 }
 
 void
 *lst_at(lst_t *plst, int idx)
 {
-	int cnt = 0;
-	lst_node_t *node;
-
-	if ((idx < 0) || (idx >= plst->numelements))
-		return (NULL);
-
-	for (node = plst->head;
-	    (node != NULL) && (cnt < plst->numelements);
-	    node = node->next, cnt++) {
-		if (cnt == idx)
-			return (node->data);
+	if (idx < 0 || idx >= plst->csz) {
+		(void) fprintf(stderr, gettext(
+		    "error accessing element outside lst\n"));
+		exit(1);
 	}
-
-	/* Should not reach here */
-	return (NULL);
+	return plst->buf[idx];
 }
 
 void
 *lst_replace_at(lst_t *plst, int idx, void *ndata)
 {
-	int cnt = 0;
-	lst_node_t *node;
 	void *odata;
 
-	if ((idx < 0) || (idx >= plst->numelements))
-		return (NULL);
-
-	for (node = plst->head;
-	    (node != NULL) && (cnt < plst->numelements);
-	    node = node->next, cnt++) {
-		if (cnt == idx) {
-			odata = node->data;
-			node->data = ndata;
-			return (odata);
-		}
+	if (idx < 0 || idx >= plst->csz) {
+		(void) fprintf(stderr, gettext(
+		    "error accessing element outside lst\n"));
+		exit(1);
 	}
-
-	/* Should not reach here unless the elemetn doesn't exist */
-	return (NULL);
+	odata = plst->buf[idx];
+	plst->buf[idx] = ndata;
+	return (odata);
 }
 
-uint32_t
+int
 lst_numelements(lst_t *plst)
 {
-	return (plst->numelements);
+	return (plst->csz);
 }
 
 
