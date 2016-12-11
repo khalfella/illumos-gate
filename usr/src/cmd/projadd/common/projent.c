@@ -54,11 +54,13 @@ projent_validate_users(char *users, lst_t *errlst)
 	int ret = 0;
 	int i;
 
-	susrs = usrs = strdup(users);
+	susrs = usrs = util_safe_strdup(users);
 	ulast = ulist = util_safe_zmalloc(
 	    (strlen(users) + 1) * sizeof(char *));
 	while ((usr = strsep(&usrs, ",")) != NULL) {
-		if (*usr == '\0')
+		if (*usr == '!')
+			usr++;
+		if ((*usr == '\0') || (strcmp(usr, "*") == 0))
 			continue;
 
 		if (getpwnam(usr) == NULL) {
@@ -91,11 +93,13 @@ projent_validate_groups(char *groups, lst_t *errlst)
 	int ret = 0;
 	int i;
 
-	sgrps = grps = strdup(groups);
+	sgrps = grps = util_safe_strdup(groups);
 	glast = glist = util_safe_zmalloc(
 	    (strlen(groups) + 1) * sizeof(char *));
 	while ((grp = strsep(&grps, ",")) != NULL) {
-		if (*grp == '\0')
+		if (*grp == '!')
+			grp++;
+		if ((*grp == '\0') || (strcmp(grp, "*") == 0))
 			continue;
 
 		if (getgrnam(grp) == NULL) {
@@ -260,13 +264,13 @@ projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
 	sep = (flags & F_PAR_SPC) ? " ," : ",";
 
 	if (flags & F_MOD_ADD) {
-		res = strdup(*elist);
+		res = util_safe_strdup(*elist);
 
-		snusrs = nusrs = strdup(nlist);
+		snusrs = nusrs = util_safe_strdup(nlist);
 		while ((nusr = strsep(&nusrs, sep)) != NULL) {
 			if (*nusr == '\0')
 				continue;
-			seusrs = eusrs = strdup(*elist);
+			seusrs = eusrs = util_safe_strdup(*elist);
 			while ((eusr = strsep(&eusrs, sep)) != NULL) {
 				if (*eusr == '\0')
 					continue;
@@ -289,11 +293,11 @@ projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
 		free(snusrs);
 	} else if (flags & F_MOD_REM) {
 
-		snusrs = nusrs = strdup(nlist);
+		snusrs = nusrs = util_safe_strdup(nlist);
 		for (i = 0; (nusr = strsep(&nusrs, sep)) != NULL; i++) {
 			if (*nusr == '\0')
 				continue;
-			sn1usrs = n1usrs = strdup(nlist);
+			sn1usrs = n1usrs = util_safe_strdup(nlist);
 			for (j = 0; (n1usr = strsep(&n1usrs, sep)) != NULL;
 			    j++) {
 				if(i != j && strcmp(nusr, n1usr) == 0) {
@@ -307,7 +311,7 @@ projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
 			}
 			free(sn1usrs);
 
-			seusrs = eusrs = strdup(*elist);
+			seusrs = eusrs = util_safe_strdup(*elist);
 			while ((eusr = strsep(&eusrs, sep)) != NULL) {
 				if (strcmp(nusr, eusr) == 0) {
 					break;
@@ -327,11 +331,11 @@ projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
 
 
 		res = util_safe_zmalloc(1);
-		seusrs = eusrs = strdup(*elist);
+		seusrs = eusrs = util_safe_strdup(*elist);
 		while ((eusr = strsep(&eusrs, sep)) != NULL) {
 			if (*eusr == '\0')
 				continue;
-			snusrs = nusrs = strdup(nlist);
+			snusrs = nusrs = util_safe_strdup(nlist);
 			while ((nusr = strsep(&nusrs, sep)) != NULL) {
 				if (strcmp(eusr, nusr) == 0) {
 					break;
@@ -347,7 +351,7 @@ projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
 		}
 		free(seusrs);
 	} else if (flags & F_MOD_SUB || flags & F_MOD_REP) {
-		res = strdup(nlist);
+		res = util_safe_strdup(nlist);
 	}
 
 out:
@@ -373,7 +377,7 @@ projent_parse_usrgrp(char *usrgrp, char *nlist, int flags, lst_t *errlst)
 	}
 
 	sep = (flags & F_PAR_SPC) ? " ," : ",";
-	susrs = usrs = strdup(nlist);
+	susrs = usrs = util_safe_strdup(nlist);
 	ulist = util_safe_zmalloc(1);
 
 	while ((usr = strsep(&usrs, sep)) != NULL) {
@@ -542,8 +546,8 @@ projent_t
 	ent = util_safe_zmalloc(sizeof(projent_t));
 
 
-	ent->projname = strdup(projname);
-	ent->comment = strdup(comment);
+	ent->projname = util_safe_strdup(projname);
+	ent->comment = util_safe_strdup(comment);
 
 	reterr += projent_parse_name(ent->projname, errlst);
 	reterr += projent_parse_projid(idstr, &ent->projid, errlst);
@@ -572,14 +576,14 @@ projent_t
 	projname = idstr = comment = users = groups = attrstr = NULL;
 	ent = NULL;
 
-	sstr  = str = strdup(projstr);
+	sstr  = str = util_safe_strdup(projstr);
 
-	if ((projname = strdup(strsep(&str, ":"))) == NULL ||
-	    (idstr = strdup(strsep(&str, ":"))) == NULL ||
-	    (comment = strdup(strsep(&str, ":"))) == NULL ||
-	    (users = strdup(strsep(&str, ":"))) == NULL ||
-	    (groups = strdup(strsep(&str, ":"))) == NULL ||
-	    (attrstr = strdup(strsep(&str, ":"))) == NULL ||
+	if ((projname = util_safe_strdup(strsep(&str, ":"))) == NULL ||
+	    (idstr = util_safe_strdup(strsep(&str, ":"))) == NULL ||
+	    (comment = util_safe_strdup(strsep(&str, ":"))) == NULL ||
+	    (users = util_safe_strdup(strsep(&str, ":"))) == NULL ||
+	    (groups = util_safe_strdup(strsep(&str, ":"))) == NULL ||
+	    (attrstr = util_safe_strdup(strsep(&str, ":"))) == NULL ||
 	    strsep(&str, ":") != NULL){
 		util_add_errmsg(errlst, gettext(
 		    "Incorrect number of fields.  Should have 5 \":\"'s."));

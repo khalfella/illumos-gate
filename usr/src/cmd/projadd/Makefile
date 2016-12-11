@@ -27,7 +27,7 @@
 
 include ../Makefile.cmd
 
-SUBDIRS=	projadd projmod projdel
+SUBDIRS=	projadd projmod projdel projtest
 
 all :=		TARGET = all
 install :=	TARGET = install

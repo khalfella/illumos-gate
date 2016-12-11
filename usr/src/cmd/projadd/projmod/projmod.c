@@ -267,12 +267,12 @@ main(int argc, char **argv)
 	if (lflag && projent_parse_name(pname, &errlst) == 0 &&
 	    projent_validate_unique_name(plst, npname, &errlst) == 0) {
 		free(modent->projname);
-		modent->projname = strdup(npname);
+		modent->projname = util_safe_strdup(npname);
 	}
 
 	if (cflag && projent_parse_comment(comment, &errlst) == 0) {
 		free(modent->comment);
-		modent->comment = strdup(comment);
+		modent->comment = util_safe_strdup(comment);
 	}
 
 	if (Uflag) {

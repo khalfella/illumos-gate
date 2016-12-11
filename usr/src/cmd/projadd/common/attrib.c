@@ -503,9 +503,9 @@ char
 	attrib_val_t *v;
 	switch(val->att_val_type) {
 		case ATT_VAL_TYPE_NULL:
-			return strdup("");
+			return util_safe_strdup("");
 		case ATT_VAL_TYPE_VALUE:
-			return strdup(val->att_val_value);
+			return util_safe_strdup(val->att_val_value);
 		case ATT_VAL_TYPE_LIST:
 			/* Only innerlists need to be betweeen ( and ) */
 			if (innerlist)
@@ -678,10 +678,10 @@ attrib_val_append(attrib_val_t *atv, char *token)
 	if (atv->att_val_type == ATT_VAL_TYPE_NULL) {
 		/* convert this to VALUE attribute */
 		atv->att_val_type = ATT_VAL_TYPE_VALUE;
-		atv->att_val_value = strdup(token);
+		atv->att_val_value = util_safe_strdup(token);
 	} else if (atv->att_val_type == ATT_VAL_TYPE_LIST) {
 		/* append token to the list */
-		nat = ATT_VAL_ALLOC_VALUE(strdup(token));
+		nat = ATT_VAL_ALLOC_VALUE(util_safe_strdup(token));
 		lst_insert_tail(atv->att_val_values, nat);
 	}
 }
@@ -844,7 +844,7 @@ attrib_t
 	ret = ATT_ALLOC();
 
 	if (regexec(attrbexp, att, attrbexp->re_nsub + 1 , mat, 0) == 0) {
-		ret->att_name = strdup(att);
+		ret->att_name = util_safe_strdup(att);
 		ret->att_value = ATT_VAL_ALLOC_NULL();
 	} else if (regexec(atvalexp, att,
 	    atvalexp->re_nsub + 1, mat, 0) == 0) {
@@ -970,7 +970,7 @@ lst_t
 	if (regcomp(&atvalexp, ATVAL_EXP, REG_EXTENDED) != 0)
 		goto out2;
 
-	sattrs = attrs = strdup(attribs);
+	sattrs = attrs = util_safe_strdup(attribs);
 	while ((att = strsep(&attrs, ";")) != NULL) {
 		if (*att == '\0')
 			continue;
@@ -1004,7 +1004,7 @@ attrib_val_t
 			natv = ATT_VAL_ALLOC_NULL();
 		break;
 		case ATT_VAL_TYPE_VALUE:
-			natv = ATT_VAL_ALLOC_VALUE(strdup(atv->att_val_value));
+			natv = ATT_VAL_ALLOC_VALUE(util_safe_strdup(atv->att_val_value));
 		break;
 		case ATT_VAL_TYPE_LIST:
 			values = util_safe_malloc(sizeof(lst_t));
@@ -1025,7 +1025,7 @@ attrib_val_t
 attrib_t
 *attrib_duplicate(attrib_t *att) {
 	attrib_t *natt = ATT_ALLOC();
-	natt->att_name = strdup(att->att_name);
+	natt->att_name = util_safe_strdup(att->att_name);
 	natt->att_value = attrib_val_duplicate(att->att_value);
 	return (natt);
 }
@@ -1041,7 +1041,7 @@ attrib_t
 	eatv = eatt->att_value;
 	natv = natt->att_value;
 	att = ATT_ALLOC();
-	att->att_name = strdup(eatt->att_name);
+	att->att_name = util_safe_strdup(eatt->att_name);
 
 	if (eatv->att_val_type == ATT_VAL_TYPE_NULL) {
 
@@ -1172,7 +1172,7 @@ attrib_t
 		/* VALUE - VALUE -> {EMPTY | ERR} */
 		if (attrib_val_equal(eatv, natv) == 0) {
 			att = ATT_ALLOC();
-			att->att_name = strdup("");
+			att->att_name = util_safe_strdup("");
 			att->att_value = ATT_VAL_ALLOC_NULL();
 		} else {
 			util_add_errmsg(errlst, gettext(
@@ -1185,7 +1185,7 @@ attrib_t
 		/* LIST - LIST -> {EMPTY | ERR | LIST} */
 		if (attrib_val_equal(eatv, natv) == 0) {
 			att = ATT_ALLOC();
-			att->att_name = strdup("");
+			att->att_name = util_safe_strdup("");
 			att->att_value = ATT_VAL_ALLOC_NULL();
 			goto out;
 		}
@@ -1243,7 +1243,7 @@ attrib_t
 			}
 		}
 		att = ATT_ALLOC();
-		att->att_name = strdup(eatt->att_name);
+		att->att_name = util_safe_strdup(eatt->att_name);
 		att->att_value = ATT_VAL_ALLOC_LIST(values);
 	}
 

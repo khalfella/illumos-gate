@@ -32,12 +32,26 @@
 #define BYTES_SCALE	1
 #define SCNDS_SCALE	2
 
+char
+*util_safe_strdup(char *str)
+{
+	char *ptr;
+	if (str == NULL)
+		return (NULL);
+
+	if((ptr = strdup(str)) == NULL) {
+		(void) fprintf(stderr, gettext("error allocating memory"));
+		exit(1);
+	}
+	return (ptr);
+}
+
 void *
 util_safe_realloc(void *ptr, size_t sz)
 {
 	if ((ptr = realloc(ptr, sz)) == NULL) {
 		(void) fprintf(stderr, gettext(
-		    "projadd: error reallocating %d bytes of memory"), sz);
+		    "error reallocating %d bytes of memory"), sz);
 		exit(1);
 	}
 	return (ptr);
@@ -334,7 +348,7 @@ util_tokenize(char *values, lst_t *errlst)
 				goto out1;
 			}
 		}
-		*ctoken++ = strdup(token);
+		*ctoken++ = util_safe_strdup(token);
 		*ctoken = NULL;
 	}
 

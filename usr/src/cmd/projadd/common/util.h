@@ -25,6 +25,7 @@ extern "C" {
 #define	SCNDS_SCALE	2
 
 
+extern char *util_safe_strdup(char *);
 extern void *util_safe_realloc(void* , size_t);
 extern void *util_safe_malloc(size_t);
 extern void *util_safe_zmalloc(size_t);

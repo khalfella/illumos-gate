@@ -34,6 +34,8 @@ typedef struct projent {
 } projent_t;
 
 
+extern void projent_free(projent_t *);
+extern projent_t *projent_parse(char *, int, lst_t *);
 extern projent_t *projent_parse_components(char *, char * , char *, char *,
     char *, char *, int, lst_t *);
 extern int projent_validate(projent_t *, int, lst_t *);
