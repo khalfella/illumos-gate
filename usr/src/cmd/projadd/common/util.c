@@ -178,10 +178,7 @@ util_scale(char *unit, int scale, uint64_t *res, lst_t *errlst)
 		{'e', 1000000000000000000ULL},
 	};
 
-	if (scale == BYTES_SCALE)
-		sc = bscale;
-	else
-		sc = oscale;
+	sc = (scale == BYTES_SCALE) ? bscale : oscale;
 
 	for (i = 0; i < SCLS; i++) {
 		if (tolower(*unit) == sc[i].unit) {
