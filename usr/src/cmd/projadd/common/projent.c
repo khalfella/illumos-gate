@@ -22,13 +22,17 @@
 
 #define BOSTR_REG_EXP	"^"
 #define EOSTR_REG_EXP	"$"
-#define USERN_REG_EXP	"!?[[:alpha:]][[:alnum:]_.-]*"
 #define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
+#define PRJID_REG_EXP	"[[:digit:]]+"
+#define USERN_REG_EXP	"!?[[:alpha:]][[:alnum:]_.-]*"
+#define GRUPN_REG_EXP	"!?[[:alnum:]][[:alnum:]]*"
 
 #define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
 
 #define PROJN_EXP	TO_EXP(IDENT_REG_EXP)
+#define PRJID_EXP	TO_EXP(PRJID_REG_EXP)
 #define USERN_EXP	TO_EXP(USERN_REG_EXP)
+#define GRUPN_EXP	TO_EXP(GRUPN_REG_EXP)
 
 /*ARGSUSED*/
 int
@@ -362,12 +366,12 @@ out:
 }
 
 char *
-projent_parse_usrgrp(char *usrgrp, char *nlist, int flags, lst_t *errlst)
+projent_parse_users(char *nlist, int flags, lst_t *errlst)
 {
 	char *ulist = NULL;
 	char *susrs, *usrs, *usr;
-	char *sep;
 	regex_t usernexp;
+	char *sep;
 
 	if (regcomp(&usernexp, USERN_EXP, REG_EXTENDED) != 0) {
 		util_add_errmsg(errlst, gettext(
@@ -388,8 +392,7 @@ projent_parse_usrgrp(char *usrgrp, char *nlist, int flags, lst_t *errlst)
 		    strcmp(usr, "*") != 0 &&
 		    strcmp(usr, "!*") != 0) {
 			util_add_errmsg(errlst, gettext(
-			    "Invalid %s name \"%s\""),
-			    usrgrp, usr);
+			    "Invalid user name \"%s\""), usr);
 			UTIL_FREE_SNULL(ulist);
 			break;
 		}
@@ -405,6 +408,49 @@ out:
 	return (ulist);
 }
 
+
+char *
+projent_parse_groups(char *nlist, int flags, lst_t *errlst)
+{
+	char *glist = NULL;
+	char *sgrps, *grps, *grp;
+	regex_t groupnexp;
+	char *sep;
+
+	if (regcomp(&groupnexp, GRUPN_EXP, REG_EXTENDED) != 0) {
+		util_add_errmsg(errlst, gettext(
+		    "Failed to compile regular expression: \"%s\""),
+		    GRUPN_EXP);
+		goto out;
+	}
+
+	sep = (flags & F_PAR_SPC) ? " ," : ",";
+	sgrps = grps = util_safe_strdup(nlist);
+	glist = util_safe_zmalloc(1);
+
+	while ((grp = strsep(&grps, sep)) != NULL) {
+		if (*grp == '\0')
+			continue;
+
+		if (regexec(&groupnexp, grp, 0, NULL, 0) != 0 &&
+		    strcmp(grp, "*") != 0 &&
+		    strcmp(grp, "!*") != 0) {
+			util_add_errmsg(errlst, gettext(
+			    "Invalid group name \"%s\""), grp);
+			UTIL_FREE_SNULL(glist);
+			break;
+		}
+		/* Append ',' first if required */
+		if (*glist != '\0')
+			glist = UTIL_STR_APPEND1(glist, ",");
+		glist = UTIL_STR_APPEND1(glist, grp);
+	}
+
+	free(sgrps);
+	regfree(&groupnexp);
+out:
+	return (glist);
+}
 
 int
 projent_parse_comment(char *comment, lst_t *errlst)
@@ -455,29 +501,56 @@ int
 projent_parse_projid(char *projidstr, projid_t *pprojid, lst_t *errlst)
 {
 	char *ptr;
-	projid_t id;
+	long long llid;
+	regex_t prjidexp;
+	int ret = 0;
 
-	id = strtol(projidstr, &ptr, 10);
+	if (regcomp(&prjidexp, PRJID_EXP, REG_EXTENDED) != 0) {
+		util_add_errmsg(errlst, gettext(
+		    "Failed to compile regular expression: \"%s\""), PRJID_EXP);
+		return (1);
+	}
+
+
+	if (regexec(&prjidexp, projidstr, 0, NULL, 0) != 0) {
+		util_add_errmsg(errlst, gettext("Invalid project id: \"%s\""),
+		    projidstr);
+		ret = 1;
+		goto out;
+	}
+
+	llid = strtoll(projidstr, &ptr, 10);
 
 	/* projid should be a positive number */
-	if (id == 0 && (errno == EINVAL || errno == ERANGE || *ptr != '\0') ) {
-		util_add_errmsg(errlst, gettext("Invalid project id:  %s"),
+	if (llid == 0 && errno == ERANGE && *ptr != '\0') {
+		util_add_errmsg(errlst, gettext("Invalid project id: \"%s\""),
 		    projidstr);
-		return (1);
+		ret = 1;
+		goto out;
+	}
+
+	/* projid should be a positive number >= 0 */
+	if (llid < 0) {
+		util_add_errmsg(errlst, gettext(
+		    "Invalid projid \"%lld\": must be >= 0"), llid);
+		ret = 1;
+		goto out;
 	}
 
 	/* projid should be less than UID_MAX */
-	if (id > INT_MAX) {
+	if (llid > INT_MAX) {
 		util_add_errmsg(errlst, gettext(
-		    "Invalid projid \"%s\": must be <= %d"),
-		    id, INT_MAX);
-		return (1);
+		    "Invalid projid \"%lld\": must be <= %d"),
+		    llid, INT_MAX);
+		ret = 1;
+		goto out;
 	}
 
 	if (pprojid != NULL)
-		*pprojid = id;
-
-	return (0);
+		*pprojid = llid;
+out:
+	regfree(&prjidexp);
+	return (ret);
 }
 
 int
@@ -552,8 +625,8 @@ projent_t
 	reterr += projent_parse_name(ent->projname, errlst);
 	reterr += projent_parse_projid(idstr, &ent->projid, errlst);
 	reterr += projent_parse_comment(ent->comment, errlst);
-	ent->userlist = projent_parse_usrgrp("user", users, flags, errlst);
-	ent->grouplist = projent_parse_usrgrp("group", groups, flags, errlst);
+	ent->userlist = projent_parse_users(users, flags, errlst);
+	ent->grouplist = projent_parse_groups(groups, flags, errlst);
 	ent->attrs = projent_parse_attributes(attr, flags, errlst);
 
 	if (reterr > 0 || ent->userlist == NULL ||

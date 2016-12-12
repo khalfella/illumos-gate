@@ -146,76 +146,52 @@ util_substr(regex_t *reg, regmatch_t *mat, char *str, int idx)
 	return (ret);
 }
 
+typedef struct {
+	char unit;
+	uint64_t val;
+} scl;
+
+#define SCLS	7
+
 int
 util_scale(char *unit, int scale, uint64_t *res, lst_t *errlst)
 {
-	if (scale == BYTES_SCALE) {
+	int i;
+	scl *sc;
+	scl bscale[SCLS] = {
+		{'\0', 1ULL},
+		{'k', 1024ULL},
+		{'m', 1048576ULL},
+		{'g', 1073741824ULL},
+		{'t', 1099511627776ULL},
+		{'p', 1125899906842624ULL},
+		{'e', 1152921504606846976ULL},
+	};
 
-		switch(tolower(*unit)) {
-			case 'k':
-				*res = 1024ULL;
-				break;
-			case 'm':
-				*res = 1048576ULL;
-				break;
-			case 'g':
-				*res = 1073741824ULL;
-				break;
-			case 't':
-				*res = 1099511627776ULL;
-				break;
-			case 'p':
-				*res = 1125899906842624ULL;
-				break;
-			case 'e':
-				*res = 1152921504606846976ULL;
-				break;
-			case '\0':
-				*res = 1ULL;
-				break;
-			default:
-				util_add_errmsg(errlst, gettext(
-				    "Invalid unit: \"%s\""), unit);
-				return (1);
+	scl oscale[SCLS] = {
+		{'\0', 1ULL},
+		{'k', 1000ULL},
+		{'m', 1000000ULL},
+		{'g', 1000000000ULL},
+		{'t', 1000000000000ULL},
+		{'p', 1000000000000000ULL},
+		{'e', 1000000000000000000ULL},
+	};
+
+	if (scale == BYTES_SCALE)
+		sc = bscale;
+	else
+		sc = oscale;
+
+	for (i = 0; i < SCLS; i++) {
+		if (tolower(*unit) == sc[i].unit) {
+			*res = sc[i].val;
+			return (0);
 		}
-
-		return (0);
-
-	} else if (scale == SCNDS_SCALE) {
-
-		switch(tolower(*unit)) {
-			case 'k':
-				*res = 1000ULL;
-				break;
-			case 'm':
-				*res = 1000000ULL;
-				break;
-			case 'g':
-				*res = 1000000000ULL;
-				break;
-			case 't':
-				*res = 1000000000000ULL;
-				break;
-			case 'p':
-				*res = 1000000000000000ULL;
-				break;
-			case 'e':
-				*res = 1000000000000000000ULL;
-				break;
-			case '\0':
-				*res = 1ULL;
-				break;
-			default:
-				util_add_errmsg(errlst, gettext(
-				    "Invalid unit: \"%s\""), unit);
-				return (1);
-		}
-		return (0);
 	}
 
 	util_add_errmsg(errlst, gettext(
 	    "Invalid scale: %d"), scale);
-
 	return (1);	
 }
 
@@ -262,7 +238,9 @@ util_val2num(char *value, int scale, lst_t *errlst, char **retnum,
 	    (strlen(modifier) == 0 && strchr(num, '.') != NULL) ||
 	    (util_scale(modifier, scale, &mul64, errlst) != 0) ||
 	    (scale == BYTES_SCALE && *unit != '\0' && tolower(*unit) != 'b') ||
-	    (scale == SCNDS_SCALE && *unit != '\0' && tolower(*unit) != 's')) {
+	    (scale == SCNDS_SCALE && *unit != '\0' && tolower(*unit) != 's') ||
+	    (scale == COUNT_SCALE && *unit != '\0') ||
+	    (scale == UNKWN_SCALE && *unit != '\0'))  {
 		util_add_errmsg(errlst, gettext( "Error near: \"%s\""),
 		    value);
 		goto out;

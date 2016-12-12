@@ -122,9 +122,7 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 	nmatch = signlexp.re_nsub + 1;
 	mat = util_safe_zmalloc(nmatch * sizeof(regmatch_t));
 
-	if (atv_type == ATT_VAL_TYPE_NULL) {
-		goto out;
-	} else if (atv_type == ATT_VAL_TYPE_VALUE) {
+	if (atv_type != ATT_VAL_TYPE_LIST) {
 		util_add_errmsg(errlst, gettext(
 		    "rctl \"%s\" missing value"), atname);
 		ret = 1;
@@ -900,16 +898,20 @@ attrib_t
 		resctl_get_rule(&rinfo, &rrule);
 		retv = ret->att_value;
 
-		/*
-		 * Handle the case of RESCTL_TYPE_SCNDS
-		 * and RESCTL_TYPE_BYTES only
-		 */
-		if (!(rrule.resctl_type == RESCTL_TYPE_SCNDS ||
-		    rrule.resctl_type == RESCTL_TYPE_BYTES))
-			goto out;
-
-		scale = (rrule.resctl_type == RESCTL_TYPE_SCNDS)?
-		    SCNDS_SCALE : BYTES_SCALE;
+		switch(rrule.resctl_type) {
+			case RESCTL_TYPE_BYTES:
+				scale = BYTES_SCALE;
+				break;
+			case RESCTL_TYPE_SCNDS:
+				scale = SCNDS_SCALE;
+				break;
+			case RESCTL_TYPE_COUNT:
+				scale = COUNT_SCALE;
+				break;
+			default:
+				scale = UNKWN_SCALE;
+				break;
+		}
 
 		if (retv->att_val_type != ATT_VAL_TYPE_LIST)
 			goto out;

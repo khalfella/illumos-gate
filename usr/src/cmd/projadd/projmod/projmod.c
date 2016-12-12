@@ -276,7 +276,7 @@ main(int argc, char **argv)
 	}
 
 	if (Uflag) {
-		pusers = projent_parse_usrgrp("user", users, F_PAR_SPC,
+		pusers = projent_parse_users(users, F_PAR_SPC,
 		    &errlst);
 		if (pusers != NULL) {
 			projent_merge_usrgrp("user", &modent->userlist,
@@ -286,7 +286,7 @@ main(int argc, char **argv)
 	}
 
 	if (Gflag) {
-		pgroups = projent_parse_usrgrp("group", groups, F_PAR_SPC,
+		pgroups = projent_parse_groups(groups, F_PAR_SPC,
 		    &errlst);
 		if (pgroups != NULL) {
 			projent_merge_usrgrp("group", &modent->grouplist,

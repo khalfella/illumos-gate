@@ -21,8 +21,10 @@ extern "C" {
 	ptr = NULL;		\
 }
 
+#define UNKWN_SCALE	0
 #define	BYTES_SCALE	1
 #define	SCNDS_SCALE	2
+#define	COUNT_SCALE	3
 
 
 extern char *util_safe_strdup(char *);
