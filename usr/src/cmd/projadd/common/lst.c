@@ -73,8 +73,8 @@ lst_remove(lst_t *plst, void *rdata)
 	return (-1);
 }
 
-void
-*lst_at(lst_t *plst, int idx)
+void *
+lst_at(lst_t *plst, int idx)
 {
 	if (idx < 0 || idx >= plst->csz) {
 		(void) fprintf(stderr, gettext(
@@ -84,8 +84,8 @@ void
 	return (plst->buf[idx]);
 }
 
-void
-*lst_replace_at(lst_t *plst, int idx, void *ndata)
+void *
+lst_replace_at(lst_t *plst, int idx, void *ndata)
 {
 	void *odata;
 

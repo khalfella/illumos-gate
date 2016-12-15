@@ -477,14 +477,14 @@ attrib_validate_lst(lst_t *attribs, lst_t *errlst)
 	return (ret);
 }
 
-attrib_t
-*attrib_alloc()
+attrib_t *
+attrib_alloc()
 {
 	return (util_safe_zmalloc(sizeof (attrib_t)));
 }
 
-attrib_val_t
-*attrib_val_alloc(int type, void *val)
+attrib_val_t *
+attrib_val_alloc(int type, void *val)
 {
 	attrib_val_t *ret;
 
@@ -494,8 +494,8 @@ attrib_val_t
 	return (ret);
 }
 
-char
-*attrib_val_tostring(attrib_val_t *val, boolean_t innerlist)
+char *
+attrib_val_tostring(attrib_val_t *val, boolean_t innerlist)
 {
 	char *ret = NULL;
 	char *vstring;
@@ -533,8 +533,8 @@ out:
 	return (ret);
 }
 
-char
-*attrib_tostring(void *at)
+char *
+attrib_tostring(void *at)
 {
 	attrib_t *att;
 	char *ret = NULL, *vstring;
@@ -551,8 +551,8 @@ char
 	return (ret);
 }
 
-char
-*attrib_lst_tostring(lst_t *attrs)
+char *
+attrib_lst_tostring(lst_t *attrs)
 {
 	int i;
 	attrib_t *att;
@@ -686,8 +686,8 @@ attrib_val_append(attrib_val_t *atv, char *token)
 	}
 }
 
-attrib_val_t
-*attrib_val_parse(char *values, lst_t *errlst)
+attrib_val_t *
+attrib_val_parse(char *values, lst_t *errlst)
 {
 	attrib_val_t *ret = NULL;
 	attrib_val_t *at;
@@ -822,8 +822,8 @@ out1:
 	return (ret);
 }
 
-attrib_t
-*attrib_parse(regex_t *attrbexp, regex_t *atvalexp, char *att, int flags,
+attrib_t *
+attrib_parse(regex_t *attrbexp, regex_t *atvalexp, char *att, int flags,
     lst_t *errlst)
 {
 	int nmatch = MAX_OF(attrbexp->re_nsub, atvalexp->re_nsub) + 1;
@@ -956,8 +956,8 @@ out:
 	return (ret);
 }
 
-lst_t
-*attrib_parse_attributes(char *attribs, int flags, lst_t *errlst)
+lst_t *
+attrib_parse_attributes(char *attribs, int flags, lst_t *errlst)
 {
 	char *sattrs, *attrs, *att;
 	regex_t attrbexp, atvalexp;
@@ -995,8 +995,9 @@ out1:
 	return (ret);
 }
 
-attrib_val_t
-*attrib_val_duplicate(attrib_val_t *atv) {
+attrib_val_t *
+attrib_val_duplicate(attrib_val_t *atv)
+{
 	int i;
 	lst_t *values;
 	attrib_val_t *val;
@@ -1026,16 +1027,17 @@ attrib_val_t
 	return (natv);
 }
 
-attrib_t
-*attrib_duplicate(attrib_t *att) {
+attrib_t *
+attrib_duplicate(attrib_t *att)
+{
 	attrib_t *natt = ATT_ALLOC();
 	natt->att_name = util_safe_strdup(att->att_name);
 	natt->att_value = attrib_val_duplicate(att->att_value);
 	return (natt);
 }
 
-attrib_t
-*attrib_merge_add(attrib_t *eatt, attrib_t *natt)
+attrib_t *
+attrib_merge_add(attrib_t *eatt, attrib_t *natt)
 {
 	int i;
 	attrib_t *att;
@@ -1133,8 +1135,8 @@ attrib_val_equal(attrib_val_t *xatv, attrib_val_t *yatv)
 	return (0);
 }
 
-attrib_t
-*attrib_merge_remove(attrib_t *eatt, attrib_t *natt, lst_t *errlst)
+attrib_t *
+attrib_merge_remove(attrib_t *eatt, attrib_t *natt, lst_t *errlst)
 {
 
 	int i, j;
@@ -1255,8 +1257,8 @@ out:
 	return (att);
 }
 
-attrib_t
-*attrib_merge(attrib_t *eatt, attrib_t *natt, int flags, lst_t *errlst)
+attrib_t *
+attrib_merge(attrib_t *eatt, attrib_t *natt, int flags, lst_t *errlst)
 {
 	attrib_t *att = NULL;
 
@@ -1273,7 +1275,8 @@ attrib_t
 
 void
 attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
-    lst_t *errlst) {
+    lst_t *errlst)
+{
 
 	lst_t *attrs = NULL;
 	int i, j;

@@ -32,8 +32,8 @@
 #define	BYTES_SCALE	1
 #define	SCNDS_SCALE	2
 
-char
-*util_safe_strdup(char *str)
+char *
+util_safe_strdup(char *str)
 {
 	char *ptr;
 	if (str == NULL)

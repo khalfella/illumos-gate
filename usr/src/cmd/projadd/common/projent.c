@@ -134,8 +134,8 @@ projent_validate_attributes(lst_t *attrs, lst_t *errlst)
 	return (attrib_validate_lst(attrs, errlst));
 }
 
-char
-*projent_tostring(projent_t *ent)
+char *
+projent_tostring(projent_t *ent)
 {
 	char *ret = NULL;
 	char *attrs = attrib_lst_tostring(ent->attrs);
@@ -230,33 +230,35 @@ projent_sort_attributes(lst_t *attribs)
 	attrib_sort_lst(attribs);
 }
 
-char
-*projent_attrib_tostring(void *attrib)
+char *
+projent_attrib_tostring(void *attrib)
 {
 	return (attrib_tostring(attrib));
 }
 
-char
-*projent_attrib_lst_tostring(lst_t *lst)
+char *
+projent_attrib_lst_tostring(lst_t *lst)
 {
 	return (attrib_lst_tostring(lst));
 }
 
 void
 projent_merge_attributes(lst_t **eattrs, lst_t *nattrs, int flags,
-    lst_t *errlst) {
+    lst_t *errlst)
+{
 	attrib_merge_attrib_lst(eattrs, nattrs, flags, errlst);
 }
 
-lst_t
-*projent_parse_attributes(char *attribs, int flags, lst_t *errlst)
+lst_t *
+projent_parse_attributes(char *attribs, int flags, lst_t *errlst)
 {
 	return (attrib_parse_attributes(attribs, flags, errlst));
 }
 
 void
 projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
-    int flags, lst_t *errlst) {
+    int flags, lst_t *errlst)
+{
 	char *res = NULL;
 	char *seusrs, *eusrs, *eusr;
 	char *snusrs, *nusrs, *nusr;
@@ -608,8 +610,8 @@ projent_free(projent_t *ent)
 	free(ent->attrs);
 }
 
-projent_t
-*projent_parse_components(char *projname, char *idstr, char *comment,
+projent_t *
+projent_parse_components(char *projname, char *idstr, char *comment,
     char *users, char *groups, char *attr, int flags, lst_t *errlst)
 {
 	projent_t *ent;
@@ -636,8 +638,9 @@ projent_t
 
 	return (ent);
 }
-projent_t
-*projent_parse(char *projstr, int flags, lst_t *errlst) {
+projent_t *
+projent_parse(char *projstr, int flags, lst_t *errlst)
+{
 	char *str, *sstr;
 	char *projname, *idstr, *comment, *users, *groups, *attrstr;
 	projent_t *ent;
@@ -757,8 +760,8 @@ out:
 	free(tmpprojfile);
 }
 
-lst_t
-*projent_get_lst(char *projfile, int flags, lst_t *errlst)
+lst_t *
+projent_get_lst(char *projfile, int flags, lst_t *errlst)
 {
 	FILE *fp;
 	lst_t *plst;
