@@ -1,5 +1,5 @@
-#ifndef _PROJENT_ATTRIB_H
-#define _PROJENT_ATTRIB_H
+#ifndef	_PROJENT_ATTRIB_H
+#define	_PROJENT_ATTRIB_H
 
 
 #include <sys/types.h>

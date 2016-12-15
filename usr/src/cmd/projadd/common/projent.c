@@ -20,19 +20,19 @@
 #include "util.h"
 
 
-#define BOSTR_REG_EXP	"^"
-#define EOSTR_REG_EXP	"$"
-#define IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
-#define PRJID_REG_EXP	"[[:digit:]]+"
-#define USERN_REG_EXP	"!?[[:alpha:]][[:alnum:]_.-]*"
-#define GRUPN_REG_EXP	"!?[[:alnum:]][[:alnum:]]*"
+#define	BOSTR_REG_EXP	"^"
+#define	EOSTR_REG_EXP	"$"
+#define	IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
+#define	PRJID_REG_EXP	"[[:digit:]]+"
+#define	USERN_REG_EXP	"!?[[:alpha:]][[:alnum:]_.-]*"
+#define	GRUPN_REG_EXP	"!?[[:alnum:]][[:alnum:]]*"
 
-#define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
+#define	TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
 
-#define PROJN_EXP	TO_EXP(IDENT_REG_EXP)
-#define PRJID_EXP	TO_EXP(PRJID_REG_EXP)
-#define USERN_EXP	TO_EXP(USERN_REG_EXP)
-#define GRUPN_EXP	TO_EXP(GRUPN_REG_EXP)
+#define	PROJN_EXP	TO_EXP(IDENT_REG_EXP)
+#define	PRJID_EXP	TO_EXP(PRJID_REG_EXP)
+#define	USERN_EXP	TO_EXP(USERN_REG_EXP)
+#define	GRUPN_EXP	TO_EXP(GRUPN_REG_EXP)
 
 /*ARGSUSED*/
 int
@@ -60,7 +60,7 @@ projent_validate_users(char *users, lst_t *errlst)
 
 	susrs = usrs = util_safe_strdup(users);
 	ulast = ulist = util_safe_zmalloc(
-	    (strlen(users) + 1) * sizeof(char *));
+	    (strlen(users) + 1) * sizeof (char *));
 	while ((usr = strsep(&usrs, ",")) != NULL) {
 		if (*usr == '!')
 			usr++;
@@ -99,7 +99,7 @@ projent_validate_groups(char *groups, lst_t *errlst)
 
 	sgrps = grps = util_safe_strdup(groups);
 	glast = glist = util_safe_zmalloc(
-	    (strlen(groups) + 1) * sizeof(char *));
+	    (strlen(groups) + 1) * sizeof (char *));
 	while ((grp = strsep(&grps, ",")) != NULL) {
 		if (*grp == '!')
 			grp++;
@@ -131,7 +131,7 @@ projent_validate_groups(char *groups, lst_t *errlst)
 int
 projent_validate_attributes(lst_t *attrs, lst_t *errlst)
 {
-	return attrib_validate_lst(attrs, errlst);
+	return (attrib_validate_lst(attrs, errlst));
 }
 
 char
@@ -204,7 +204,7 @@ projent_validate_lst(lst_t *plst, int flags, lst_t *errlst)
 
 		/* Add the projname an projid to out temp list */
 		pnames = UTIL_STR_APPEND2(pnames, "|", ent->projname);
-		pids = util_safe_realloc(pids, (idx + 1) * sizeof(projid_t));
+		pids = util_safe_realloc(pids, (idx + 1) * sizeof (projid_t));
 		pids[idx] = ent->projid;
 		idx++;
 
@@ -262,8 +262,7 @@ projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
 	char *snusrs, *nusrs, *nusr;
 	char *sn1usrs, *n1usrs, *n1usr;
 	char *sep;
-
-	int i,j;
+	int i, j;
 
 	sep = (flags & F_PAR_SPC) ? " ," : ",";
 
@@ -304,7 +303,7 @@ projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
 			sn1usrs = n1usrs = util_safe_strdup(nlist);
 			for (j = 0; (n1usr = strsep(&n1usrs, sep)) != NULL;
 			    j++) {
-				if(i != j && strcmp(nusr, n1usr) == 0) {
+				if (i != j && strcmp(nusr, n1usr) == 0) {
 					util_add_errmsg(errlst, gettext(
 					    "Duplicate %s name \"%s\""),
 					    usrgrp, nusr);
@@ -466,7 +465,7 @@ projent_parse_comment(char *comment, lst_t *errlst)
 }
 
 int
-projent_validate_unique_id(lst_t *plst, projid_t projid,lst_t *errlst)
+projent_validate_unique_id(lst_t *plst, projid_t projid, lst_t *errlst)
 {
 	int e;
 	projent_t *ent;
@@ -484,7 +483,7 @@ int
 projent_validate_projid(projid_t projid, int flags, lst_t *errlst)
 {
 	projid_t maxprojid;
-		
+
 	maxprojid = (flags & F_PAR_RES) ? 0 : 100;
 
 	if (projid < maxprojid) {
@@ -610,13 +609,13 @@ projent_free(projent_t *ent)
 }
 
 projent_t
-*projent_parse_components(char *projname, char * idstr, char *comment,
+*projent_parse_components(char *projname, char *idstr, char *comment,
     char *users, char *groups, char *attr, int flags, lst_t *errlst)
 {
 	projent_t *ent;
 	int reterr = 0;
 
-	ent = util_safe_zmalloc(sizeof(projent_t));
+	ent = util_safe_zmalloc(sizeof (projent_t));
 
 
 	ent->projname = util_safe_strdup(projname);
@@ -657,7 +656,7 @@ projent_t
 	    (users = util_safe_strdup(strsep(&str, ":"))) == NULL ||
 	    (groups = util_safe_strdup(strsep(&str, ":"))) == NULL ||
 	    (attrstr = util_safe_strdup(strsep(&str, ":"))) == NULL ||
-	    strsep(&str, ":") != NULL){
+	    strsep(&str, ":") != NULL) {
 		util_add_errmsg(errlst, gettext(
 		    "Incorrect number of fields.  Should have 5 \":\"'s."));
 		goto out;
@@ -681,7 +680,7 @@ projent_free_lst(lst_t *plst)
 	if (plst == NULL)
 		return;
 
-	while(!lst_is_empty(plst)) {
+	while (!lst_is_empty(plst)) {
 		ent = lst_at(plst, 0);
 		(void) lst_remove(plst, ent);
 		projent_free(ent);
@@ -702,7 +701,7 @@ projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
 	tmpprojfile = NULL;
 	if (asprintf(&tmpprojfile, "%s.%ld_tmp", projfile, getpid()) == -1) {
 		util_add_errmsg(errlst, gettext(
-			"Failed to allocate memory"));
+		    "Failed to allocate memory"));
 		goto out;
 	}
 
@@ -768,7 +767,7 @@ lst_t
 	size_t cap = 0;
 	projent_t *ent;
 
-	plst = util_safe_malloc(sizeof(lst_t));
+	plst = util_safe_malloc(sizeof (lst_t));
 	lst_create(plst);
 
 	if ((fp = fopen(projfile, "r")) == NULL) {
@@ -789,7 +788,7 @@ lst_t
 		}
 	}
 
-	while((getline(&buf, &cap, fp)) != -1 && ++line) {
+	while ((getline(&buf, &cap, fp)) != -1 && ++line) {
 
 		if ((nlp = strchr(buf, '\n')) != NULL)
 			*nlp = '\0';

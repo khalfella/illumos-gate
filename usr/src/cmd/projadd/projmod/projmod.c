@@ -35,7 +35,7 @@
 #include "projent.h"
 #include "util.h"
 
-#define SEQU(str1, str2)                (strcmp(str1, str2) == 0)
+#define	SEQU(str1, str2)		(strcmp(str1, str2) == 0)
 
 #define	CHECK_ERRORS_FREE_PLST(errlst, plst, attrs, ecode) {	\
 	if (!lst_is_empty(errlst)) {					\
@@ -87,11 +87,8 @@ main(int argc, char **argv)
 	boolean_t modify;
 
 	/* Project entry fields */
-	char *pname = NULL;
-	char *npname = NULL;
-	/*projid_t projid; */
-	char *comment = "";
-	char *users = "", *groups = "" , *attrs;
+	char *pname, *npname;
+	char *comment, *users, *groups, *attrs;
 	char *pusers, *pgroups;
 
 	lst_t *pattribs;
@@ -103,6 +100,9 @@ main(int argc, char **argv)
 	struct project proj, *projp;
 	char buf[PROJECT_BUFSZ];
 	char *str;
+
+	comment = users = groups = "";
+	pname = npname = NULL;
 
 	fflag = nflag = cflag = oflag = pflag = lflag = B_FALSE;
 	sflag = rflag = aflag = B_FALSE;
@@ -118,13 +118,13 @@ main(int argc, char **argv)
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
-#define TEXT_DOMAIN "SYS_TEST"		/* Use this only if it wasn't */
+#define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
 	/* Parse the command line argument list */
-	while((c = getopt(argc, argv, ":hf:nc:op:l:sraU:G:K:A")) != EOF)
-		switch(c) {
+	while ((c = getopt(argc, argv, ":hf:nc:op:l:sraU:G:K:A")) != EOF)
+		switch (c) {
 			case 'h':
 				usage();
 				exit(0);
@@ -358,7 +358,7 @@ main(int argc, char **argv)
 			} else {
 				/* To be completed */
 				projp = getprojbyname(pname, &proj, buf,
-				    sizeof(buf));
+				    sizeof (buf));
 				pattribs = (projp != NULL) ?
 				    projent_parse_attributes(projp->pj_attr,
 				    0, &errlst) : NULL;

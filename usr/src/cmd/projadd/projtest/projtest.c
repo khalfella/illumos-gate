@@ -32,11 +32,25 @@
 #include "projent.h"
 #include "util.h"
 
+/*
+ * All the below test cases were copied from perl test code located at
+ * "usr/src/cmd/perl/contrib/Sun/Solaris/Project/t/Project.t". Part of the
+ * Parse/Validate test cases were commented out because the implementation
+ * of users list parsing is more permissive in this C code compared to the
+ * original perl code. It is more consistent this way that perl way.
+ *
+ * For example, the original perl code assume the below test succeeds
+ *	{ 0, 0, FLAG_000, "comma8:158:::root,,:"},
+ * On the same time, it assumes, the below this test case to fail.
+ *	{ 1, 0, FLAG_000, "comma6:195:::,,root,bin:"},
+ * This C implementations passes both of these cases and neglect the extra
+ * commas in both cases.
+ */
 
 /*
  * file1, parse error (extra ":") on group.staff project.
  */
-#define FILE1 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
+#define	FILE1 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
 "user.test2:456:project two:adm,uucp:staff:attr1=p;attr2=q\n"		\
 "group.test3:678:project three::root,nobody:root,lp:attr1=y;attr2=z\n"	\
 "test4:678:project four:root:root:\n"					\
@@ -46,7 +60,7 @@
 /*
  * file2, duplicate project names.
  */
-#define FILE2 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
+#define	FILE2 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
 "user.test2:456:project two:adm,uucp:staff:attr1=p;attr2=q\n"		\
 "group.test3:677:project three:root,nobody:root,lp:attr1=y;attr2=z\n"	\
 "test1:678:project four:root:root:\n"					\
@@ -56,7 +70,7 @@
 /*
  * file3, duplicate project ids.
  */
-#define FILE3 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
+#define	FILE3 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
 "user.test2:456:project two:adm,uucp:staff:attr1=p;attr2=q\n"		\
 "group.test3:677:project three:root,nobody:root,lp:attr1=y;attr2=z\n"	\
 "test4:678:project four:root:root:\n"					\
@@ -66,7 +80,7 @@
 /*
  * file4, system project ids.
  */
-#define FILE4 "system:0::::\n"						\
+#define	FILE4 "system:0::::\n"						\
 "user.root:1::::\n"							\
 "noproject:2::::\n"							\
 "default:3::::\n"							\
@@ -81,7 +95,7 @@
 /*
  * file5, all unique user projects.
  */
-#define FILE5 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
+#define	FILE5 "test1:123:project one:root,bin:adm:attr1=a;attr2=b\n"	\
 "user.test2:456:project two:adm,uucp:staff:attr1=p;attr2=q\n"		\
 "group.test3:677:project three:root,nobody:root,lp:attr1=y;attr2=z\n"	\
 "test4:678:project four:root:root:\n"					\
@@ -89,10 +103,10 @@
 "test6:690::::\n"
 
 
-#define FLAG1	(0)
-#define FLAG2	(F_PAR_VLD)
-#define FLAG3	(F_PAR_VLD | F_PAR_RES)
-#define FLAG4	(F_PAR_VLD | F_PAR_DUP)
+#define	FLAG1	(0)
+#define	FLAG2	(F_PAR_VLD)
+#define	FLAG3	(F_PAR_VLD | F_PAR_RES)
+#define	FLAG4	(F_PAR_VLD | F_PAR_DUP)
 
 
 typedef struct {
@@ -135,12 +149,12 @@ typedef struct {
 
 
 
-#define FLAG_000 0
-#define FLAG_RES F_PAR_RES
-#define FLAG_SPC F_PAR_SPC
-#define FLAG_UNT F_PAR_UNT
+#define	FLAG_000 0
+#define	FLAG_RES F_PAR_RES
+#define	FLAG_SPC F_PAR_SPC
+#define	FLAG_UNT F_PAR_UNT
 
-#define PARSE_VALIDATE_TESTS_SIZE	302
+#define	PARSE_VALIDATE_TESTS_SIZE	302
 parse_validate_test pvtests[PARSE_VALIDATE_TESTS_SIZE] = {
 /* positive */
 	{ 0, 0, FLAG_RES, "system:0::::"},
@@ -469,19 +483,19 @@ projtest_compare_two_files(char *file1, char *file2, lst_t *errlst)
 	FILE *fp1, *fp2;
 	int c1, c2;
 
-	if((fp1 = fopen(file1, "r")) == NULL) {
+	if ((fp1 = fopen(file1, "r")) == NULL) {
 		util_add_errmsg(errlst, "failed to open \"%s\"", file1);
 		return (1);
 	}
 
-	if((fp2 = fopen(file2, "r")) == NULL) {
+	if ((fp2 = fopen(file2, "r")) == NULL) {
 		util_add_errmsg(errlst, "failed to open \"%s\"", file2);
 		return (1);
 	}
 
 	c1 = getc(fp1);
 	c2 = getc(fp2);
-	while((c1 != EOF) && (c2 != EOF) && (c1 == c2)) {
+	while ((c1 != EOF) && (c2 != EOF) && (c1 == c2)) {
 		c1 = getc(fp1);
 		c2 = getc(fp2);
 	}
@@ -501,7 +515,7 @@ void
 projtest_free_errlst(lst_t *errlst)
 {
 	char *msg;
-	while(!lst_is_empty(errlst)) {
+	while (!lst_is_empty(errlst)) {
 		msg = lst_at(errlst,  0);
 		(void) lst_remove(errlst, msg);
 		free(msg);
@@ -539,7 +553,8 @@ do_read_test(read_test *rt, int tnum)
 
 
 	if (plst == NULL && rt->res == 1) {
-		(void) printf("Read test[%02d]: **************[-SUCCESS-]\n", tnum);
+		(void) printf("Read test[%02d]: **************[-SUCCESS-]\n",
+		    tnum);
 	} else if (plst != NULL && rt->res == 0) {
 
 		projent_put_lst(projwrite, plst, &errlst);
@@ -548,7 +563,8 @@ do_read_test(read_test *rt, int tnum)
 		    lst_is_empty(&errlst) ? "-SUCCESS-" : "*FAILURE*");
 
 	} else {
-		printf("Read test[%02d]: **************[*FAILURE*]\n", tnum);
+		(void) printf("Read test[%02d]: **************[*FAILURE*]\n",
+		    tnum);
 	}
 
 	if (vflag) {
@@ -572,11 +588,6 @@ do_parse_validate_test(parse_validate_test *pvt, int tnum)
 	projent_t *ent;
 	int vres;
 
-/*
-	if (tnum != 65)
-		return;
-	printf("len = %d line = %s\n", strlen(pvt->pline), pvt->pline);
-*/
 
 	lst_create(&errlst);
 
@@ -584,17 +595,18 @@ do_parse_validate_test(parse_validate_test *pvt, int tnum)
 	ent = projent_parse(pvt->pline, pvt->flags, &errlst);
 
 	if (ent == NULL && pvt->pres == 1) {
-		printf("Prse test[%02d]: **************[-SUCCESS-]\n", tnum);
+		(void) printf("Prse test[%02d]: **************[-SUCCESS-]\n", tnum);
 	} else if (ent != NULL && pvt->pres == 0) {
-		printf("Prse test[%02d]: **************[-SUCCESS-]\n", tnum);
+		(void) printf("Prse test[%02d]: **************[-SUCCESS-]\n", tnum);
 		vres = projent_validate(ent, pvt->flags, &errlst);
-		printf("Vdte test[%02d]: **************[%s]\n", tnum,
-		    ((vres == 0 && pvt->vres == 0) || (vres != 0 && pvt->vres != 0)) ? "-SUCCESS-" : "*FAILURE*");
+		(void) printf("Vdte test[%02d]: **************[%s]\n", tnum,
+		    ((vres == 0 && pvt->vres == 0) ||
+		    (vres != 0 && pvt->vres != 0)) ?
+		    "-SUCCESS-" : "*FAILURE*");
 	} else {
-		printf("Prse test[%02d]: **************[*FAILURE*]\n", tnum);
+		(void) printf("Prse test[%02d]: **************[*FAILURE*]\n", tnum);
 	}
 
-	
 	if (vflag) {
 		util_print_errmsgs(&errlst);
 	}
@@ -637,8 +649,8 @@ main(int argc, char **argv)
 {
 	int c;
 
-	while((c = getopt(argc, argv, "vk")) != EOF) {
-		switch(c) {
+	while ((c = getopt(argc, argv, "vk")) != EOF) {
+		switch (c) {
 			case 'v':
 				vflag = B_TRUE;
 				break;

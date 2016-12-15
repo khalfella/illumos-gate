@@ -126,7 +126,7 @@ out:
 }
 
 void
-resctl_get_rule(resctl_info_t *pinfo, resctlrule_t* prule)
+resctl_get_rule(resctl_info_t *pinfo, resctlrule_t *prule)
 {
 
 	prule->resctl_max = pinfo->value;

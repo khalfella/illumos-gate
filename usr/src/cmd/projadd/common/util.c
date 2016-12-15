@@ -17,20 +17,20 @@
 
 
 
-#define BOSTR_REG_EXP	"^"
-#define EOSTR_REG_EXP	"$"
-#define FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
+#define	BOSTR_REG_EXP	"^"
+#define	EOSTR_REG_EXP	"$"
+#define	FLTNM_REG_EXP	"([[:digit:]]+(\\.[[:digit:]]+)?)"
 #define	MODIF_REG_EXP	"([kmgtpeKMGTPE])?"
-#define UNIT__REG_EXP	"([bsBS])?"
-#define TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
-#define VALUE_REG_EXP	FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
+#define	UNIT__REG_EXP	"([bsBS])?"
+#define	TOKEN_REG_EXP	"[[:alnum:]_./=+-]*"
+#define	VALUE_REG_EXP	FLTNM_REG_EXP MODIF_REG_EXP UNIT__REG_EXP
 
-#define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
-#define TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
-#define VALUE_EXP	TO_EXP(VALUE_REG_EXP)
+#define	TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
+#define	TOKEN_EXP	TO_EXP(TOKEN_REG_EXP)
+#define	VALUE_EXP	TO_EXP(VALUE_REG_EXP)
 
-#define BYTES_SCALE	1
-#define SCNDS_SCALE	2
+#define	BYTES_SCALE	1
+#define	SCNDS_SCALE	2
 
 char
 *util_safe_strdup(char *str)
@@ -39,7 +39,7 @@ char
 	if (str == NULL)
 		return (NULL);
 
-	if((ptr = strdup(str)) == NULL) {
+	if ((ptr = strdup(str)) == NULL) {
 		(void) fprintf(stderr, gettext("error allocating memory"));
 		exit(1);
 	}
@@ -61,13 +61,13 @@ util_safe_realloc(void *ptr, size_t sz)
 void *
 util_safe_malloc(size_t sz)
 {
- 	char *ptr;
+	char *ptr;
 	if ((ptr = malloc(sz)) == NULL) {
 		(void) fprintf(stderr, gettext(
 		    "error allocating %d bytes of memory\n"), sz);
 		exit(1);
-        }
-        return (ptr);
+	}
+	return (ptr);
 }
 
 void *
@@ -80,7 +80,7 @@ void
 util_print_errmsgs(lst_t *errlst)
 {
 	char *errmsg;
-	while(!lst_is_empty(errlst)) {
+	while (!lst_is_empty(errlst)) {
 		errmsg = lst_at(errlst, 0);
 		(void) lst_remove(errlst, errmsg);
 		(void) fprintf(stderr, "%s\n", errmsg);
@@ -96,10 +96,10 @@ util_add_errmsg(lst_t *errlst, char *format, ...)
 	char *errmsg;
 
 	va_start(args, format);
-	if(vasprintf(&errmsg, format, args) < 0) {
+	if (vasprintf(&errmsg, format, args) < 0) {
 		va_end(args);
 		(void) fprintf(stderr, gettext(
-		   "error allocating memory\n"));
+		    "error allocating memory\n"));
 		exit(1);
 	}
 	va_end(args);
@@ -118,14 +118,14 @@ util_str_append(char *str, int nargs, ...)
 
 	len = strlen(str) + 1;
 	va_start(ap, nargs);
-	for(i = 0; i < nargs; i++) {
-		s = va_arg(ap, char*);
+	for (i = 0; i < nargs; i++) {
+		s = va_arg(ap, char *);
 		len += strlen(s);
 		str = util_safe_realloc(str, len);
 		(void) strcat(str, s);
 	}
 	va_end(ap);
-	return str;
+	return (str);
 }
 
 char *
@@ -133,7 +133,7 @@ util_substr(regex_t *reg, regmatch_t *mat, char *str, int idx)
 {
 	int mat_len;
 	char *ret;
-	
+
 	if (idx < 0 || idx > reg->re_nsub)
 		return (NULL);
 
@@ -151,7 +151,7 @@ typedef struct {
 	uint64_t val;
 } scl;
 
-#define SCLS	7
+#define	SCLS	7
 
 int
 util_scale(char *unit, int scale, uint64_t *res, lst_t *errlst)
@@ -189,7 +189,7 @@ util_scale(char *unit, int scale, uint64_t *res, lst_t *errlst)
 
 	util_add_errmsg(errlst, gettext(
 	    "Invalid scale: %d"), scale);
-	return (1);	
+	return (1);
 }
 
 
@@ -197,7 +197,6 @@ int
 util_val2num(char *value, int scale, lst_t *errlst, char **retnum,
     char **retmod, char **retunit)
 {
-	
 	int ret = 1;
 	regex_t valueexp;
 	regmatch_t *mat;
@@ -217,7 +216,7 @@ util_val2num(char *value, int scale, lst_t *errlst, char **retnum,
 	}
 
 	nmatch = valueexp.re_nsub + 1;
-	mat = util_safe_malloc(nmatch * sizeof(regmatch_t));
+	mat = util_safe_malloc(nmatch * sizeof (regmatch_t));
 
 	if (regexec(&valueexp, value, nmatch, mat, 0) != 0) {
 		util_add_errmsg(errlst, gettext(
@@ -238,15 +237,15 @@ util_val2num(char *value, int scale, lst_t *errlst, char **retnum,
 	    (scale == SCNDS_SCALE && *unit != '\0' && tolower(*unit) != 's') ||
 	    (scale == COUNT_SCALE && *unit != '\0') ||
 	    (scale == UNKWN_SCALE && *unit != '\0'))  {
-		util_add_errmsg(errlst, gettext( "Error near: \"%s\""),
+		util_add_errmsg(errlst, gettext("Error near: \"%s\""),
 		    value);
 		goto out;
 	}
 
 	dnum = strtold(num, &ptr);
 	if (dnum == 0 &&
-	    (errno == EINVAL || errno == ERANGE ) &&
-	    *ptr != '\0' ) {
+	    (errno == EINVAL || errno == ERANGE) &&
+	    *ptr != '\0') {
 		util_add_errmsg(errlst, gettext("Invalid value:  \"%s\""),
 		    value);
 		goto out;
@@ -292,9 +291,9 @@ util_tokenize(char *values, lst_t *errlst)
 	if (regcomp(&tokenexp, TOKEN_EXP, REG_EXTENDED | REG_NOSUB) != 0)
 		return (tokens);
 
-	/* assume each character will be a token + NULL terminating value*/
+	/* Assume each character will be a token + NULL terminating value. */
 	ctoken = tokens = util_safe_malloc(
-	    (strlen(values) + 1) * sizeof(char *));
+	    (strlen(values) + 1) * sizeof (char *));
 	token = util_safe_malloc(strlen(values) + 1);
 
 	v = values;
@@ -304,7 +303,7 @@ util_tokenize(char *values, lst_t *errlst)
 		/* get the next token */
 		t = token;
 		while ((*t = *v++) != '\0') {
-			if (*t == '(' || *t == ')' || *t == ','|| 
+			if (*t == '(' || *t == ')' || *t == ','||
 			    *v == '(' || *v == ')' || *v == ',') {
 				*++t = '\0';
 				break;
@@ -313,11 +312,11 @@ util_tokenize(char *values, lst_t *errlst)
 		}
 
 		if (strcmp(token, "(") != 0 && strcmp(token, ")") != 0 &&
-		    strcmp(token, ",") != 0 ) {
+		    strcmp(token, ",") != 0) {
 			if (regexec(&tokenexp, token, 0, NULL, 0) != 0) {
 				util_add_errmsg(errlst, gettext(
 				    "Invalid Character at or near \"%s\""),
-				    token); 
+				    token);
 				util_free_tokens(tokens);
 				UTIL_FREE_SNULL(tokens);
 				goto out1;

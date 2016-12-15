@@ -1,5 +1,5 @@
-#ifndef _PROJENT_PROJENT_H
-#define _PROJENT_PROJENT_H
+#ifndef	_PROJENT_PROJENT_H
+#define	_PROJENT_PROJENT_H
 
 #include <sys/types.h>
 #include <regex.h>
@@ -8,16 +8,16 @@
 
 #include "lst.h"
 
-#define F_PAR_VLD       0x00000001      /* Run validation after parsing */
-#define F_PAR_SPC       0x00000002      /* Allow spaces between names */
-#define F_PAR_UNT       0x00000004      /* Allow units in attribs values */
-#define F_PAR_RES       0x00000008      /* Allow projid < 100 */
-#define F_PAR_DUP       0x00000010      /* Allow duplicate projids */
+#define	F_PAR_VLD	0x0001	/* Run validation after parsing */
+#define	F_PAR_SPC	0x0002	/* Allow spaces between names */
+#define	F_PAR_UNT	0x0004	/* Allow units in attribs values */
+#define	F_PAR_RES	0x0008	/* Allow projid < 100 */
+#define	F_PAR_DUP	0x0010	/* Allow duplicate projids */
 
-#define F_MOD_ADD       0x00000100
-#define F_MOD_REM       0x00000200
-#define F_MOD_SUB       0x00000400
-#define F_MOD_REP       0x00000800
+#define	F_MOD_ADD	0x0100
+#define	F_MOD_REM	0x0200
+#define	F_MOD_SUB	0x0400
+#define	F_MOD_REP	0x0800
 
 #ifdef  __cplusplus
 extern "C" {
@@ -36,7 +36,7 @@ typedef struct projent {
 
 extern void projent_free(projent_t *);
 extern projent_t *projent_parse(char *, int, lst_t *);
-extern projent_t *projent_parse_components(char *, char * , char *, char *,
+extern projent_t *projent_parse_components(char *, char *, char *, char *,
     char *, char *, int, lst_t *);
 extern int projent_validate(projent_t *, int, lst_t *);
 extern lst_t *projent_get_lst(char *, int, lst_t *);
@@ -45,7 +45,7 @@ extern int  projent_parse_name(char *, lst_t *);
 extern int  projent_validate_unique_name(lst_t *, char *, lst_t *);
 extern int  projent_parse_projid(char *, projid_t *, lst_t *);
 extern int  projent_validate_projid(projid_t, int, lst_t *);
-extern int  projent_validate_unique_id(lst_t *, projid_t ,lst_t *);
+extern int  projent_validate_unique_id(lst_t *, projid_t, lst_t *);
 extern int  projent_parse_comment(char *, lst_t *);
 extern void projent_merge_usrgrp(char *, char **, char *, int, lst_t *);
 extern char *projent_parse_users(char *, int, lst_t *);

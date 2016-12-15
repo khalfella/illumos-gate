@@ -21,43 +21,42 @@
 #define	BOSTR_REG_EXP	"^"
 #define	EOSTR_REG_EXP	"$"
 #define	EQUAL_REG_EXP	"="
-#define STRN0_REG_EXP	"(.*)"
+#define	STRN0_REG_EXP	"(.*)"
 #define	IDENT_REG_EXP	"[[:alpha:]][[:alnum:]_.-]*"
-#define INTNM_REG_EXP	"[[:digit:]]+"
-#define SIGAC_REG_EXP	"sig(nal)?(=.*)?"
-#define SIGHD_REG_EXP	"(signal|sig)"
-#define SIGVL_REG_EXP	"(([[:digit:]]+)|((SIG)?([[:upper:]]+)([+-][123])?))"
-#define SIGNL_REG_EXP	SIGHD_REG_EXP EQUAL_REG_EXP SIGVL_REG_EXP
-#define STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
-#define ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
-#define ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
+#define	INTNM_REG_EXP	"[[:digit:]]+"
+#define	SIGAC_REG_EXP	"sig(nal)?(=.*)?"
+#define	SIGHD_REG_EXP	"(signal|sig)"
+#define	SIGVL_REG_EXP	"(([[:digit:]]+)|((SIG)?([[:upper:]]+)([+-][123])?))"
+#define	SIGNL_REG_EXP	SIGHD_REG_EXP EQUAL_REG_EXP SIGVL_REG_EXP
+#define	STOCK_REG_EXP	"([[:upper:]]{1,5}(.[[:upper:]]{1,5})?,)?"
+#define	ATTRB_REG_EXP	"(" STOCK_REG_EXP IDENT_REG_EXP ")"
+#define	ATVAL_REG_EXP	ATTRB_REG_EXP EQUAL_REG_EXP STRN0_REG_EXP
 
-#define TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
+#define	TO_EXP(X)	BOSTR_REG_EXP X EOSTR_REG_EXP
 
-#define POOLN_EXP	TO_EXP(IDENT_REG_EXP)
-#define INTNM_EXP	TO_EXP(INTNM_REG_EXP)
-#define SIGAC_EXP	TO_EXP(SIGAC_REG_EXP)
-#define SIGNL_EXP	TO_EXP(SIGNL_REG_EXP)
-#define ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
-#define ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
+#define	POOLN_EXP	TO_EXP(IDENT_REG_EXP)
+#define	INTNM_EXP	TO_EXP(INTNM_REG_EXP)
+#define	SIGAC_EXP	TO_EXP(SIGAC_REG_EXP)
+#define	SIGNL_EXP	TO_EXP(SIGNL_REG_EXP)
+#define	ATTRB_EXP	TO_EXP(ATTRB_REG_EXP)
+#define	ATVAL_EXP	TO_EXP(ATVAL_REG_EXP)
 
-#define MAX_OF(X,Y)	(((X) > (Y)) ? (X) : (Y))
+#define	MAX_OF(X, Y)	(((X) > (Y)) ? (X) : (Y))
 
-
-#define SEQU(X,Y)		(strcmp((X), (Y)) == 0)
+#define	SEQU(X, Y)		(strcmp((X), (Y)) == 0)
 #define	SIN1(X, S1)		((SEQU((X), (S1))))
 #define	SIN2(X, S1, S2)		((SEQU((X), (S1))) || (SIN1((X), (S2))))
 #define	SIN3(X, S1, S2, S3)	((SEQU((X), (S1))) || (SIN2((X), (S2), (S3))))
 
 #define	ATT_VAL_TYPE_NULL	0
-#define ATT_VAL_TYPE_VALUE	1
-#define ATT_VAL_TYPE_LIST	2
+#define	ATT_VAL_TYPE_VALUE	1
+#define	ATT_VAL_TYPE_LIST	2
 
-#define ATT_ALLOC()		attrib_alloc()
-#define ATT_VAL_ALLOC(T, V)	attrib_val_alloc((T), (V))
-#define ATT_VAL_ALLOC_NULL()	ATT_VAL_ALLOC(ATT_VAL_TYPE_NULL, NULL)
-#define ATT_VAL_ALLOC_VALUE(V)	ATT_VAL_ALLOC(ATT_VAL_TYPE_VALUE, (V))
-#define ATT_VAL_ALLOC_LIST(L)	ATT_VAL_ALLOC(ATT_VAL_TYPE_LIST, (L))
+#define	ATT_ALLOC()		attrib_alloc()
+#define	ATT_VAL_ALLOC(T, V)	attrib_val_alloc((T), (V))
+#define	ATT_VAL_ALLOC_NULL()	ATT_VAL_ALLOC(ATT_VAL_TYPE_NULL, NULL)
+#define	ATT_VAL_ALLOC_VALUE(V)	ATT_VAL_ALLOC(ATT_VAL_TYPE_VALUE, (V))
+#define	ATT_VAL_ALLOC_LIST(L)	ATT_VAL_ALLOC(ATT_VAL_TYPE_LIST, (L))
 
 typedef struct attrib_val_s {
 	int att_val_type;
@@ -65,7 +64,7 @@ typedef struct attrib_val_s {
 	union {
 		char *att_val_value;
 		lst_t *att_val_values;
-        };
+	};
 } attrib_val_t;
 
 typedef struct attrib_s {
@@ -120,7 +119,7 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 	}
 
 	nmatch = signlexp.re_nsub + 1;
-	mat = util_safe_zmalloc(nmatch * sizeof(regmatch_t));
+	mat = util_safe_zmalloc(nmatch * sizeof (regmatch_t));
 
 	if (atv_type != ATT_VAL_TYPE_LIST) {
 		util_add_errmsg(errlst, gettext(
@@ -171,9 +170,12 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 			    atname, vpriv);
 			ret = 1;
 		} else if (!(
-		    ((rpriv & RESCTL_PRIV_PRIVE) && SEQU(vpriv, "priv")) ||
-		    ((rpriv & RESCTL_PRIV_PRIVD) && SEQU(vpriv, "privileged")) ||
-		    ((rpriv & RESCTL_PRIV_BASIC) && SEQU(vpriv, "basic")))) {
+		    ((rpriv & RESCTL_PRIV_PRIVE) &&
+		    SEQU(vpriv, "priv")) ||
+		    ((rpriv & RESCTL_PRIV_PRIVD) &&
+		    SEQU(vpriv, "privileged")) ||
+		    ((rpriv & RESCTL_PRIV_BASIC) &&
+		    SEQU(vpriv, "basic")))) {
 			util_add_errmsg(errlst, gettext(
 			    "rctl \"%s\" privilege not allowed \"%s\""),
 			    atname, vpriv);
@@ -204,7 +206,7 @@ attrib_validate_rctl(attrib_t *att, resctlrule_t *rule, lst_t *errlst)
 		sigcount = 0;
 
 		for (j = 2; j < lst_size(atv->att_val_values); j++) {
-			action = lst_at(atv->att_val_values,j);
+			action = lst_at(atv->att_val_values, j);
 
 			if (action->att_val_type != ATT_VAL_TYPE_VALUE) {
 				util_add_errmsg(errlst, gettext(
@@ -448,12 +450,12 @@ attrib_validate_lst(lst_t *attribs, lst_t *errlst)
 	int ret = 0;
 
 	atlast = atnames = util_safe_zmalloc(
-	    (lst_size(attribs) + 1) * sizeof(char *));
+	    (lst_size(attribs) + 1) * sizeof (char *));
 	for (i = 0; i < lst_size(attribs); i++) {
 		att = lst_at(attribs, i);
 
 		/* Validate this attribute */
-		if(attrib_validate(att, errlst) != 0)
+		if (attrib_validate(att, errlst) != 0)
 			ret = 1;
 		/* Make sure it is not duplicated */
 		for (j = 0; (atname = atnames[j]) != NULL; j++) {
@@ -478,7 +480,7 @@ attrib_validate_lst(lst_t *attribs, lst_t *errlst)
 attrib_t
 *attrib_alloc()
 {
-	return (util_safe_zmalloc(sizeof(attrib_t)));
+	return (util_safe_zmalloc(sizeof (attrib_t)));
 }
 
 attrib_val_t
@@ -486,7 +488,7 @@ attrib_val_t
 {
 	attrib_val_t *ret;
 
-	ret = util_safe_malloc(sizeof(attrib_val_t));
+	ret = util_safe_malloc(sizeof (attrib_val_t));
 	ret->att_val_type = type;
 	ret->att_val_value = val;
 	return (ret);
@@ -499,11 +501,11 @@ char
 	char *vstring;
 	int i;
 	attrib_val_t *v;
-	switch(val->att_val_type) {
+	switch (val->att_val_type) {
 		case ATT_VAL_TYPE_NULL:
-			return util_safe_strdup("");
+			return (util_safe_strdup(""));
 		case ATT_VAL_TYPE_VALUE:
-			return util_safe_strdup(val->att_val_value);
+			return (util_safe_strdup(val->att_val_value));
 		case ATT_VAL_TYPE_LIST:
 			/* Only innerlists need to be betweeen ( and ) */
 			if (innerlist)
@@ -655,7 +657,7 @@ attrib_val_to_list(attrib_val_t *atv)
 	type = atv->att_val_type;
 
 	atv->att_val_type = ATT_VAL_TYPE_LIST;
-	atv->att_val_values = util_safe_malloc(sizeof(lst_t));
+	atv->att_val_values = util_safe_malloc(sizeof (lst_t));
 	lst_create(atv->att_val_values);
 
 	if (type == ATT_VAL_TYPE_VALUE && val != NULL) {
@@ -712,7 +714,7 @@ attrib_val_t
 		usedtokens = UTIL_STR_APPEND1(usedtokens, token);
 
 		if (SEQU(token, ",")) {
-			if (SIN3(prev, "," , "(", "")) {
+			if (SIN3(prev, ",", "(", "")) {
 				attrib_val_append(at, "");
 			}
 			attrib_val_to_list(at);
@@ -720,22 +722,21 @@ attrib_val_t
 		} else if (SEQU(token, "(")) {
 			if (!(SIN3(prev, "(", ",", ""))) {
 				util_add_errmsg(errlst, gettext(
-				    "\"%s\" <- \"(\" unexpected"), usedtokens); 
+				    "\"%s\" <- \"(\" unexpected"), usedtokens);
 				error = 1;
 				goto out;
 			}
 
-			switch(at->att_val_type) {
+			switch (at->att_val_type) {
 				case ATT_VAL_TYPE_VALUE:
 					util_add_errmsg(errlst, gettext(
 					    "\"%s\" <- \"%s\" unexpected"),
-					    usedtokens, token); 
+					    usedtokens, token);
 					error = 1;
 					goto out;
 				case ATT_VAL_TYPE_NULL:
 					/* Make is a LIST attrib */
 					attrib_val_to_list(at);
-					/*break; */
 					/*FALLTHROUGH*/
 				case ATT_VAL_TYPE_LIST:
 					/* Allocate NULL node */
@@ -753,7 +754,7 @@ attrib_val_t
 		} else if (SEQU(token, ")")) {
 			if (parendepth <= 0) {
 				util_add_errmsg(errlst, gettext(
-				    "\"%s\" <- \")\" unexpected"), usedtokens); 
+				    "\"%s\" <- \")\" unexpected"), usedtokens);
 				error = 1;
 				goto out;
 			}
@@ -771,7 +772,7 @@ attrib_val_t
 			if (!(SIN3(prev, ",", "(", ""))) {
 				util_add_errmsg(errlst, gettext(
 				    "\"%s\" <- \"%s\" unexpected"),
-				    usedtokens, token); 
+				    usedtokens, token);
 				error = 1;
 				goto out;
 			}
@@ -784,17 +785,17 @@ attrib_val_t
 	if (parendepth != 0) {
 		util_add_errmsg(errlst, gettext(
 		    "\"%s\" <- \")\" missing"),
-		    usedtokens); 
+		    usedtokens);
 		error = 1;
 		goto out;
 	}
 
 	if (SIN2(prev, ",", "")) {
-		switch(at->att_val_type) {
+		switch (at->att_val_type) {
 			case ATT_VAL_TYPE_NULL:
 				util_add_errmsg(errlst, gettext(
 				    "\"%s\" unexpected"),
-				    usedtokens); 
+				    usedtokens);
 				error = 1;
 				goto out;
 			case ATT_VAL_TYPE_VALUE:
@@ -806,9 +807,9 @@ attrib_val_t
 
 out:
 	while (!lst_is_empty(&stk)) {
-                at = lst_at(&stk, 0);
-                (void) lst_remove(&stk, at);
-        }
+		at = lst_at(&stk, 0);
+		(void) lst_remove(&stk, at);
+	}
 
 	util_free_tokens(tokens);
 	free(tokens);
@@ -838,10 +839,10 @@ attrib_t
 	resctl_info_t rinfo;
 	resctlrule_t rrule;
 
-	regmatch_t *mat = util_safe_malloc(nmatch * sizeof(regmatch_t));
+	regmatch_t *mat = util_safe_malloc(nmatch * sizeof (regmatch_t));
 	ret = ATT_ALLOC();
 
-	if (regexec(attrbexp, att, attrbexp->re_nsub + 1 , mat, 0) == 0) {
+	if (regexec(attrbexp, att, attrbexp->re_nsub + 1, mat, 0) == 0) {
 		ret->att_name = util_safe_strdup(att);
 		ret->att_value = ATT_VAL_ALLOC_NULL();
 	} else if (regexec(atvalexp, att,
@@ -849,7 +850,7 @@ attrib_t
 		vidx = atvalexp->re_nsub;
 		vlen = mat[vidx].rm_eo - mat[vidx].rm_so;
 		nidx = atvalexp->re_nsub - 3;
-		ret->att_name = util_substr(atvalexp, mat, att, nidx); 
+		ret->att_name = util_substr(atvalexp, mat, att, nidx);
 
 		if (vlen > 0) {
 			values = util_substr(atvalexp, mat, att, vidx);
@@ -898,7 +899,7 @@ attrib_t
 		resctl_get_rule(&rinfo, &rrule);
 		retv = ret->att_value;
 
-		switch(rrule.resctl_type) {
+		switch (rrule.resctl_type) {
 			case RESCTL_TYPE_BYTES:
 				scale = BYTES_SCALE;
 				break;
@@ -964,7 +965,7 @@ lst_t
 	attrib_t *natt = NULL;
 	lst_t *ret = NULL;
 
-	ret = util_safe_malloc(sizeof(lst_t));
+	ret = util_safe_malloc(sizeof (lst_t));
 	lst_create(ret);
 
 	if (regcomp(&attrbexp, ATTRB_EXP, REG_EXTENDED) != 0)
@@ -1001,15 +1002,16 @@ attrib_val_t
 	attrib_val_t *val;
 	attrib_val_t *natv;
 
-	switch(atv->att_val_type) {
+	switch (atv->att_val_type) {
 		case ATT_VAL_TYPE_NULL:
 			natv = ATT_VAL_ALLOC_NULL();
 		break;
 		case ATT_VAL_TYPE_VALUE:
-			natv = ATT_VAL_ALLOC_VALUE(util_safe_strdup(atv->att_val_value));
+			natv = ATT_VAL_ALLOC_VALUE(
+			    util_safe_strdup(atv->att_val_value));
 		break;
 		case ATT_VAL_TYPE_LIST:
-			values = util_safe_malloc(sizeof(lst_t));
+			values = util_safe_malloc(sizeof (lst_t));
 			lst_create(values);
 			for (i = 0; i < lst_size(atv->att_val_values);
 			    i++) {
@@ -1021,7 +1023,7 @@ attrib_val_t
 		break;
 	}
 
-	return natv;
+	return (natv);
 }
 
 attrib_t
@@ -1059,7 +1061,7 @@ attrib_t
 	    natv->att_val_type == ATT_VAL_TYPE_VALUE) {
 
 		/* VALUE + VALUE -> LIST */
-		values = util_safe_malloc(sizeof(lst_t));
+		values = util_safe_malloc(sizeof (lst_t));
 		lst_create(values);
 		lst_insert_tail(values, attrib_val_duplicate(eatv));
 		lst_insert_tail(values, attrib_val_duplicate(natv));
@@ -1089,7 +1091,7 @@ attrib_t
 		for (i = 0; i < lst_size(natv->att_val_values); i++) {
 			lst_insert_tail(atv->att_val_values,
 			    attrib_val_duplicate(
-			    lst_at(natv->att_val_values,i)));
+			    lst_at(natv->att_val_values, i)));
 		}
 	}
 
@@ -1098,7 +1100,7 @@ attrib_t
 }
 
 int
-attrib_val_equal(attrib_val_t *xatv,attrib_val_t *yatv)
+attrib_val_equal(attrib_val_t *xatv, attrib_val_t *yatv)
 {
 	int i;
 	attrib_val_t *xv, *yv;
@@ -1225,7 +1227,7 @@ attrib_t
 			}
 		}
 
-		values = util_safe_malloc(sizeof(lst_t));
+		values = util_safe_malloc(sizeof (lst_t));
 		lst_create(values);
 		for (i = 0; i < lst_size(eatv->att_val_values); i++) {
 			ev = lst_at(eatv->att_val_values, i);
@@ -1266,20 +1268,20 @@ attrib_t
 		att = attrib_merge_remove(eatt, natt, errlst);
 	}
 
-	return att;
+	return (att);
 }
 
 void
 attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
     lst_t *errlst) {
 
-	lst_t* attrs = NULL;
+	lst_t *attrs = NULL;
 	int i, j;
 	attrib_t *att, *natt, *eatt;
 	boolean_t found;
 
 	if (flags & F_MOD_ADD) {
-		attrs = util_safe_malloc(sizeof(lst_t));
+		attrs = util_safe_malloc(sizeof (lst_t));
 		lst_create(attrs);
 
 		for (i = 0; i < lst_size(*eattrs); i++) {
@@ -1315,7 +1317,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 			}
 			if (found)
 				continue;
-			lst_insert_tail(attrs,attrib_duplicate(natt));
+			lst_insert_tail(attrs, attrib_duplicate(natt));
 		}
 
 	} else if (flags & (F_MOD_REM | F_MOD_SUB)) {
@@ -1349,7 +1351,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 			}
 		}
 
-		attrs = util_safe_malloc(sizeof(lst_t));
+		attrs = util_safe_malloc(sizeof (lst_t));
 		lst_create(attrs);
 
 		for (i = 0; i < lst_size(*eattrs); i++) {
@@ -1375,7 +1377,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 				attrib_free_lst(attrs);
 				UTIL_FREE_SNULL(attrs);
 				goto out;
-			} else if (SEQU(att->att_name,"")) {
+			} else if (SEQU(att->att_name, "")) {
 				attrib_free(att);
 			} else {
 				lst_insert_tail(attrs, att);
@@ -1383,7 +1385,7 @@ attrib_merge_attrib_lst(lst_t **eattrs, lst_t *nattrs, int flags,
 		}
 
 	} else if (flags & F_MOD_REP) {
-		attrs = util_safe_malloc(sizeof(lst_t));
+		attrs = util_safe_malloc(sizeof (lst_t));
 		lst_create(attrs);
 		for (i = 0; i < lst_size(nattrs); i++) {
 			natt = lst_at(nattrs, i);

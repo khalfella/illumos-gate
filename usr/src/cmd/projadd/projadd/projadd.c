@@ -71,22 +71,18 @@ main(int argc, char **argv)
 	projid_t maxpjid = 99;
 	lst_t *plst = NULL;
 	int flags = 0;
+	char *projfile = PROJF_PATH;
+
 	projent_t *ent;
-
-	/* Command line options */
-	boolean_t nflag, pflag, oflag;
-
-	/* Project entry fields */
-	char *pname;
+	boolean_t nflag, pflag, oflag;		/* Command line flags.	*/
+	char *pname, *projidstr, *comment;	/* projent fields.	*/
+	char *users, *groups, *attrs;
 	projid_t projid;
-	char *projidstr = "";
-	char *comment = "";
-	char *users = "", *groups = "" , *attrs;
 
 	lst_t errlst;
 
 	/* Project file defaults to system project file "/etc/project" */
-	char *projfile = PROJF_PATH;
+	users = groups = comment = projidstr = "";
 
 	nflag = pflag = oflag = B_FALSE;
 	attrs = util_safe_zmalloc(1);
@@ -95,13 +91,13 @@ main(int argc, char **argv)
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
-#define TEXT_DOMAIN "SYS_TEST"		/* Use this only if it wasn't */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it wasn't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
 	/* Parse the command line argument list */
-	while((c = getopt(argc, argv, ":hnf:p:oc:U:G:K:")) != EOF)
-		switch(c) {
+	while ((c = getopt(argc, argv, ":hnf:p:oc:U:G:K:")) != EOF)
+		switch (c) {
 			case 'h':
 				usage();
 				exit(0);
@@ -166,7 +162,7 @@ main(int argc, char **argv)
 			if (!oflag) {
 				projent_validate_unique_id(plst, projid,
 				    &errlst);
-			} 
+			}
 		}
 	}
 	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
@@ -177,7 +173,7 @@ main(int argc, char **argv)
 		maxpjid = (ent->projid > maxpjid) ? ent->projid : maxpjid;
 	}
 
-	
+
 	if (!pflag && asprintf(&projidstr, "%ld", maxpjid + 1) == -1) {
 		util_add_errmsg(&errlst, gettext("Failed to allocate memory"));
 		CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);

@@ -26,7 +26,7 @@ lst_insert_head(lst_t *plst, void *ndata)
 	if (plst->csz == plst->tsz) {
 		plst->tsz = (plst->tsz == 0) ? 1 : plst->tsz * 2;
 		plst->buf = util_safe_realloc(plst->buf,
-		    plst->tsz * sizeof(void *));
+		    plst->tsz * sizeof (void *));
 	}
 
 	for (i = plst->csz; i > 0; i--)
@@ -43,13 +43,14 @@ lst_insert_tail(lst_t *plst, void *ndata)
 	if (plst->csz == plst->tsz) {
 		plst->tsz = (plst->tsz == 0) ? 1 : plst->tsz * 2;
 		plst->buf = util_safe_realloc(plst->buf,
-		    plst->tsz * sizeof(void *));
+		    plst->tsz * sizeof (void *));
 	}
 
 	plst->buf[plst->csz++] = ndata;
 }
 
-int lst_remove(lst_t *plst, void *rdata)
+int
+lst_remove(lst_t *plst, void *rdata)
 {
 	int i, idx = -1;
 	for (i = 0; i < plst->csz; i++) {
@@ -80,7 +81,7 @@ void
 		    "error accessing element outside lst\n"));
 		exit(1);
 	}
-	return plst->buf[idx];
+	return (plst->buf[idx]);
 }
 
 void
@@ -103,5 +104,3 @@ lst_size(lst_t *plst)
 {
 	return (plst->csz);
 }
-
-
