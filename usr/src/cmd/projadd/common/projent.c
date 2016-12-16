@@ -137,16 +137,18 @@ projent_validate_attributes(lst_t *attrs, lst_t *errlst)
 char *
 projent_tostring(projent_t *ent)
 {
+	char *attrs;
 	char *ret = NULL;
-	char *attrs = attrib_lst_tostring(ent->attrs);
-	(void) asprintf(&ret, "%s:%ld:%s:%s:%s:%s",
-	    ent->projname,
-	    ent->projid,
-	    ent->comment,
-	    ent->userlist,
-	    ent->grouplist,
-	    attrs);
-	free(attrs);
+	if ((attrs = attrib_lst_tostring(ent->attrs)) != NULL) {
+		(void) asprintf(&ret, "%s:%ld:%s:%s:%s:%s",
+		    ent->projname,
+		    ent->projid,
+		    ent->comment,
+		    ent->userlist,
+		    ent->grouplist,
+		    attrs);
+		free(attrs);
+	}
 	return (ret);
 }
 
@@ -162,12 +164,15 @@ projent_validate(projent_t *pent, int flags, lst_t *errlst)
 	(void) projent_validate_groups(pent->grouplist, errlst);
 	(void) projent_validate_attributes(pent->attrs, errlst);
 
-	str = projent_tostring(pent);
-	if (strlen(str) > (PROJECT_BUFSZ - 2)) {
-		util_add_errmsg(errlst, gettext(
-		    "projent line too long"));
+	if ((str = projent_tostring(pent)) == NULL) {
+		util_add_errmsg(errlst, gettext("error allocating memory"));
+	} else {
+		if (strlen(str) > (PROJECT_BUFSZ - 2)) {
+			util_add_errmsg(errlst, gettext(
+			    "projent line too long"));
+		}
+		free(str);
 	}
-	free(str);
 	return (lst_is_empty(errlst) == 0);
 }
 
