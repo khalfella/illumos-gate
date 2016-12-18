@@ -58,10 +58,10 @@ main(int argc, char **argv)
 	projent_t *ent, *delent;
 	int del;
 	char *pname;			/* Project name */
-	lst_t errlst;			/* Errors list */
+	list_t errlst;			/* Errors list */
 	char *projfile = PROJF_PATH;	/* Project file "/etc/project" */
 
-	lst_create(&errlst);
+	util_init_errlst(&errlst);
 
 
 	(void) setlocale(LC_ALL, "");
@@ -99,7 +99,7 @@ main(int argc, char **argv)
 	/* Parse the project file to get the list of the projects */
 	plst = projent_get_lst(projfile, flags, &errlst);
 
-	if (!lst_is_empty(&errlst)) {
+	if (!list_is_empty(&errlst)) {
 		util_print_errmsgs(&errlst);
 		usage();
 		exit(2);
@@ -114,6 +114,7 @@ main(int argc, char **argv)
 			delent = ent;
 		}
 	}
+
 
 	if (del == 0) {
 		(void) fprintf(stderr, gettext(
@@ -135,13 +136,15 @@ main(int argc, char **argv)
 	/* Write out the project file */
 	projent_put_lst(projfile, plst, &errlst);
 
-	if (!lst_is_empty(&errlst)) {
+	if (!list_is_empty(&errlst)) {
 		util_print_errmsgs(&errlst);
+		list_destroy(&errlst);
 		usage();
 		ret = 2;
 	}
 out:
 	projent_free_lst(plst);
 	free(plst);
+	list_destroy(&errlst);
 	return (ret);
 }

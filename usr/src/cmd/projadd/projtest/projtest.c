@@ -478,7 +478,7 @@ boolean_t vflag = B_FALSE;
 boolean_t kflag = B_FALSE;
 
 int
-projtest_compare_two_files(char *file1, char *file2, lst_t *errlst)
+projtest_compare_two_files(char *file1, char *file2, list_t *errlst)
 {
 	FILE *fp1, *fp2;
 	int c1, c2;
@@ -512,24 +512,13 @@ projtest_compare_two_files(char *file1, char *file2, lst_t *errlst)
 }
 
 void
-projtest_free_errlst(lst_t *errlst)
-{
-	char *msg;
-	while (!lst_is_empty(errlst)) {
-		msg = lst_at(errlst,  0);
-		(void) lst_remove(errlst, msg);
-		free(msg);
-	}
-}
-
-void
 do_read_test(read_test *rt, int tnum)
 {
 	FILE *fp;
 	char *projfile, *projwrite;
 	lst_t *plst;
-	lst_t errlst;
-	lst_create(&errlst);
+	list_t errlst;
+	util_init_errlst(&errlst);
 
 
 	(void) asprintf(&projfile, "/tmp/project_%ld_%d_tmp", getpid(), tnum);
@@ -560,7 +549,7 @@ do_read_test(read_test *rt, int tnum)
 		projent_put_lst(projwrite, plst, &errlst);
 		(void) projtest_compare_two_files(projfile, projwrite, &errlst);
 		(void) printf("Read test[%02d]: **************[%s]\n", tnum,
-		    lst_is_empty(&errlst) ? "-SUCCESS-" : "*FAILURE*");
+		    list_is_empty(&errlst) ? "-SUCCESS-" : "*FAILURE*");
 
 	} else {
 		(void) printf("Read test[%02d]: **************[*FAILURE*]\n",
@@ -577,19 +566,19 @@ do_read_test(read_test *rt, int tnum)
 	}
 
 	projent_free_lst(plst);
-	projtest_free_errlst(&errlst);
+	util_free_errlst(&errlst);
 }
 
 
 void
 do_parse_validate_test(parse_validate_test *pvt, int tnum)
 {
-	lst_t errlst;
+	list_t errlst;
 	projent_t *ent;
 	int vres;
 
 
-	lst_create(&errlst);
+	util_init_errlst(&errlst);
 
 
 	ent = projent_parse(pvt->pline, pvt->flags, &errlst);
@@ -615,7 +604,7 @@ do_parse_validate_test(parse_validate_test *pvt, int tnum)
 		projent_free(ent);
 		free(ent);
 	}
-	projtest_free_errlst(&errlst);
+	util_free_errlst(&errlst);
 }
 
 void

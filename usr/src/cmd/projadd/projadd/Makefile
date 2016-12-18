@@ -30,7 +30,7 @@ SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/projadd/Makefile.projadd
 
-LDLIBS += -lpool
+LDLIBS += -lpool -lcmdutils
 CFLAGS += $(CCVERBOSE) -I${PROJADDCOMMONDIR}
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-switch

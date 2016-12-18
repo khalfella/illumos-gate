@@ -8,9 +8,7 @@
 #include <locale.h>
 #include <stddef.h>
 #include <limits.h>
-
 #include <project.h>
-
 #include <ctype.h>
 
 #include "util.h"
@@ -31,6 +29,11 @@
 
 #define	BYTES_SCALE	1
 #define	SCNDS_SCALE	2
+
+typedef struct {
+	char *em_msg;
+	list_node_t em_next;
+} errmsg_t;
 
 char *
 util_safe_strdup(char *str)
@@ -77,33 +80,54 @@ util_safe_zmalloc(size_t sz)
 }
 
 void
-util_print_errmsgs(lst_t *errlst)
+util_init_errlst(list_t *errlst)
 {
-	char *errmsg;
-	while (!lst_is_empty(errlst)) {
-		errmsg = lst_at(errlst, 0);
-		(void) lst_remove(errlst, errmsg);
-		(void) fprintf(stderr, "%s\n", errmsg);
-		free(errmsg);
+	list_create(errlst, sizeof (errmsg_t), offsetof (errmsg_t, em_next));
+}
+
+void
+util_free_errlst(list_t *errlst)
+{
+	errmsg_t *emsg;
+	while((emsg = list_head(errlst)) != NULL) {
+		list_remove(errlst, emsg);
+		free(emsg->em_msg);
+		free(emsg);
+	}
+}
+
+void
+util_print_errmsgs(list_t *errlst)
+{
+	errmsg_t *emsg;
+	while((emsg = list_head(errlst)) != NULL) {
+		(void) fprintf(stderr, "%s\n", emsg->em_msg);
+		list_remove(errlst, emsg);
+		free(emsg->em_msg);
+		free(emsg);
 	}
 }
 
 
 void
-util_add_errmsg(lst_t *errlst, char *format, ...)
+util_add_errmsg(list_t *errlst, char *format, ...)
 {
 	va_list args;
-	char *errmsg;
+	errmsg_t *emsg;
+
+	emsg = util_safe_malloc(sizeof (errmsg_t));
+	list_link_init(&emsg->em_next);
 
 	va_start(args, format);
-	if (vasprintf(&errmsg, format, args) < 0) {
+	if (vasprintf(&emsg->em_msg, format, args) < 0) {
 		va_end(args);
 		(void) fprintf(stderr, gettext(
 		    "error allocating memory\n"));
 		exit(1);
 	}
 	va_end(args);
-	lst_insert_tail(errlst, errmsg);
+	list_insert_tail(errlst, emsg);
+
 }
 
 char *
@@ -154,7 +178,7 @@ typedef struct {
 #define	SCLS	7
 
 int
-util_scale(char *unit, int scale, uint64_t *res, lst_t *errlst)
+util_scale(char *unit, int scale, uint64_t *res, list_t *errlst)
 {
 	int i;
 	scl *sc;
@@ -194,7 +218,7 @@ util_scale(char *unit, int scale, uint64_t *res, lst_t *errlst)
 
 
 int
-util_val2num(char *value, int scale, lst_t *errlst, char **retnum,
+util_val2num(char *value, int scale, list_t *errlst, char **retnum,
     char **retmod, char **retunit)
 {
 	int ret = 1;
@@ -281,7 +305,7 @@ util_free_tokens(char **tokens)
 }
 
 char **
-util_tokenize(char *values, lst_t *errlst)
+util_tokenize(char *values, list_t *errlst)
 {
 	char *token, *t;
 	char *v;

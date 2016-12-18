@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <regex.h>
 #include <sys/varargs.h>
+#include <sys/list.h>
 
 #include "lst.h"
 
@@ -31,13 +32,15 @@ extern char *util_safe_strdup(char *);
 extern void *util_safe_realloc(void*, size_t);
 extern void *util_safe_malloc(size_t);
 extern void *util_safe_zmalloc(size_t);
-extern char **util_tokenize(char *, lst_t *);
+extern char **util_tokenize(char *, list_t *);
 extern void util_free_tokens(char **);
 extern char *util_substr(regex_t *, regmatch_t *, char *, int);
 extern char *util_str_append(char *, int, ...);
-extern int util_val2num(char *, int, lst_t *, char **, char **, char **);
-extern void util_add_errmsg(lst_t *, char *format, ...);
-extern void util_print_errmsgs(lst_t *);
+extern int util_val2num(char *, int, list_t *, char **, char **, char **);
+extern void util_init_errlst(list_t *);
+extern void util_free_errlst(list_t *);
+extern void util_add_errmsg(list_t *, char *format, ...);
+extern void util_print_errmsgs(list_t *);
 
 #ifdef  __cplusplus
 }

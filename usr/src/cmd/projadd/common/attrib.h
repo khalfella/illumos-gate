@@ -15,12 +15,12 @@ extern "C" {
 #endif
 
 extern char *attrib_lst_tostring(lst_t *);
-extern lst_t *attrib_parse_attributes(char *, int, lst_t *);
+extern lst_t *attrib_parse_attributes(char *, int, list_t *);
 extern void attrib_free_lst(lst_t *);
 extern char *attrib_tostring(void *);
 extern void attrib_sort_lst(lst_t *);
-extern int attrib_validate_lst(lst_t *, lst_t *);
-extern void attrib_merge_attrib_lst(lst_t **, lst_t *, int, lst_t *);
+extern int attrib_validate_lst(lst_t *, list_t *);
+extern void attrib_merge_attrib_lst(lst_t **, lst_t *, int, list_t *);
 
 #ifdef  __cplusplus
 }

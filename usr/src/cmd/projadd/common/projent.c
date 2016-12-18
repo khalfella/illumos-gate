@@ -36,7 +36,7 @@
 
 /*ARGSUSED*/
 int
-projent_validate_name(char *pname, lst_t *errlst)
+projent_validate_name(char *pname, list_t *errlst)
 {
 	/* Do nothing, as any parse-able project name is valid */
 	return (0);
@@ -44,14 +44,14 @@ projent_validate_name(char *pname, lst_t *errlst)
 
 /*ARGSUSED*/
 int
-projent_validate_comment(char *comment, lst_t *errlst)
+projent_validate_comment(char *comment, list_t *errlst)
 {
 	/* Do nothing, as any parse-able project name is valid */
 	return (0);
 }
 
 int
-projent_validate_users(char *users, lst_t *errlst)
+projent_validate_users(char *users, list_t *errlst)
 {
 	char *susrs, *usrs, *usr;
 	char *u, **ulast, **ulist;
@@ -90,7 +90,7 @@ projent_validate_users(char *users, lst_t *errlst)
 }
 
 int
-projent_validate_groups(char *groups, lst_t *errlst)
+projent_validate_groups(char *groups, list_t *errlst)
 {
 	char *sgrps, *grps, *grp;
 	char *g, **glast, **glist;
@@ -129,7 +129,7 @@ projent_validate_groups(char *groups, lst_t *errlst)
 }
 
 int
-projent_validate_attributes(lst_t *attrs, lst_t *errlst)
+projent_validate_attributes(lst_t *attrs, list_t *errlst)
 {
 	return (attrib_validate_lst(attrs, errlst));
 }
@@ -153,7 +153,7 @@ projent_tostring(projent_t *ent)
 }
 
 int
-projent_validate(projent_t *pent, int flags, lst_t *errlst)
+projent_validate(projent_t *pent, int flags, list_t *errlst)
 {
 	char *str;
 
@@ -173,11 +173,11 @@ projent_validate(projent_t *pent, int flags, lst_t *errlst)
 		}
 		free(str);
 	}
-	return (lst_is_empty(errlst) == 0);
+	return (list_is_empty(errlst) == 0);
 }
 
 int
-projent_validate_lst(lst_t *plst, int flags, lst_t *errlst)
+projent_validate_lst(lst_t *plst, int flags, list_t *errlst)
 {
 	int e, i, idx;
 	projent_t *ent;
@@ -249,20 +249,20 @@ projent_attrib_lst_tostring(lst_t *lst)
 
 void
 projent_merge_attributes(lst_t **eattrs, lst_t *nattrs, int flags,
-    lst_t *errlst)
+    list_t *errlst)
 {
 	attrib_merge_attrib_lst(eattrs, nattrs, flags, errlst);
 }
 
 lst_t *
-projent_parse_attributes(char *attribs, int flags, lst_t *errlst)
+projent_parse_attributes(char *attribs, int flags, list_t *errlst)
 {
 	return (attrib_parse_attributes(attribs, flags, errlst));
 }
 
 void
 projent_merge_usrgrp(char *usrgrp, char **elist, char *nlist,
-    int flags, lst_t *errlst)
+    int flags, list_t *errlst)
 {
 	char *res = NULL;
 	char *seusrs, *eusrs, *eusr;
@@ -372,7 +372,7 @@ out:
 }
 
 char *
-projent_parse_users(char *nlist, int flags, lst_t *errlst)
+projent_parse_users(char *nlist, int flags, list_t *errlst)
 {
 	char *ulist = NULL;
 	char *susrs, *usrs, *usr;
@@ -416,7 +416,7 @@ out:
 
 
 char *
-projent_parse_groups(char *nlist, int flags, lst_t *errlst)
+projent_parse_groups(char *nlist, int flags, list_t *errlst)
 {
 	char *glist = NULL;
 	char *sgrps, *grps, *grp;
@@ -459,7 +459,7 @@ out:
 }
 
 int
-projent_parse_comment(char *comment, lst_t *errlst)
+projent_parse_comment(char *comment, list_t *errlst)
 {
 	int ret = 0;
 	if (strchr(comment, ':') != NULL) {
@@ -472,7 +472,7 @@ projent_parse_comment(char *comment, lst_t *errlst)
 }
 
 int
-projent_validate_unique_id(lst_t *plst, projid_t projid, lst_t *errlst)
+projent_validate_unique_id(lst_t *plst, projid_t projid, list_t *errlst)
 {
 	int e;
 	projent_t *ent;
@@ -487,7 +487,7 @@ projent_validate_unique_id(lst_t *plst, projid_t projid, lst_t *errlst)
 	return (0);
 }
 int
-projent_validate_projid(projid_t projid, int flags, lst_t *errlst)
+projent_validate_projid(projid_t projid, int flags, list_t *errlst)
 {
 	projid_t maxprojid;
 
@@ -504,7 +504,7 @@ projent_validate_projid(projid_t projid, int flags, lst_t *errlst)
 }
 
 int
-projent_parse_projid(char *projidstr, projid_t *pprojid, lst_t *errlst)
+projent_parse_projid(char *projidstr, projid_t *pprojid, list_t *errlst)
 {
 	char *ptr;
 	long long llid;
@@ -560,7 +560,7 @@ out:
 }
 
 int
-projent_validate_unique_name(lst_t *plst, char *pname, lst_t *errlst)
+projent_validate_unique_name(lst_t *plst, char *pname, list_t *errlst)
 {
 	int e;
 	projent_t *ent;
@@ -576,7 +576,7 @@ projent_validate_unique_name(lst_t *plst, char *pname, lst_t *errlst)
 }
 
 int
-projent_parse_name(char *pname, lst_t *errlst)
+projent_parse_name(char *pname, list_t *errlst)
 {
 	int ret = 1;
 	regex_t projnexp;
@@ -617,7 +617,7 @@ projent_free(projent_t *ent)
 
 projent_t *
 projent_parse_components(char *projname, char *idstr, char *comment,
-    char *users, char *groups, char *attr, int flags, lst_t *errlst)
+    char *users, char *groups, char *attr, int flags, list_t *errlst)
 {
 	projent_t *ent;
 	int reterr = 0;
@@ -644,7 +644,7 @@ projent_parse_components(char *projname, char *idstr, char *comment,
 	return (ent);
 }
 projent_t *
-projent_parse(char *projstr, int flags, lst_t *errlst)
+projent_parse(char *projstr, int flags, list_t *errlst)
 {
 	char *str, *sstr;
 	char *projname, *idstr, *comment, *users, *groups, *attrstr;
@@ -698,7 +698,7 @@ projent_free_lst(lst_t *plst)
 
 
 void
-projent_put_lst(char *projfile, lst_t *plst, lst_t *errlst)
+projent_put_lst(char *projfile, lst_t *plst, list_t *errlst)
 {
 	char *tmpprojfile, *attrs;
 	FILE *fp;
@@ -766,7 +766,7 @@ out:
 }
 
 lst_t *
-projent_get_lst(char *projfile, int flags, lst_t *errlst)
+projent_get_lst(char *projfile, int flags, list_t *errlst)
 {
 	FILE *fp;
 	lst_t *plst;

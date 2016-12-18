@@ -5,6 +5,7 @@
 #include <regex.h>
 #include <project.h>
 #include <sys/varargs.h>
+#include <sys/list.h>
 
 #include "lst.h"
 
@@ -35,28 +36,28 @@ typedef struct projent {
 
 
 extern void projent_free(projent_t *);
-extern projent_t *projent_parse(char *, int, lst_t *);
+extern projent_t *projent_parse(char *, int, list_t *);
 extern projent_t *projent_parse_components(char *, char *, char *, char *,
-    char *, char *, int, lst_t *);
-extern int projent_validate(projent_t *, int, lst_t *);
-extern lst_t *projent_get_lst(char *, int, lst_t *);
+    char *, char *, int, list_t *);
+extern int projent_validate(projent_t *, int, list_t *);
+extern lst_t *projent_get_lst(char *, int, list_t *);
 extern void projent_free_lst(lst_t *);
-extern int  projent_parse_name(char *, lst_t *);
-extern int  projent_validate_unique_name(lst_t *, char *, lst_t *);
-extern int  projent_parse_projid(char *, projid_t *, lst_t *);
-extern int  projent_validate_projid(projid_t, int, lst_t *);
-extern int  projent_validate_unique_id(lst_t *, projid_t, lst_t *);
-extern int  projent_parse_comment(char *, lst_t *);
-extern void projent_merge_usrgrp(char *, char **, char *, int, lst_t *);
-extern char *projent_parse_users(char *, int, lst_t *);
-extern char *projent_parse_groups(char *, int, lst_t *);
-extern void projent_merge_attributes(lst_t **, lst_t *, int, lst_t *);
-extern lst_t *projent_parse_attributes(char *, int, lst_t *);
+extern int  projent_parse_name(char *, list_t *);
+extern int  projent_validate_unique_name(lst_t *, char *, list_t *);
+extern int  projent_parse_projid(char *, projid_t *, list_t *);
+extern int  projent_validate_projid(projid_t, int, list_t *);
+extern int  projent_validate_unique_id(lst_t *, projid_t, list_t *);
+extern int  projent_parse_comment(char *, list_t *);
+extern void projent_merge_usrgrp(char *, char **, char *, int, list_t *);
+extern char *projent_parse_users(char *, int, list_t *);
+extern char *projent_parse_groups(char *, int, list_t *);
+extern void projent_merge_attributes(lst_t **, lst_t *, int, list_t *);
+extern lst_t *projent_parse_attributes(char *, int, list_t *);
 extern void projent_sort_attributes(lst_t *);
 extern void projent_free_attributes(lst_t *);
 extern char *projent_attrib_tostring(void *);
 extern char *projent_attrib_lst_tostring(lst_t *);
-extern void projent_put_lst(char *, lst_t *, lst_t *);
+extern void projent_put_lst(char *, lst_t *, list_t *);
 
 #ifdef  __cplusplus
 }

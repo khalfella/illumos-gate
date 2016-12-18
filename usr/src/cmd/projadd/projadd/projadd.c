@@ -33,8 +33,9 @@
 
 
 #define	CHECK_ERRORS_FREE_PLST(errlst, plst, attrs, ecode) {	\
-	if (!lst_is_empty(errlst)) {					\
+	if (!list_is_empty(errlst)) {					\
 		util_print_errmsgs(errlst);				\
+		list_destroy(errlst);					\
 		if (plst != NULL) {					\
 			projent_free_lst(plst);				\
 			free(plst);					\
@@ -79,14 +80,14 @@ main(int argc, char **argv)
 	char *users, *groups, *attrs;
 	projid_t projid;
 
-	lst_t errlst;
+	list_t errlst;
 
 	/* Project file defaults to system project file "/etc/project" */
 	users = groups = comment = projidstr = "";
 
 	nflag = pflag = oflag = B_FALSE;
 	attrs = util_safe_zmalloc(1);
-	lst_create(&errlst);
+	util_init_errlst(&errlst);
 
 
 	(void) setlocale(LC_ALL, "");
