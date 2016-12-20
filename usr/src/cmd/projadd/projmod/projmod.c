@@ -37,13 +37,14 @@
 
 #define	SEQU(str1, str2)		(strcmp(str1, str2) == 0)
 
-#define	CHECK_ERRORS_FREE_PLST(errlst, plst, attrs, ecode) {	\
+#define	CHECK_ERRORS_FREE_PLIST(errlst, plist, attrs, ecode) {		\
 	if (!list_is_empty(errlst)) {					\
 		util_print_errmsgs(errlst);				\
 		list_destroy(errlst);					\
-		if (plst != NULL) {					\
-			projent_free_lst(plst);				\
-			free(plst);					\
+		if (plist != NULL) {					\
+			projent_free_list(plist);			\
+			list_destroy(plist);				\
+			free(plist);					\
 		}							\
 		free(attrs);						\
 		usage();						\
@@ -73,11 +74,10 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int e, c, error;
-
+	int c, error;
 	extern char *optarg;
 	extern int optind, optopt;
-	lst_t *plst = NULL;
+	list_t *plist = NULL;
 	int flags = 0;
 	projent_t *ent, *modent;
 
@@ -181,7 +181,7 @@ main(int argc, char **argv)
 				break;
 		}
 
-	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	if (optind == argc - 1) {
 		pname = argv[optind];
@@ -220,7 +220,7 @@ main(int argc, char **argv)
 		    "or -K attributes to be specified"));
 	}
 
-	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	if (aflag) {
 		flags |= F_MOD_ADD;
@@ -236,13 +236,13 @@ main(int argc, char **argv)
 	}
 	flags |= F_PAR_RES | F_PAR_DUP;
 
-	plst = projent_get_lst(projfile, flags, &errlst);
-	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
+	plist = projent_get_list(projfile, flags, &errlst);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	modent = NULL;
 	if (pname != NULL) {
-		for (e = 0; e < lst_size(plst); e++) {
-			ent = lst_at(plst, e);
+		for (ent = list_head(plist); ent != NULL;
+		    ent = list_next(plist, ent)) {
 			if (SEQU(ent->projname, pname)) {
 				modent = ent;
 			}
@@ -253,7 +253,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	/*
 	 * If there is no modification options, simply reading the file, which
@@ -266,7 +266,7 @@ main(int argc, char **argv)
 	VERIFY(modent != NULL);
 
 	if (lflag && projent_parse_name(pname, &errlst) == 0 &&
-	    projent_validate_unique_name(plst, npname, &errlst) == 0) {
+	    projent_validate_unique_name(plist, npname, &errlst) == 0) {
 		free(modent->projname);
 		modent->projname = util_safe_strdup(npname);
 	}
@@ -310,12 +310,12 @@ main(int argc, char **argv)
 	if (!nflag) {
 		(void) projent_validate(modent, flags, &errlst);
 	}
-	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	if (modify) {
-		projent_put_lst(projfile, plst, &errlst);
+		projent_put_list(projfile, plist, &errlst);
 	}
-	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 
 	if (Aflag && (error = setproject(pname, "root",
 	    TASK_FINAL|TASK_PROJ_PURGE)) != 0) {
@@ -387,7 +387,6 @@ main(int argc, char **argv)
 		}
 	}
 
-	CHECK_ERRORS_FREE_PLST(&errlst, plst, attrs, 2);
-
+	CHECK_ERRORS_FREE_PLIST(&errlst, plist, attrs, 2);
 	return (0);
 }

@@ -516,7 +516,7 @@ do_read_test(read_test *rt, int tnum)
 {
 	FILE *fp;
 	char *projfile, *projwrite;
-	lst_t *plst;
+	list_t *plist;
 	list_t errlst;
 	util_init_errlst(&errlst);
 
@@ -538,15 +538,15 @@ do_read_test(read_test *rt, int tnum)
 	(void) fclose(fp);
 
 
-	plst = projent_get_lst(projfile, rt->flags, &errlst);
+	plist = projent_get_list(projfile, rt->flags, &errlst);
 
 
-	if (plst == NULL && rt->res == 1) {
+	if (plist == NULL && rt->res == 1) {
 		(void) printf("Read test[%02d]: **************[-SUCCESS-]\n",
 		    tnum);
-	} else if (plst != NULL && rt->res == 0) {
+	} else if (plist != NULL && rt->res == 0) {
 
-		projent_put_lst(projwrite, plst, &errlst);
+		projent_put_list(projwrite, plist, &errlst);
 		(void) projtest_compare_two_files(projfile, projwrite, &errlst);
 		(void) printf("Read test[%02d]: **************[%s]\n", tnum,
 		    list_is_empty(&errlst) ? "-SUCCESS-" : "*FAILURE*");
@@ -565,7 +565,7 @@ do_read_test(read_test *rt, int tnum)
 		(void) unlink(projwrite);
 	}
 
-	projent_free_lst(plst);
+	projent_free_list(plist);
 	util_free_errlst(&errlst);
 }
 

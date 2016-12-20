@@ -82,14 +82,14 @@ util_safe_zmalloc(size_t sz)
 void
 util_init_errlst(list_t *errlst)
 {
-	list_create(errlst, sizeof (errmsg_t), offsetof (errmsg_t, em_next));
+	list_create(errlst, sizeof (errmsg_t), offsetof(errmsg_t, em_next));
 }
 
 void
 util_free_errlst(list_t *errlst)
 {
 	errmsg_t *emsg;
-	while((emsg = list_head(errlst)) != NULL) {
+	while ((emsg = list_head(errlst)) != NULL) {
 		list_remove(errlst, emsg);
 		free(emsg->em_msg);
 		free(emsg);
@@ -100,7 +100,7 @@ void
 util_print_errmsgs(list_t *errlst)
 {
 	errmsg_t *emsg;
-	while((emsg = list_head(errlst)) != NULL) {
+	while ((emsg = list_head(errlst)) != NULL) {
 		(void) fprintf(stderr, "%s\n", emsg->em_msg);
 		list_remove(errlst, emsg);
 		free(emsg->em_msg);

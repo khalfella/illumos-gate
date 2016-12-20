@@ -50,11 +50,11 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int e, c, ret = 0;
+	int c, ret = 0;
 	int flags;
 	extern char *optarg;
 	extern int optind, optopt;
-	lst_t *plst;			/* Projects list */
+	list_t *plist;			/* Projects list */
 	projent_t *ent, *delent;
 	int del;
 	char *pname;			/* Project name */
@@ -97,7 +97,7 @@ main(int argc, char **argv)
 	flags = F_PAR_VLD | F_PAR_RES | F_PAR_DUP;
 
 	/* Parse the project file to get the list of the projects */
-	plst = projent_get_lst(projfile, flags, &errlst);
+	plist = projent_get_list(projfile, flags, &errlst);
 
 	if (!list_is_empty(&errlst)) {
 		util_print_errmsgs(&errlst);
@@ -107,8 +107,7 @@ main(int argc, char **argv)
 
 	/* Find the project to be deleted */
 	del = 0;
-	for (e = 0; e < lst_size(plst); e++) {
-		ent = lst_at(plst, e);
+	for (ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
 		if (SEQU(ent->projname, pname)) {
 			del++;
 			delent = ent;
@@ -131,10 +130,10 @@ main(int argc, char **argv)
 	}
 
 	/* Remove the project entry from the list */
-	(void) lst_remove(plst, delent);
+	list_remove(plist, delent);
 
 	/* Write out the project file */
-	projent_put_lst(projfile, plst, &errlst);
+	projent_put_list(projfile, plist, &errlst);
 
 	if (!list_is_empty(&errlst)) {
 		util_print_errmsgs(&errlst);
@@ -143,8 +142,9 @@ main(int argc, char **argv)
 		ret = 2;
 	}
 out:
-	projent_free_lst(plst);
-	free(plst);
+	projent_free_list(plist);
+	list_destroy(plist);
+	free(plist);
 	list_destroy(&errlst);
 	return (ret);
 }
