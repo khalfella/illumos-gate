@@ -74,7 +74,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int c, error;
+	int c, error, cnt;
 	extern char *optarg;
 	extern int optind, optopt;
 	list_t *plist = NULL;
@@ -92,7 +92,7 @@ main(int argc, char **argv)
 	char *comment, *users, *groups, *attrs;
 	char *pusers, *pgroups;
 
-	lst_t *pattribs;
+	list_t *pattribs;
 
 	list_t errlst;
 
@@ -100,6 +100,7 @@ main(int argc, char **argv)
 	char *projfile = PROJF_PATH;
 	struct project proj, *projp;
 	char buf[PROJECT_BUFSZ];
+	void *attr;
 	char *str;
 
 	comment = users = groups = "";
@@ -364,21 +365,35 @@ main(int argc, char **argv)
 				    projent_parse_attributes(projp->pj_attr,
 				    0, &errlst) : NULL;
 				if (projp != NULL && pattribs != NULL &&
-				    (str = projent_attrib_tostring(
-				    lst_at(pattribs, error - 1))) != NULL) {
-					util_add_errmsg(&errlst, gettext(
-					    "warning, \"%s\" resource control "
-					    "assignment failed for project "
-					    "\"%s\""), str, pname);
-					free(str);
-				} else {
-					util_add_errmsg(&errlst, gettext(
-					    "warning, resource control "
-					    "assignment failed for project "
-					    "\"%s\" attribute %d"), pname,
-					    error);
+				    error >= 1) {
+					/* Iterate to pattribs[error - 1] */
+					cnt = 0;
+					attr = list_head(pattribs);
+					while (cnt < error - 1&& attr != NULL) {
+						cnt++;
+						attr = list_next(pattribs,
+						    attr);
+					}
+
+					if (attr != NULL && (str =
+					    projent_attrib_tostring(
+					    attr)) != NULL) {
+						util_add_errmsg(&errlst,
+						    gettext( "warning, \"%s\" "
+						    "resource control "
+						    "assignment failed for "
+						    "project \"%s\""),
+						    str, pname);
+						free(str);
+						goto out1;
+					}
 				}
 
+				util_add_errmsg(&errlst, gettext(
+				    "warning, resource control assignment "
+				    "failed for project \"%s\" attribute %d"),
+				    pname, error);
+out1:
 				if (pattribs != NULL) {
 					projent_free_attributes(pattribs);
 					UTIL_FREE_SNULL(pattribs);

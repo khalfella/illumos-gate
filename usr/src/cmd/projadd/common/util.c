@@ -35,6 +35,17 @@ typedef struct {
 	list_node_t em_next;
 } errmsg_t;
 
+
+int
+util_list_size(list_t *list)
+{
+	void *ent;
+	int size = 0;
+	for (ent = list_head(list); ent != NULL; ent = list_next(list, ent))
+		size++;
+	return (size);
+}
+
 char *
 util_safe_strdup(char *str)
 {

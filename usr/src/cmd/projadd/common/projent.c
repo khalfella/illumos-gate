@@ -129,9 +129,9 @@ projent_validate_groups(char *groups, list_t *errlst)
 }
 
 int
-projent_validate_attributes(lst_t *attrs, list_t *errlst)
+projent_validate_attributes(list_t *attrs, list_t *errlst)
 {
-	return (attrib_validate_lst(attrs, errlst));
+	return (attrib_validate_list(attrs, errlst));
 }
 
 char *
@@ -139,7 +139,7 @@ projent_tostring(projent_t *ent)
 {
 	char *attrs;
 	char *ret = NULL;
-	if ((attrs = attrib_lst_tostring(ent->attrs)) != NULL) {
+	if ((attrs = attrib_list_tostring(ent->attrs)) != NULL) {
 		(void) asprintf(&ret, "%s:%ld:%s:%s:%s:%s",
 		    ent->projname,
 		    ent->projid,
@@ -223,15 +223,15 @@ projent_validate_list(list_t *plist, int flags, list_t *errlst)
 }
 
 void
-projent_free_attributes(lst_t *attribs)
+projent_free_attributes(list_t *attribs)
 {
-	attrib_free_lst(attribs);
+	attrib_free_list(attribs);
 }
 
 void
-projent_sort_attributes(lst_t *attribs)
+projent_sort_attributes(list_t *attribs)
 {
-	attrib_sort_lst(attribs);
+	attrib_sort_list(attribs);
 }
 
 char *
@@ -241,19 +241,19 @@ projent_attrib_tostring(void *attrib)
 }
 
 char *
-projent_attrib_lst_tostring(lst_t *lst)
+projent_attrib_list_tostring(list_t *lst)
 {
-	return (attrib_lst_tostring(lst));
+	return (attrib_list_tostring(lst));
 }
 
 void
-projent_merge_attributes(lst_t **eattrs, lst_t *nattrs, int flags,
+projent_merge_attributes(list_t **eattrs, list_t *nattrs, int flags,
     list_t *errlst)
 {
-	attrib_merge_attrib_lst(eattrs, nattrs, flags, errlst);
+	attrib_merge_attrib_list(eattrs, nattrs, flags, errlst);
 }
 
-lst_t *
+list_t *
 projent_parse_attributes(char *attribs, int flags, list_t *errlst)
 {
 	return (attrib_parse_attributes(attribs, flags, errlst));
@@ -606,7 +606,7 @@ projent_free(projent_t *ent)
 	free(ent->comment);
 	free(ent->userlist);
 	free(ent->grouplist);
-	attrib_free_lst(ent->attrs);
+	attrib_free_list(ent->attrs);
 	free(ent->attrs);
 }
 
@@ -721,7 +721,7 @@ projent_put_list(char *projfile, list_t *plist, list_t *errlst)
 	}
 
 	for (ent = list_head(plist); ent != NULL; ent = list_next(plist, ent)) {
-		if ((attrs = attrib_lst_tostring(ent->attrs)) == NULL) {
+		if ((attrs = attrib_list_tostring(ent->attrs)) == NULL) {
 			util_add_errmsg(errlst, gettext(
 			    "Failed to write to  %s: error allocating memory"),
 			    tmpprojfile);

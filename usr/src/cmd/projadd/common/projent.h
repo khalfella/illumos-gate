@@ -7,7 +7,6 @@
 #include <sys/varargs.h>
 #include <sys/list.h>
 
-#include "lst.h"
 
 #define	F_PAR_VLD	0x0001	/* Run validation after parsing */
 #define	F_PAR_SPC	0x0002	/* Allow spaces between names */
@@ -31,7 +30,7 @@ typedef struct projent {
 	char *comment;
 	char *userlist;
 	char *grouplist;
-	lst_t *attrs;
+	list_t *attrs;
 	list_node_t next;
 } projent_t;
 
@@ -52,12 +51,12 @@ extern int  projent_parse_comment(char *, list_t *);
 extern void projent_merge_usrgrp(char *, char **, char *, int, list_t *);
 extern char *projent_parse_users(char *, int, list_t *);
 extern char *projent_parse_groups(char *, int, list_t *);
-extern void projent_merge_attributes(lst_t **, lst_t *, int, list_t *);
-extern lst_t *projent_parse_attributes(char *, int, list_t *);
-extern void projent_sort_attributes(lst_t *);
-extern void projent_free_attributes(lst_t *);
+extern void projent_merge_attributes(list_t **, list_t *, int, list_t *);
+extern list_t *projent_parse_attributes(char *, int, list_t *);
+extern void projent_sort_attributes(list_t *);
+extern void projent_free_attributes(list_t *);
 extern char *projent_attrib_tostring(void *);
-extern char *projent_attrib_lst_tostring(lst_t *);
+extern char *projent_attrib_list_tostring(list_t *);
 extern void projent_put_list(char *, list_t *, list_t *);
 
 #ifdef  __cplusplus

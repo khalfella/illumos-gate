@@ -6,8 +6,6 @@
 #include <sys/varargs.h>
 #include <sys/list.h>
 
-#include "lst.h"
-
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -41,6 +39,7 @@ extern void util_init_errlst(list_t *);
 extern void util_free_errlst(list_t *);
 extern void util_add_errmsg(list_t *, char *format, ...);
 extern void util_print_errmsgs(list_t *);
+extern int util_list_size(list_t *);
 
 #ifdef  __cplusplus
 }

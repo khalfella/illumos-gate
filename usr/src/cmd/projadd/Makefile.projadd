@@ -27,5 +27,5 @@
 PROJADD = $(SRC)/cmd/projadd
 PROJADDCOMMONDIR = $(PROJADD)/common
 
-COMMON_OBJS = projent.o attrib.o util.o resctl.o lst.o
+COMMON_OBJS = projent.o attrib.o util.o resctl.o
 COMMON_SRCS = $(COMMON_OBJS:%.o=$(PROJADDCOMMONDIR)/%.c)
