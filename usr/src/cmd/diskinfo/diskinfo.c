@@ -37,12 +37,10 @@
 #include <sys/fm/protocol.h>
 #include <modules/common/disk/disk.h>
 
-typedef struct di_opts {
-	boolean_t di_scripted;
-	boolean_t di_parseable;
-	boolean_t di_physical;
-	boolean_t di_condensed;
-} di_opts_t;
+static boolean_t g_cflag = B_FALSE;	/* Condensed */
+static boolean_t g_Hflag = B_FALSE;	/* Scripted  */
+static boolean_t g_Pflag = B_FALSE;	/* Physical  */
+static boolean_t g_pflag = B_FALSE;	/* Parseable */
 
 typedef struct di_phys {
 	const char *dp_dev;
@@ -210,7 +208,7 @@ populate_physical(topo_hdl_t *hp, di_phys_t *pp)
 }
 
 static void
-enumerate_disks(di_opts_t *opts)
+enumerate_disks()
 {
 	topo_hdl_t *hp;
 	dm_descriptor_t *media;
@@ -314,7 +312,7 @@ enumerate_disks(di_opts_t *opts)
 		 */
 		total = size * blocksize;
 
-		if (opts->di_parseable) {
+		if (g_pflag) {
 			(void) snprintf(sizestr, sizeof (sizestr),
 			    "%llu", total);
 		} else {
@@ -324,7 +322,7 @@ enumerate_disks(di_opts_t *opts)
 			    "%7.2f GiB", total_in_GiB);
 		}
 
-		if (opts->di_parseable) {
+		if (g_pflag) {
 			(void) snprintf(slotname, sizeof (slotname), "%d,%d",
 			    phys.dp_chassis, phys.dp_slot);
 		} else if (phys.dp_slotname != NULL) {
@@ -335,7 +333,7 @@ enumerate_disks(di_opts_t *opts)
 			slotname[1] = '\0';
 		}
 
-		if (opts->di_condensed) {
+		if (g_cflag) {
 			(void) snprintf(statestr, sizeof (statestr), "%c%c%c%c",
 			    condensed_tristate(phys.dp_faulty, 'F'),
 			    condensed_tristate(phys.dp_locate, 'L'),
@@ -343,8 +341,8 @@ enumerate_disks(di_opts_t *opts)
 			    condensed_tristate(ssd, 'S'));
 		}
 
-		if (opts->di_physical) {
-			if (opts->di_scripted) {
+		if (g_Pflag) {
+			if (g_Hflag) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				    device, vid, pid,
 				    display_string(phys.dp_serial),
@@ -358,8 +356,8 @@ enumerate_disks(di_opts_t *opts)
 				    display_tristate(phys.dp_faulty),
 				    display_tristate(phys.dp_locate), slotname);
 			}
-		} else if (opts->di_condensed) {
-			if (opts->di_scripted) {
+		} else if (g_cflag) {
+			if (g_Hflag) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				    ctype, device, vid, pid,
 				    display_string(phys.dp_serial),
@@ -372,7 +370,7 @@ enumerate_disks(di_opts_t *opts)
 				    sizestr, statestr, slotname);
 			}
 		} else {
-			if (opts->di_scripted) {
+			if (g_Hflag) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				    ctype, device, vid, pid, sizestr,
 				    display_tristate(removable),
@@ -403,34 +401,19 @@ main(int argc, char *argv[])
 {
 	char c;
 
-	di_opts_t opts = {
-		.di_condensed = B_FALSE,
-		.di_scripted = B_FALSE,
-		.di_physical = B_FALSE,
-		.di_parseable = B_FALSE
-	};
-
 	while ((c = getopt(argc, argv, ":cHPp")) != EOF) {
 		switch (c) {
 		case 'c':
-			if (opts.di_physical) {
-				usage(argv[0]);
-				fatal(1, "-c and -P are mutually exclusive\n");
-			}
-			opts.di_condensed = B_TRUE;
+			g_cflag = B_TRUE;
 			break;
 		case 'H':
-			opts.di_scripted = B_TRUE;
+			g_Hflag = B_TRUE;
 			break;
 		case 'P':
-			if (opts.di_condensed) {
-				usage(argv[0]);
-				fatal(1, "-c and -P are mutually exclusive\n");
-			}
-			opts.di_physical = B_TRUE;
+			g_Pflag = B_TRUE;
 			break;
 		case 'p':
-			opts.di_parseable = B_TRUE;
+			g_pflag = B_TRUE;
 			break;
 		case '?':
 			usage(argv[0]);
@@ -440,12 +423,17 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (!opts.di_scripted) {
-		if (opts.di_physical) {
+	if (g_cflag && g_Pflag) {
+		usage(argv[0]);
+		fatal(1, "-c and -P are mutually exclusive\n");
+	}
+
+	if (!g_Hflag) {
+		if (g_pflag) {
 			printf("DISK                    VID      PID"
 			    "              SERIAL               FLT LOC"
 			    " LOCATION\n");
-		} else if (opts.di_condensed) {
+		} else if (g_cflag) {
 			printf("TYPE    DISK                    VID      PID"
 			    "              SERIAL\n");
 			printf("\tSIZE          FLRS LOCATION\n");
@@ -455,7 +443,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	enumerate_disks(&opts);
+	enumerate_disks();
 
 	return (0);
 }
