@@ -432,6 +432,8 @@ SDT_OBJS += sdt_subr.o
 
 PROFILE_OBJS += profile.o
 
+UFBT_OBJS += ufbt.o
+
 SYSTRACE_OBJS += systrace.o
 
 LOCKSTAT_OBJS += lockstat.o
