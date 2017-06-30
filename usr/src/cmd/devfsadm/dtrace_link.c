@@ -36,6 +36,8 @@ static devfsadm_create_t dtrace_create_cbt[] = {
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace },
 	{ "pseudo", "ddi_pseudo", "fasttrap",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
+	{ "pseudo", "ddi_pseudo", "ufbt",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
 	{ "pseudo", "ddi_pseudo", "fbt",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
 	{ "pseudo", "ddi_pseudo", "lockstat",

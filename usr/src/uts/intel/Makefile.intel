@@ -432,6 +432,7 @@ DRV_KMODS	+= profile
 DRV_KMODS	+= sdt
 DRV_KMODS	+= systrace
 DRV_KMODS	+= fasttrap
+DRV_KMODS	+= ufbt
 DRV_KMODS	+= dcpc
 
 #
