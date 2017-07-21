@@ -103,6 +103,7 @@
 #include <dt_provider.h>
 #include <dt_printf.h>
 #include <dt_pid.h>
+#include <dt_ufbt.h>
 #include <dt_grammar.h>
 #include <dt_ident.h>
 #include <dt_string.h>
@@ -1669,6 +1670,16 @@ dt_setcontext(dtrace_hdl_t *dtp, dtrace_probedesc_t *pdp)
 	    ((pvp = dt_provider_lookup(dtp, pdp->dtpd_provider)) == NULL ||
 	    pvp->pv_desc.dtvd_priv.dtpp_flags & DTRACE_PRIV_PROC) &&
 	    dt_pid_create_probes(pdp, dtp, yypcb) != 0) {
+		longjmp(yypcb->pcb_jmpbuf, EDT_COMPILER);
+	}
+
+
+	/*
+	 * For ufbt probes, we need to create the probes. We match the
+	 * provider name in this case
+	 */
+	if (strcmp(pdp->dtpd_provider, "ufbt") == 0 &&
+	    dt_ufbt_create_probes(pdp, dtp, yypcb) != 0) {
 		longjmp(yypcb->pcb_jmpbuf, EDT_COMPILER);
 	}
 

@@ -53,6 +53,7 @@ LIBSRCS = \
 	dt_parser.c \
 	dt_pcb.c \
 	dt_pid.c \
+	dt_ufbt.c \
 	dt_pq.c \
 	dt_pragma.c \
 	dt_print.c \
