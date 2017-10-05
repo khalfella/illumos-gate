@@ -96,6 +96,39 @@ fatal(int rv, const char *fmt, ...)
 	exit(rv);
 }
 
+static void *
+safe_zmalloc(size_t size)
+{
+	void *ptr = malloc(size);
+	if (ptr == NULL)
+		fatal(-1, "failed to allocate memeory");
+	memset(ptr, 0, size);
+	return ptr;
+}
+
+static char *
+safe_strdup(const char *s1)
+{
+	char *s2 = strdup(s1);
+	if (s2 == NULL)
+		fatal(-1, "failed to allocate memeory");
+	return s2;
+}
+
+static int
+safe_asprintf(char **ret, const char *fmt, ...)
+{
+	va_list ap;
+	int v;
+
+	va_start(ap, fmt);
+	v = vasprintf(ret, fmt, ap);
+	va_end(ap);
+	if (v == -1)
+		fatal(-1, "failed to allocate memeory");
+	return v;
+}
+
 static void
 usage(const char *execname)
 {
@@ -162,15 +195,13 @@ bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	}
 
 	if (!found) {
-		dip = malloc(sizeof (di_phys_t));
-		assert(dip != NULL);
-		memset(dip, 0, sizeof (di_phys_t));
+		dip = safe_zmalloc(sizeof (di_phys_t));
 		dip->dp_slot = slot;
 		dip->dp_chassis = chassis;
 
 		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
 		    TOPO_PROP_LABEL, &slotname, &err) == 0) {
-			dip->dp_slotname = strdup(slotname);
+			dip->dp_slotname = safe_strdup(slotname);
 		}
 		avl_add(&g_disks, dip);
 	}
@@ -204,7 +235,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 
 	if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_SERIAL_NUM, &dip->dp_serial, &err) == 0) {
-		dip->dp_serial = strdup(dip->dp_serial);
+		dip->dp_serial = safe_strdup(dip->dp_serial);
 	}
 
 	pnp = topo_node_parent(np);
@@ -245,7 +276,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 
 		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
 		    TOPO_PROP_LABEL, &dip->dp_slotname, &err) == 0) {
-			dip->dp_slotname = strdup(dip->dp_slotname);
+			dip->dp_slotname = safe_strdup(dip->dp_slotname);
 		}
 
 		dip->dp_slot = topo_node_instance(pnp);
@@ -285,9 +316,7 @@ enumerate_disks()
 			continue;
 		}
 
-		dip = malloc(sizeof (di_phys_t));
-		assert(dip != NULL);
-		memset(dip, 0, sizeof (di_phys_t));
+		dip = safe_zmalloc(sizeof (di_phys_t));
 
 		mattrs = dm_get_attributes(media[i], &err);
 		err = nvlist_lookup_uint64(mattrs, DM_SIZE, &dip->dp_size);
@@ -303,9 +332,9 @@ enumerate_disks()
 		nvlist_query_string(dattrs, DM_PRODUCT_ID, &dip->dp_pid);
 		nvlist_query_string(dattrs, DM_OPATH, &dip->dp_dev);
 
-		dip->dp_vid = strdup(dip->dp_vid);
-		dip->dp_pid = strdup(dip->dp_pid);
-		dip->dp_dev = strdup(dip->dp_dev);
+		dip->dp_vid = safe_strdup(dip->dp_vid);
+		dip->dp_pid = safe_strdup(dip->dp_pid);
+		dip->dp_dev = safe_strdup(dip->dp_dev);
 
 		dip->dp_removable = B_FALSE;
 		if (nvlist_lookup_boolean(dattrs, DM_REMOVABLE) == 0)
@@ -321,14 +350,14 @@ enumerate_disks()
 		    DM_CONTROLLER, &err)) != NULL) {
 			cattrs = dm_get_attributes(controller[0], &err);
 			nvlist_query_string(cattrs, DM_CTYPE, &dip->dp_ctype);
-			dip->dp_ctype = strdup(dip->dp_ctype);
+			dip->dp_ctype = safe_strdup(dip->dp_ctype);
 			for (c = dip->dp_ctype; *c != '\0'; c++)
 				*c = toupper(*c);
 			nvlist_free(cattrs);
 		}
 
 		if (dip->dp_ctype == NULL)
-			dip->dp_ctype = strdup("");
+			dip->dp_ctype = safe_strdup("");
 
 		dm_free_descriptors(controller);
 		dm_free_descriptors(disk);
@@ -424,24 +453,25 @@ show_disks()
 		total = dip->dp_size * dip->dp_blksize;
 
 		if (g_pflag) {
-			(void) asprintf(&sizestr, "%llu", total);
+			(void) safe_asprintf(&sizestr, "%llu", total);
 		} else {
-			total_in_GiB = (double)total / 1024.0 / 1024.0 / 1024.0;
-			(void) asprintf(&sizestr, "%7.2f GiB", total_in_GiB);
+			total_in_GiB = (double)total /
+			    1024.0 / 1024.0 / 1024.0;
+			(void) safe_asprintf(&sizestr, "%7.2f GiB", (float)(total_in_GiB));
 		}
 
 		if (g_pflag) {
-			(void) asprintf(&slotname, "%d,%d",
+			(void) safe_asprintf(&slotname, "%d,%d",
 			    dip->dp_chassis, dip->dp_slot);
 		} else if (dip->dp_slotname != NULL) {
-			(void) asprintf(&slotname, "[%d] %s",
+			(void) safe_asprintf(&slotname, "[%d] %s",
 			    dip->dp_chassis, dip->dp_slotname);
 		} else {
-			slotname = strdup("-");
+			slotname = safe_strdup("-");
 		}
 
 		if (g_cflag) {
-			(void) asprintf(&statestr, "%c%c%c%c",
+			(void) safe_asprintf(&statestr, "%c%c%c%c",
 			    condensed_tristate(dip->dp_faulty, 'F'),
 			    condensed_tristate(dip->dp_locate, 'L'),
 			    condensed_tristate(dip->dp_removable, 'R'),
