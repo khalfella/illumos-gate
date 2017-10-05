@@ -140,12 +140,11 @@ condensed_tristate(int val, char c)
 static int
 bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 {
-	int err;
 	di_phys_t *dip;
 	tnode_t *pnp;
 	char *slotname;
+	int err, slot, chassis;
 	boolean_t found = B_FALSE;
-	int slot, chassis;
 
 	if (strcmp(topo_node_name(np), BAY) != 0)
 		return (TOPO_WALK_NEXT);
@@ -188,9 +187,9 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	tnode_t *ppnp;
 	topo_faclist_t fl;
 	topo_faclist_t *lp;
-	int err;
 	topo_led_state_t mode;
 	topo_led_type_t type;
+	int err;
 
 	if (strcmp(topo_node_name(np), DISK) != 0)
 		return (TOPO_WALK_NEXT);
@@ -253,7 +252,6 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	}
 
 	dip->dp_chassis = topo_node_instance(ppnp);
-
 	return (TOPO_WALK_NEXT);
 }
 
@@ -263,14 +261,14 @@ enumerate_disks()
 	topo_hdl_t *hp;
 	topo_walk_t *wp;
 	dm_descriptor_t *media;
-	int err, i;
 	int filter[] = { DM_DT_FIXED, -1 };
 	dm_descriptor_t *disk, *controller;
-	nvlist_t *mattrs, *dattrs, *cattrs = NULL;
+	nvlist_t *mattrs, *dattrs, *cattrs;
 
 	char *s, *c;
 	di_phys_t *dip;
 	size_t len;
+	int err, i;
 
 	avl_create(&g_disks, avl_di_comp, sizeof (di_phys_t),
 	    offsetof(di_phys_t, dp_tnode));
@@ -358,7 +356,6 @@ enumerate_disks()
 
 	dm_free_descriptors(media);
 
-
 	/*
 	 * Walk toplogy information to populate serial, chassis,
 	 * slot, faulty and locator information.
@@ -378,7 +375,6 @@ enumerate_disks()
 		    topo_strerror(err));
 	}
 
-
 	wp = topo_walk_init(hp, FM_FMRI_SCHEME_HC, disk_walker, NULL, &err);
 	if (wp == NULL) {
 		fatal(-1, "unable to initialise topo walker: %s",
@@ -391,7 +387,6 @@ enumerate_disks()
 		fatal(-1, "topo walk failed");
 
 	topo_walk_fini(wp);
-
 
 	/* Here the aflag should work */
 	wp = topo_walk_init(hp, FM_FMRI_SCHEME_HC, bay_walker, NULL, &err);
