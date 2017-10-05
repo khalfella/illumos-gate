@@ -66,9 +66,29 @@ static avl_tree_t g_disks;
 static int
 avl_di_comp(const void *di1, const void *di2)
 {
+	int cmp;
 	const di_phys_t *di1p = di1;
 	const di_phys_t *di2p = di2;
-	int cmp = strcmp(di1p->dp_dev, di2p->dp_dev);
+	if (di1p->dp_dev == NULL || di2p->dp_dev == NULL) {
+		if (di1p->dp_chassis != di2p->dp_chassis) {
+			if (di1p->dp_chassis < di2p->dp_chassis)
+				return (-1);
+			return (1);
+		}
+		if (di1p->dp_slot != di2p->dp_slot) {
+			if (di1p->dp_slot < di2p->dp_slot)
+				return (-1);
+			return (1);
+		}
+		if (di1p->dp_slotname != NULL && di2p->dp_slotname != NULL) {
+			cmp = strcmp(di1p->dp_slotname, di2p->dp_slotname);
+			if (cmp == 0)
+				return (0);
+			return (cmp/abs(cmp));
+		}
+		return (0);
+	}
+	cmp = strcmp(di1p->dp_dev, di2p->dp_dev);
 	if (cmp == 0)
 		return (0);
 	return (cmp/abs(cmp));
@@ -153,9 +173,9 @@ bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	}
 
 	if (!found) {
-		dip = malloc(sizeof(di_phys_t));
+		dip = malloc(sizeof (di_phys_t));
 		assert(dip != NULL);
-		memset(dip, 0, sizeof(di_phys_t));
+		memset(dip, 0, sizeof (di_phys_t));
 		dip->dp_slot = slot;
 		dip->dp_chassis = chassis;
 
@@ -186,7 +206,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		return (TOPO_WALK_NEXT);
 
 	if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_LOGICAL_DISK_NAME, &dip->dp_dev, &err) != 0) {
+	    TOPO_STORAGE_LOGICAL_DISK_NAME, &di.dp_dev, &err) != 0) {
 		return (TOPO_WALK_NEXT);
 	}
 
@@ -259,10 +279,10 @@ enumerate_disks()
 	nvlist_t *mattrs, *dattrs, *cattrs = NULL;
 
 	char *s, *c;
-	di_phys_t* dip;
+	di_phys_t *dip;
 	size_t len;
 
-	avl_create(&g_disks, avl_di_comp, sizeof(di_phys_t),
+	avl_create(&g_disks, avl_di_comp, sizeof (di_phys_t),
 	    offsetof(di_phys_t, dp_tnode));
 
 	err = 0;
@@ -277,9 +297,9 @@ enumerate_disks()
 			continue;
 		}
 
-		dip = malloc(sizeof(di_phys_t));
+		dip = malloc(sizeof (di_phys_t));
 		assert(dip != NULL);
-		memset(dip, 0, sizeof(di_phys_t));
+		memset(dip, 0, sizeof (di_phys_t));
 
 		mattrs = dm_get_attributes(media[i], &err);
 		err = nvlist_lookup_uint64(mattrs, DM_SIZE, &dip->dp_size);
