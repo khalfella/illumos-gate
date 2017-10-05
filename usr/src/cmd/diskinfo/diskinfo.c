@@ -529,6 +529,24 @@ show_disks()
 	}
 }
 
+static void
+cleanup()
+{
+	di_phys_t *dip;
+	void *c = NULL;
+
+	while ((dip = avl_destroy_nodes(&g_disks, &c)) != NULL) {
+		free(dip->dp_vid);
+		free(dip->dp_pid);
+		free(dip->dp_dev);
+		free(dip->dp_ctype);
+		free(dip->dp_serial);
+		free(dip->dp_slotname);
+		free(dip);
+	}
+	avl_destroy(&g_disks);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -578,6 +596,7 @@ main(int argc, char *argv[])
 
 	enumerate_disks();
 	show_disks();
+	cleanup();
 
 	return (0);
 }
