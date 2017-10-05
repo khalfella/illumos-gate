@@ -532,7 +532,7 @@ main(int argc, char *argv[])
 	}
 
 	if (!g_Hflag) {
-		if (g_pflag) {
+		if (g_Pflag) {
 			printf("DISK                    VID      PID"
 			    "              SERIAL               FLT LOC"
 			    " LOCATION\n");
