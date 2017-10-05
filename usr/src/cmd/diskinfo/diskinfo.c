@@ -481,14 +481,18 @@ show_disks()
 		if (g_Pflag) {
 			if (g_Hflag) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				    dip->dp_dev, dip->dp_vid, dip->dp_pid,
+				    display_string(dip->dp_dev),
+				    display_string(dip->dp_vid),
+				    display_string(dip->dp_pid),
 				    display_string(dip->dp_serial),
 				    display_tristate(dip->dp_faulty),
 				    display_tristate(dip->dp_locate), slotname);
 			} else {
 				printf("%-22s  %-8s %-16s "
 				    "%-20s %-3s %-3s %s\n",
-				    dip->dp_dev, dip->dp_vid, dip->dp_pid,
+				    display_string(dip->dp_dev),
+				    display_string(dip->dp_vid),
+				    display_string(dip->dp_pid),
 				    display_string(dip->dp_serial),
 				    display_tristate(dip->dp_faulty),
 				    display_tristate(dip->dp_locate), slotname);
@@ -496,30 +500,38 @@ show_disks()
 		} else if (g_cflag) {
 			if (g_Hflag) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				    dip->dp_ctype, dip->dp_dev,
-				    dip->dp_vid, dip->dp_pid,
+				    display_string(dip->dp_ctype),
+				    display_string(dip->dp_dev),
+				    display_string(dip->dp_vid),
+				    display_string(dip->dp_pid),
 				    display_string(dip->dp_serial),
 				    sizestr, statestr, slotname);
 			} else {
 				printf("%-7s %-22s  %-8s %-16s "
 				    "%-20s\n\t%-13s %-4s %s\n",
-				    dip->dp_ctype, dip->dp_dev,
-				    dip->dp_vid, dip->dp_pid,
+				    display_string(dip->dp_ctype),
+				    display_string(dip->dp_dev),
+				    display_string(dip->dp_vid),
+				    display_string(dip->dp_pid),
 				    display_string(dip->dp_serial),
 				    sizestr, statestr, slotname);
 			}
 		} else {
 			if (g_Hflag) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				    dip->dp_ctype, dip->dp_dev,
-				    dip->dp_vid, dip->dp_pid, sizestr,
+				    display_string(dip->dp_ctype),
+				    display_string(dip->dp_dev),
+				    display_string(dip->dp_vid),
+				    display_string(dip->dp_pid), sizestr,
 				    display_tristate(dip->dp_removable),
 				    display_tristate(dip->dp_ssd));
 			} else {
 				printf("%-7s %-22s  %-8s %-16s "
 				    "%-13s %-3s %-3s\n",
-				    dip->dp_ctype, dip->dp_dev,
-				    dip->dp_vid, dip->dp_pid, sizestr,
+				    display_string(dip->dp_ctype),
+				    display_string(dip->dp_dev),
+				    display_string(dip->dp_vid),
+				    display_string(dip->dp_pid), sizestr,
 				    display_tristate(dip->dp_removable),
 				    display_tristate(dip->dp_ssd));
 			}
