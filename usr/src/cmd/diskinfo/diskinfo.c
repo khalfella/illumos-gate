@@ -43,6 +43,8 @@ static boolean_t g_Hflag = B_FALSE;	/* Scripted  */
 static boolean_t g_Pflag = B_FALSE;	/* Physical  */
 static boolean_t g_pflag = B_FALSE;	/* Parseable */
 
+static avl_tree_t g_disks;
+
 typedef struct di_phys {
 	uint64_t dp_size;
 	uint32_t dp_blksize;
@@ -61,8 +63,6 @@ typedef struct di_phys {
 	avl_node_t dp_tnode;
 } di_phys_t;
 
-static avl_tree_t g_disks;
-
 static int
 avl_di_comp(const void *di1, const void *di2)
 {
@@ -70,28 +70,18 @@ avl_di_comp(const void *di1, const void *di2)
 	const di_phys_t *di1p = di1;
 	const di_phys_t *di2p = di2;
 	if (di1p->dp_dev == NULL || di2p->dp_dev == NULL) {
-		if (di1p->dp_chassis != di2p->dp_chassis) {
-			if (di1p->dp_chassis < di2p->dp_chassis)
-				return (-1);
-			return (1);
-		}
-		if (di1p->dp_slot != di2p->dp_slot) {
-			if (di1p->dp_slot < di2p->dp_slot)
-				return (-1);
-			return (1);
-		}
+		if (di1p->dp_chassis != di2p->dp_chassis)
+			return ((di1p->dp_chassis < di2p->dp_chassis) ? -1 : 1);
+		if (di1p->dp_slot != di2p->dp_slot)
+			return ((di1p->dp_slot < di2p->dp_slot) ? -1 : 1);
 		if (di1p->dp_slotname != NULL && di2p->dp_slotname != NULL) {
 			cmp = strcmp(di1p->dp_slotname, di2p->dp_slotname);
-			if (cmp == 0)
-				return (0);
-			return (cmp/abs(cmp));
+			return ((cmp == 0) ? 0 : cmp/abs(cmp));
 		}
 		return (0);
 	}
 	cmp = strcmp(di1p->dp_dev, di2p->dp_dev);
-	if (cmp == 0)
-		return (0);
-	return (cmp/abs(cmp));
+	return ((cmp == 0) ? 0 : cmp/abs(cmp));
 }
 
 static void __NORETURN
