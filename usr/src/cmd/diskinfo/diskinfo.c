@@ -38,6 +38,7 @@
 #include <sys/fm/protocol.h>
 #include <modules/common/disk/disk.h>
 
+static boolean_t g_aflag = B_FALSE;	/* All Slots */
 static boolean_t g_cflag = B_FALSE;	/* Condensed */
 static boolean_t g_Hflag = B_FALSE;	/* Scripted  */
 static boolean_t g_Pflag = B_FALSE;	/* Physical  */
@@ -287,10 +288,29 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 }
 
 static void
+walk_topo_snapshot(topo_hdl_t *hp, topo_walk_cb_t cb)
+{
+	int err = 0;
+	topo_walk_t *wp;
+
+	if ((wp = topo_walk_init(hp, FM_FMRI_SCHEME_HC, cb, NULL,
+	    &err)) == NULL) {
+		fatal(-1, "unable to initialise topo walker: %s",
+		    topo_strerror(err));
+	}
+
+	while ((err = topo_walk_step(wp, TOPO_WALK_CHILD)) == TOPO_WALK_NEXT)
+		;
+
+	if (err == TOPO_WALK_ERR)
+		fatal(-1, "topo walk failed");
+	topo_walk_fini(wp);
+}
+
+static void
 enumerate_disks()
 {
 	topo_hdl_t *hp;
-	topo_walk_t *wp;
 	dm_descriptor_t *media;
 	int filter[] = { DM_DT_FIXED, -1 };
 	dm_descriptor_t *disk, *controller;
@@ -404,32 +424,10 @@ enumerate_disks()
 		    topo_strerror(err));
 	}
 
-	wp = topo_walk_init(hp, FM_FMRI_SCHEME_HC, disk_walker, NULL, &err);
-	if (wp == NULL) {
-		fatal(-1, "unable to initialise topo walker: %s",
-		    topo_strerror(err));
-	}
+	walk_topo_snapshot(hp, disk_walker);
 
-	while ((err = topo_walk_step(wp, TOPO_WALK_CHILD)) == TOPO_WALK_NEXT)
-		;
-	if (err == TOPO_WALK_ERR)
-		fatal(-1, "topo walk failed");
-
-	topo_walk_fini(wp);
-
-	/* Here the aflag should work */
-	wp = topo_walk_init(hp, FM_FMRI_SCHEME_HC, bay_walker, NULL, &err);
-	if (wp == NULL) {
-		fatal(-1, "unable to initialise topo walker: %s",
-		    topo_strerror(err));
-	}
-
-	while ((err = topo_walk_step(wp, TOPO_WALK_CHILD)) == TOPO_WALK_NEXT)
-		;
-	if (err == TOPO_WALK_ERR)
-		fatal(-1, "topo walk failed");
-
-	topo_walk_fini(wp);
+	if (g_aflag)
+		walk_topo_snapshot(hp, bay_walker);
 
 	topo_snap_release(hp);
 	topo_close(hp);
@@ -564,8 +562,11 @@ main(int argc, char *argv[])
 {
 	char c;
 
-	while ((c = getopt(argc, argv, ":cHPp")) != EOF) {
+	while ((c = getopt(argc, argv, ":acHPp")) != EOF) {
 		switch (c) {
+		case 'a':
+			g_aflag = B_TRUE;
+			break;
 		case 'c':
 			g_cflag = B_TRUE;
 			break;
