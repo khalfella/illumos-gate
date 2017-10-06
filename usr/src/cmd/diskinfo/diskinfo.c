@@ -38,13 +38,16 @@
 #include <sys/fm/protocol.h>
 #include <modules/common/disk/disk.h>
 
-static boolean_t g_aflag = B_FALSE;	/* All Slots */
-static boolean_t g_cflag = B_FALSE;	/* Condensed */
-static boolean_t g_Hflag = B_FALSE;	/* Scripted  */
-static boolean_t g_Pflag = B_FALSE;	/* Physical  */
-static boolean_t g_pflag = B_FALSE;	/* Parseable */
+typedef struct di_opts {
+	boolean_t di_allslots;
+	boolean_t di_scripted;
+	boolean_t di_parseable;
+	boolean_t di_physical;
+	boolean_t di_condensed;
+} di_opts_t;
 
 static avl_tree_t g_disks;
+static di_opts_t g_opts = { B_FALSE, B_FALSE, B_FALSE, B_FALSE, B_FALSE };
 
 typedef struct di_phys {
 	uint64_t dp_size;
@@ -133,7 +136,7 @@ safe_asprintf(char **ret, const char *fmt, ...)
 static void
 usage(const char *execname)
 {
-	(void) fprintf(stderr, "Usage: %s [-Hp] [{-c|-P}]\n", execname);
+	(void) fprintf(stderr, "Usage: %s [-aHp] [{-c|-P}]\n", execname);
 }
 
 static void
@@ -226,6 +229,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	if (strcmp(topo_node_name(np), DISK) != 0)
 		return (TOPO_WALK_NEXT);
 
+	memset(&di, 0, sizeof (di_phys_t));
 	if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_LOGICAL_DISK_NAME, &di.dp_dev, &err) != 0) {
 		return (TOPO_WALK_NEXT);
@@ -426,7 +430,7 @@ enumerate_disks()
 
 	walk_topo_snapshot(hp, disk_walker);
 
-	if (g_aflag)
+	if (g_opts.di_allslots)
 		walk_topo_snapshot(hp, bay_walker);
 
 	topo_snap_release(hp);
@@ -450,7 +454,7 @@ show_disks()
 		 */
 		total = dip->dp_size * dip->dp_blksize;
 
-		if (g_pflag) {
+		if (g_opts.di_parseable) {
 			(void) safe_asprintf(&sizestr, "%llu", total);
 		} else {
 			total_in_GiB = (double)total /
@@ -459,7 +463,7 @@ show_disks()
 			    "%7.2f GiB", (total_in_GiB));
 		}
 
-		if (g_pflag) {
+		if (g_opts.di_parseable) {
 			(void) safe_asprintf(&slotname, "%d,%d",
 			    dip->dp_chassis, dip->dp_slot);
 		} else if (dip->dp_slotname != NULL) {
@@ -469,7 +473,7 @@ show_disks()
 			slotname = safe_strdup("-");
 		}
 
-		if (g_cflag) {
+		if (g_opts.di_condensed) {
 			(void) safe_asprintf(&statestr, "%c%c%c%c",
 			    condensed_tristate(dip->dp_faulty, 'F'),
 			    condensed_tristate(dip->dp_locate, 'L'),
@@ -477,8 +481,8 @@ show_disks()
 			    condensed_tristate(dip->dp_ssd, 'S'));
 		}
 
-		if (g_Pflag) {
-			if (g_Hflag) {
+		if (g_opts.di_physical) {
+			if (g_opts.di_scripted) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				    display_string(dip->dp_dev),
 				    display_string(dip->dp_vid),
@@ -496,8 +500,8 @@ show_disks()
 				    display_tristate(dip->dp_faulty),
 				    display_tristate(dip->dp_locate), slotname);
 			}
-		} else if (g_cflag) {
-			if (g_Hflag) {
+		} else if (g_opts.di_condensed) {
+			if (g_opts.di_scripted) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				    display_string(dip->dp_ctype),
 				    display_string(dip->dp_dev),
@@ -516,7 +520,7 @@ show_disks()
 				    sizestr, statestr, slotname);
 			}
 		} else {
-			if (g_Hflag) {
+			if (g_opts.di_scripted) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				    display_string(dip->dp_ctype),
 				    display_string(dip->dp_dev),
@@ -566,19 +570,19 @@ main(int argc, char *argv[])
 	while ((c = getopt(argc, argv, ":acHPp")) != EOF) {
 		switch (c) {
 		case 'a':
-			g_aflag = B_TRUE;
+			g_opts.di_allslots = B_TRUE;
 			break;
 		case 'c':
-			g_cflag = B_TRUE;
+			g_opts.di_condensed = B_TRUE;
 			break;
 		case 'H':
-			g_Hflag = B_TRUE;
+			g_opts.di_scripted = B_TRUE;
 			break;
 		case 'P':
-			g_Pflag = B_TRUE;
+			g_opts.di_physical = B_TRUE;
 			break;
 		case 'p':
-			g_pflag = B_TRUE;
+			g_opts.di_parseable = B_TRUE;
 			break;
 		case '?':
 			usage(argv[0]);
@@ -588,17 +592,17 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (g_cflag && g_Pflag) {
+	if (g_opts.di_condensed && g_opts.di_physical) {
 		usage(argv[0]);
 		fatal(1, "-c and -P are mutually exclusive\n");
 	}
 
-	if (!g_Hflag) {
-		if (g_Pflag) {
+	if (!g_opts.di_scripted) {
+		if (g_opts.di_physical) {
 			printf("DISK                    VID      PID"
 			    "              SERIAL               FLT LOC"
 			    " LOCATION\n");
-		} else if (g_cflag) {
+		} else if (g_opts.di_condensed) {
 			printf("TYPE    DISK                    VID      PID"
 			    "              SERIAL\n");
 			printf("\tSIZE          FLRS LOCATION\n");
