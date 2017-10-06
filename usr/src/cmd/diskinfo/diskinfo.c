@@ -104,7 +104,7 @@ safe_zmalloc(size_t size)
 	if (ptr == NULL)
 		fatal(-1, "failed to allocate memeory");
 	memset(ptr, 0, size);
-	return ptr;
+	return (ptr);
 }
 
 static char *
@@ -113,7 +113,7 @@ safe_strdup(const char *s1)
 	char *s2 = strdup(s1);
 	if (s2 == NULL)
 		fatal(-1, "failed to allocate memeory");
-	return s2;
+	return (s2);
 }
 
 static int
@@ -127,7 +127,7 @@ safe_asprintf(char **ret, const char *fmt, ...)
 	va_end(ap);
 	if (v == -1)
 		fatal(-1, "failed to allocate memeory");
-	return v;
+	return (v);
 }
 
 static void
@@ -455,7 +455,8 @@ show_disks()
 		} else {
 			total_in_GiB = (double)total /
 			    1024.0 / 1024.0 / 1024.0;
-			(void) safe_asprintf(&sizestr, "%7.2f GiB", (float)(total_in_GiB));
+			(void) safe_asprintf(&sizestr,
+			    "%7.2f GiB", (total_in_GiB));
 		}
 
 		if (g_pflag) {

@@ -11,7 +11,7 @@
 .\" Copyright 2014 Joyent, Inc.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.Dd July 20, 2016
+.Dd October 06, 2017
 .Dt DISKINFO 1M
 .Os
 .Sh NAME
@@ -19,7 +19,7 @@
 .Nd provide disk device inventory and status
 .Sh SYNOPSIS
 .Nm
-.Op Fl Hp
+.Op Fl aHp
 .Op Fl c Ns | Ns Fl P
 .Sh DESCRIPTION
 The diskinfo tool provides information about the disk devices in the system.
@@ -65,6 +65,8 @@ See
 below for a detailed description of each column.
 .Sh OPTIONS
 .Bl -tag -width Ds
+.It Fl a
+Show all disk bays, including those don't have disks installed.
 .It Fl c
 Select compact mode output.
 At most one of
