@@ -30,7 +30,7 @@
 #include <sys/nvpair.h>
 #include <sys/param.h>
 #include <sys/ccompile.h>
-#include <sys/avl.h>
+#include <sys/list.h>
 
 #include <fm/libtopo.h>
 #include <fm/topo_hc.h>
@@ -46,7 +46,7 @@ typedef struct di_opts {
 	boolean_t di_condensed;
 } di_opts_t;
 
-static avl_tree_t g_disks;
+static list_t g_disks;
 static di_opts_t g_opts = { B_FALSE, B_FALSE, B_FALSE, B_FALSE, B_FALSE };
 
 typedef struct di_phys {
@@ -64,29 +64,29 @@ typedef struct di_phys {
 	int dp_slot;
 	int dp_faulty;
 	int dp_locate;
-	avl_node_t dp_tnode;
+	list_node_t dp_next;
 } di_phys_t;
 
+/*
 static int
-avl_di_comp(const void *di1, const void *di2)
+di_phys_comp(const di_phys_t *di1, const di_phys_t *di2)
 {
 	int cmp;
-	const di_phys_t *di1p = di1;
-	const di_phys_t *di2p = di2;
-	if (di1p->dp_dev == NULL || di2p->dp_dev == NULL) {
-		if (di1p->dp_chassis != di2p->dp_chassis)
-			return ((di1p->dp_chassis < di2p->dp_chassis) ? -1 : 1);
-		if (di1p->dp_slot != di2p->dp_slot)
-			return ((di1p->dp_slot < di2p->dp_slot) ? -1 : 1);
-		if (di1p->dp_slotname != NULL && di2p->dp_slotname != NULL) {
-			cmp = strcmp(di1p->dp_slotname, di2p->dp_slotname);
+	if (di1->dp_dev == NULL || di2->dp_dev == NULL) {
+		if (di1->dp_chassis != di2->dp_chassis)
+			return ((di1->dp_chassis < di2->dp_chassis) ? -1 : 1);
+		if (di1->dp_slot != di2->dp_slot)
+			return ((di1->dp_slot < di2->dp_slot) ? -1 : 1);
+		if (di1->dp_slotname != NULL && di2->dp_slotname != NULL) {
+			cmp = strcmp(di1->dp_slotname, di2->dp_slotname);
 			return ((cmp == 0) ? 0 : cmp/abs(cmp));
 		}
 		return (0);
 	}
-	cmp = strcmp(di1p->dp_dev, di2p->dp_dev);
+	cmp = strcmp(di1->dp_dev, di2->dp_dev);
 	return ((cmp == 0) ? 0 : cmp/abs(cmp));
 }
+*/
 
 static void __NORETURN
 fatal(int rv, const char *fmt, ...)
@@ -174,6 +174,60 @@ condensed_tristate(int val, char c)
 	return ('?');
 }
 
+static void
+set_disk_bay_info(topo_hdl_t *hp, tnode_t *np, di_phys_t *dip)
+{
+	topo_faclist_t fl;
+	topo_faclist_t *lp;
+	topo_led_state_t mode;
+	topo_led_type_t type;
+	int err;
+
+	if (strcmp(topo_node_name(np), BAY) != 0)
+		return;
+
+	if (topo_node_facility(hp, np, TOPO_FAC_TYPE_INDICATOR,
+	    TOPO_FAC_TYPE_ANY, &fl, &err) == 0) {
+		for (lp = topo_list_next(&fl.tf_list); lp != NULL;
+		    lp = topo_list_next(lp)) {
+			uint32_t prop;
+
+			if (topo_prop_get_uint32(lp->tf_node,
+			    TOPO_PGROUP_FACILITY, TOPO_FACILITY_TYPE,
+			    &prop, &err) != 0) {
+				continue;
+			}
+			type = (topo_led_type_t)prop;
+
+			if (topo_prop_get_uint32(lp->tf_node,
+			    TOPO_PGROUP_FACILITY, TOPO_LED_MODE,
+			    &prop, &err) != 0) {
+				continue;
+			}
+			mode = (topo_led_state_t)prop;
+
+			switch (type) {
+			case TOPO_LED_TYPE_SERVICE:
+				dip->dp_faulty = mode ? 1 : 0;
+				break;
+			case TOPO_LED_TYPE_LOCATE:
+				dip->dp_locate = mode ? 1 : 0;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	if (topo_prop_get_string(np, TOPO_PGROUP_PROTOCOL,
+	    TOPO_PROP_LABEL, &dip->dp_slotname, &err) == 0) {
+		dip->dp_slotname = safe_strdup(dip->dp_slotname);
+	}
+
+	dip->dp_slot = topo_node_instance(np);
+	dip->dp_chassis = topo_node_instance(topo_node_parent(np));
+}
+
 static int
 bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 {
@@ -190,8 +244,8 @@ bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	slot = topo_node_instance(np);
 	chassis = topo_node_instance(pnp);
 
-	for (dip = avl_first(&g_disks); dip != NULL;
-	    dip = AVL_NEXT(&g_disks, dip)) {
+	for (dip = list_head(&g_disks); dip != NULL;
+	    dip = list_next(&g_disks, dip)) {
 		if (dip->dp_slot == slot && dip->dp_chassis == chassis) {
 			found = B_TRUE;
 			break;
@@ -207,7 +261,7 @@ bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		    TOPO_PROP_LABEL, &slotname, &err) == 0) {
 			dip->dp_slotname = safe_strdup(slotname);
 		}
-		avl_add(&g_disks, dip);
+		list_insert_tail(&g_disks, dip);
 	}
 
 	return (TOPO_WALK_NEXT);
@@ -216,78 +270,30 @@ bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 static int
 disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 {
-	di_phys_t di;
+	char *dev;
 	di_phys_t *dip;
-	tnode_t *pnp;
-	tnode_t *ppnp;
-	topo_faclist_t fl;
-	topo_faclist_t *lp;
-	topo_led_state_t mode;
-	topo_led_type_t type;
 	int err;
 
 	if (strcmp(topo_node_name(np), DISK) != 0)
 		return (TOPO_WALK_NEXT);
 
-	memset(&di, 0, sizeof (di_phys_t));
 	if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_LOGICAL_DISK_NAME, &di.dp_dev, &err) != 0) {
+	    TOPO_STORAGE_LOGICAL_DISK_NAME, &dev, &err) != 0) {
 		return (TOPO_WALK_NEXT);
 	}
 
-	if ((dip = avl_find(&g_disks, &di, NULL)) == NULL)
-		return (TOPO_WALK_NEXT);
-
-	if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_SERIAL_NUM, &dip->dp_serial, &err) == 0) {
-		dip->dp_serial = safe_strdup(dip->dp_serial);
-	}
-
-	pnp = topo_node_parent(np);
-	ppnp = topo_node_parent(pnp);
-	if (strcmp(topo_node_name(pnp), BAY) == 0) {
-		if (topo_node_facility(hp, pnp, TOPO_FAC_TYPE_INDICATOR,
-		    TOPO_FAC_TYPE_ANY, &fl, &err) == 0) {
-			for (lp = topo_list_next(&fl.tf_list); lp != NULL;
-			    lp = topo_list_next(lp)) {
-				uint32_t prop;
-
-				if (topo_prop_get_uint32(lp->tf_node,
-				    TOPO_PGROUP_FACILITY, TOPO_FACILITY_TYPE,
-				    &prop, &err) != 0) {
-					continue;
-				}
-				type = (topo_led_type_t)prop;
-
-				if (topo_prop_get_uint32(lp->tf_node,
-				    TOPO_PGROUP_FACILITY, TOPO_LED_MODE,
-				    &prop, &err) != 0) {
-					continue;
-				}
-				mode = (topo_led_state_t)prop;
-
-				switch (type) {
-				case TOPO_LED_TYPE_SERVICE:
-					dip->dp_faulty = mode ? 1 : 0;
-					break;
-				case TOPO_LED_TYPE_LOCATE:
-					dip->dp_locate = mode ? 1 : 0;
-					break;
-				default:
-					break;
-				}
+	for (dip = list_head(&g_disks); dip != NULL;
+	    dip = list_next(&g_disks, dip)) {
+		if (dip->dp_dev && strcmp(dip->dp_dev, dev) == 0) {
+			if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
+			    TOPO_STORAGE_SERIAL_NUM,
+			    &dip->dp_serial, &err) == 0) {
+				dip->dp_serial = safe_strdup(dip->dp_serial);
 			}
+			set_disk_bay_info(hp, topo_node_parent(np), dip);
 		}
-
-		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_LABEL, &dip->dp_slotname, &err) == 0) {
-			dip->dp_slotname = safe_strdup(dip->dp_slotname);
-		}
-
-		dip->dp_slot = topo_node_instance(pnp);
 	}
 
-	dip->dp_chassis = topo_node_instance(ppnp);
 	return (TOPO_WALK_NEXT);
 }
 
@@ -325,8 +331,7 @@ enumerate_disks()
 	size_t len;
 	int err, i;
 
-	avl_create(&g_disks, avl_di_comp, sizeof (di_phys_t),
-	    offsetof(di_phys_t, dp_tnode));
+	list_create(&g_disks, sizeof (di_phys_t), offsetof(di_phys_t, dp_next));
 
 	err = 0;
 	if ((media = dm_get_descriptors(DM_MEDIA, filter, &err)) == NULL) {
@@ -380,9 +385,6 @@ enumerate_disks()
 			nvlist_free(cattrs);
 		}
 
-		if (dip->dp_ctype == NULL)
-			dip->dp_ctype = safe_strdup("");
-
 		dm_free_descriptors(controller);
 		dm_free_descriptors(disk);
 
@@ -404,7 +406,7 @@ enumerate_disks()
 
 		dip->dp_faulty = dip->dp_locate = -1;
 		dip->dp_chassis = dip->dp_slot = -1;
-		avl_add(&g_disks, dip);
+		list_insert_tail(&g_disks, dip);
 	}
 
 	dm_free_descriptors(media);
@@ -445,8 +447,8 @@ show_disks()
 	char *sizestr = NULL, *slotname = NULL, *statestr = NULL;
 	di_phys_t *dip;
 
-	for (dip = avl_first(&g_disks); dip != NULL;
-	    dip = AVL_NEXT(&g_disks, dip)) {
+	for (dip = list_head(&g_disks); dip != NULL;
+	    dip = list_next(&g_disks, dip)) {
 		/*
 		 * The size is given in blocks, so multiply the number
 		 * of blocks by the block size to get the total size,
@@ -548,9 +550,8 @@ static void
 cleanup()
 {
 	di_phys_t *dip;
-	void *c = NULL;
-
-	while ((dip = avl_destroy_nodes(&g_disks, &c)) != NULL) {
+	while ((dip = list_head(&g_disks)) != NULL) {	
+		list_remove(&g_disks, dip);
 		free(dip->dp_vid);
 		free(dip->dp_pid);
 		free(dip->dp_dev);
@@ -559,7 +560,7 @@ cleanup()
 		free(dip->dp_slotname);
 		free(dip);
 	}
-	avl_destroy(&g_disks);
+	list_destroy(&g_disks);
 }
 
 int

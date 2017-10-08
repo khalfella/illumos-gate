@@ -25,7 +25,7 @@ C99MODE=	$(C99_ENABLE)
 CPPFLAGS +=	-I$(SRC)/lib/fm/topo
 
 LDLIBS +=	-L$(ROOT)/usr/lib/fm -R/usr/lib/fm -ldiskmgt -lnvpair -ltopo \
-    -lavl
+    -lcmdutils
 
 .KEEP_STATE:
 
