@@ -232,38 +232,23 @@ static int
 bay_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 {
 	di_phys_t *dip;
-	tnode_t *pnp;
-	char *slotname;
-	int err, slot, chassis;
-	boolean_t found = B_FALSE;
+	int slot, chassis;
 
 	if (strcmp(topo_node_name(np), BAY) != 0)
 		return (TOPO_WALK_NEXT);
 
-	pnp = topo_node_parent(np);
 	slot = topo_node_instance(np);
-	chassis = topo_node_instance(pnp);
+	chassis = topo_node_instance(topo_node_parent(np));
 
 	for (dip = list_head(&g_disks); dip != NULL;
 	    dip = list_next(&g_disks, dip)) {
-		if (dip->dp_slot == slot && dip->dp_chassis == chassis) {
-			found = B_TRUE;
-			break;
-		}
+		if (dip->dp_slot == slot && dip->dp_chassis == chassis)
+			return (TOPO_WALK_NEXT);
 	}
 
-	if (!found) {
-		dip = safe_zmalloc(sizeof (di_phys_t));
-		dip->dp_slot = slot;
-		dip->dp_chassis = chassis;
-
-		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_LABEL, &slotname, &err) == 0) {
-			dip->dp_slotname = safe_strdup(slotname);
-		}
-		list_insert_tail(&g_disks, dip);
-	}
-
+	dip = safe_zmalloc(sizeof (di_phys_t));
+	set_disk_bay_info(hp, np, dip);
+	list_insert_tail(&g_disks, dip);
 	return (TOPO_WALK_NEXT);
 }
 
@@ -284,7 +269,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 
 	for (dip = list_head(&g_disks); dip != NULL;
 	    dip = list_next(&g_disks, dip)) {
-		if (dip->dp_dev && strcmp(dip->dp_dev, dev) == 0) {
+		if (strcmp(dip->dp_dev, dev) == 0) {
 			if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
 			    TOPO_STORAGE_SERIAL_NUM,
 			    &dip->dp_serial, &err) == 0) {
