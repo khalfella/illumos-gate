@@ -67,27 +67,6 @@ typedef struct di_phys {
 	list_node_t dp_next;
 } di_phys_t;
 
-/*
-static int
-di_phys_comp(const di_phys_t *di1, const di_phys_t *di2)
-{
-	int cmp;
-	if (di1->dp_dev == NULL || di2->dp_dev == NULL) {
-		if (di1->dp_chassis != di2->dp_chassis)
-			return ((di1->dp_chassis < di2->dp_chassis) ? -1 : 1);
-		if (di1->dp_slot != di2->dp_slot)
-			return ((di1->dp_slot < di2->dp_slot) ? -1 : 1);
-		if (di1->dp_slotname != NULL && di2->dp_slotname != NULL) {
-			cmp = strcmp(di1->dp_slotname, di2->dp_slotname);
-			return ((cmp == 0) ? 0 : cmp/abs(cmp));
-		}
-		return (0);
-	}
-	cmp = strcmp(di1->dp_dev, di2->dp_dev);
-	return ((cmp == 0) ? 0 : cmp/abs(cmp));
-}
-*/
-
 static void __NORETURN
 fatal(int rv, const char *fmt, ...)
 {
@@ -278,7 +257,6 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 			set_disk_bay_info(hp, topo_node_parent(np), dip);
 		}
 	}
-
 	return (TOPO_WALK_NEXT);
 }
 
@@ -535,7 +513,7 @@ static void
 cleanup()
 {
 	di_phys_t *dip;
-	while ((dip = list_head(&g_disks)) != NULL) {	
+	while ((dip = list_head(&g_disks)) != NULL) {
 		list_remove(&g_disks, dip);
 		free(dip->dp_vid);
 		free(dip->dp_pid);
