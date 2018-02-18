@@ -354,6 +354,7 @@ DRV_KMODS	+= ucode
 DRV_KMODS	+= ural
 DRV_KMODS	+= uath
 DRV_KMODS	+= urtw
+DRV_KMODS	+= upci
 DRV_KMODS	+= vgatext
 DRV_KMODS	+= vnic
 DRV_KMODS	+= vscan
