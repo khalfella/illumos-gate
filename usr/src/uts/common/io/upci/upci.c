@@ -56,6 +56,21 @@ upci_read(dev_t dev, struct uio *uiop, cred_t *credp)
 }
 
 static int
+upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
+{
+	upci_cmd_t ucmd;
+
+	switch (cmd) {
+		default:
+			copyin((void *)arg, &ucmd, sizeof(upci_cmd_t));
+			copyout("ABC", (void *) (ucmd.cm_uobuff), 4);
+			*rv = 0;
+		break;
+	}
+	return (0);
+}
+
+static int
 upci_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 {
         int ret = DDI_FAILURE;
@@ -107,21 +122,21 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 }
 
 static struct cb_ops upci_cb_ops = {
-    upci_open,        /* open */
-    upci_close,       /* close */
-    nulldev,        /* strategy */
-    nulldev,        /* print */
-    nodev,          /* dump */
-    upci_read,        /* read */
-    nodev,          /* write */
-    nodev,          /* ioctl */
-    nodev,          /* devmap */
-    nodev,          /* mmap */
-    nodev,          /* segmap */
-    nochpoll,       /* poll */
-    ddi_prop_op,        /* cb_prop_op */
-    NULL,           /* streamtab  */
-    D_MP            /* Driver compatibility flag */
+    upci_open,		/* open */
+    upci_close,		/* close */
+    nulldev,		/* strategy */
+    nulldev,		/* print */
+    nodev,		/* dump */
+    upci_read,		/* read */
+    nodev,		/* write */
+    upci_ioctl,		/* ioctl */
+    nodev,		/* devmap */
+    nodev,		/* mmap */
+    nodev,		/* segmap */
+    nochpoll,		/* poll */
+    ddi_prop_op,	/* cb_prop_op */
+    NULL,		/* streamtab  */
+    D_MP		/* Driver compatibility flag */
 };
 
 static struct dev_ops upci_dev_ops = {
