@@ -29,21 +29,24 @@
 #include <sys/ksynch.h>
 #include <sys/avl.h>
 
+#include <sys/pci_impl.h>
+#include <sys/ddi_isa.h>
+
 #include <sys/upci.h>
 
 /*
  * remove this variable
  */
 
-static dev_info_t *upci_dip;
 
 typedef struct upci_s {
-	uint8_t		up_seg;
-	uint8_t		up_bus;
-	uint8_t		up_dev;
-	uint8_t		up_fun;
-	dev_info_t	*up_dip;
-	avl_node_t	up_avl;
+	uint8_t			up_seg;
+	uint8_t			up_bus;
+	uint8_t			up_dev;
+	uint8_t			up_fun;
+	dev_info_t		*up_dip;
+	ddi_acc_handle_t 	up_hdl;
+	avl_node_t		up_avl;
 } upci_t;
 
 static avl_tree_t *upci_devices;
@@ -114,7 +117,9 @@ upci_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-		*resultp = upci_dip;
+		/*
+		 * *resultp = upci_dip;
+		 */
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
 		*resultp = (void *)((uintptr_t)getminor((dev_t)arg));
@@ -130,12 +135,12 @@ upci_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 static int
 upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	upci_t *up;
 	minor_t instance;
+	ddi_acc_impl_t *hdl;
+	pci_acc_cfblk_t *cfp;
 
 	if (cmd != DDI_ATTACH)
-		return (DDI_FAILURE);
-
-	if (upci_dip != NULL)
 		return (DDI_FAILURE);
 
 	instance = ddi_get_instance(dip);
@@ -143,19 +148,59 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_PSEUDO,  0) == DDI_FAILURE)
 		return (DDI_FAILURE);
 
-	upci_dip = dip;
+	up = kmem_zalloc(sizeof (*up), KM_SLEEP);
+
+	if (pci_config_setup(dip, &up->up_hdl) != DDI_SUCCESS) {
+		kmem_free(up, sizeof (*up));
+		ddi_remove_minor_node(dip, "upci");
+		cmn_err(CE_CONT, "Failed to access PCI config space\n");
+		return (DDI_FAILURE);
+	}
+
+	hdl = (ddi_acc_impl_t *)&up->up_hdl;
+	cfp = (pci_acc_cfblk_t *)&(hdl->ahi_common.ah_bus_private);
+
+	up->up_seg = 0;
+	up->up_bus = cfp->c_busnum;
+	up->up_dev = cfp->c_devnum;
+	up->up_fun = cfp->c_funcnum;
+	up->up_dip = dip;
+	avl_add(upci_devices, up);
+
+	ddi_set_driver_private(dip, (caddr_t)up);
+
+	cmn_err(CE_CONT, "Attached %2x:%2x.%2x\n", up->up_bus,
+	    up->up_dev, up->up_fun);
+
 	return (DDI_SUCCESS);
 }
 
 static int
 upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
+	upci_t *up;
+/*
+	minor_t instance;
+	pci_acc_cfblk_t *cfp;
+*/
+
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	VERIFY(dip == upci_dip);
-	ddi_remove_minor_node(upci_dip, "upci");
-	upci_dip = NULL;
+	/* Try to find this device in the tree */
+	for (up = avl_first(upci_devices);
+	    up != NULL && up->up_dip == dip;
+	    up = AVL_NEXT(upci_devices, up))
+		;
+
+	if (up == NULL)
+		return (DDI_FAILURE);
+
+	ddi_remove_minor_node(dip, "upci");
+	avl_remove(upci_devices, up);
+	pci_config_teardown(&up->up_hdl);
+
+
 	return (DDI_SUCCESS);
 }
 
