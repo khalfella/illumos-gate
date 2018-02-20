@@ -13,6 +13,8 @@
  * upci: user pci driver
  */
 
+#include <sys/stddef.h>
+#include <sys/cmn_err.h>
 #include <sys/modctl.h>
 #include <sys/conf.h>
 #include <sys/devops.h>
@@ -25,11 +27,46 @@
 #include <sys/errno.h>
 #include <sys/uio.h>
 #include <sys/ksynch.h>
-
+#include <sys/avl.h>
 
 #include <sys/upci.h>
 
+/*
+ * remove this variable
+ */
+
 static dev_info_t *upci_dip;
+
+typedef struct upci_s {
+	uint8_t		up_seg;
+	uint8_t		up_bus;
+	uint8_t		up_dev;
+	uint8_t		up_fun;
+	dev_info_t	*up_dip;
+	avl_node_t	up_avl;
+} upci_t;
+
+static avl_tree_t *upci_devices;
+
+static int
+upci_devices_cmp(const void *l, const void *r) {
+	upci_t *lpci = (upci_t *)l;
+	upci_t *rpci = (upci_t *)r;
+
+	if ((lpci->up_seg == rpci->up_seg) &&
+	    (lpci->up_bus == rpci->up_bus) &&
+	    (lpci->up_dev == rpci->up_dev) &&
+	    (lpci->up_fun == rpci->up_fun)) {
+		return (0);
+	} else if ((lpci->up_seg <= rpci->up_seg) &&
+	    (lpci->up_bus <= rpci->up_bus) &&
+	    (lpci->up_dev <= rpci->up_dev) &&
+	    (lpci->up_fun <= rpci->up_fun)) {
+		return (-1);
+	} else {
+		return (1);
+	}
+}
 
 static int
 upci_open(dev_t *devp, int flag, int otyp, cred_t *credp)
@@ -170,6 +207,10 @@ static struct modlinkage upci_modlinkage = {
 int
 _init(void)
 {
+	upci_devices = kmem_zalloc(sizeof (*upci_devices), KM_SLEEP);
+	avl_create(upci_devices, upci_devices_cmp, sizeof (upci_t),
+		    offsetof (upci_t, up_avl));
+	cmn_err(CE_CONT, "Initialized upci_devices to %p\n", upci_devices);
 	return (mod_install(&upci_modlinkage));
 }
 
@@ -182,5 +223,12 @@ _info(struct modinfo *modinfop)
 int
 _fini(void)
 {
+	if (upci_devices != NULL) {
+		VERIFY(avl_is_empty(upci_devices));
+		avl_destroy(upci_devices);
+		kmem_free((caddr_t) upci_devices, sizeof (*upci_devices));
+		cmn_err(CE_CONT, "upci_devices\n");
+	}
+
 	return (mod_remove(&upci_modlinkage));
 }
