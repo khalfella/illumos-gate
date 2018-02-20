@@ -140,8 +140,7 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		    cr, rv);
 	break;
 	default:
-		copyout("ABC", (void *) (ucmd->cm_uobuff), 4);
-		*rv = 0;
+		*rv = EINVAL;
 	break;
 	}
 
@@ -234,13 +233,11 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	avl_remove(upci_devices, up);
 	mutex_exit(&upci_devices_lk);
 
-
 	ddi_remove_minor_node(dip, "upci");
 	pci_config_teardown(&up->up_hdl);
 
 	mutex_destroy(&up->up_lk);
 	kmem_free(up, sizeof(*up));
-
 
 	return (DDI_SUCCESS);
 }
