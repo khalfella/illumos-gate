@@ -35,6 +35,7 @@
 
 /* Flags */
 static boolean_t g_lflag = B_FALSE;
+static boolean_t g_vflag = B_FALSE;
 
 
 
@@ -43,9 +44,10 @@ static int g_fd = -1;
 static int
 usage(int status)
 {
-	fprintf(stderr, "Usage\nupci: {-l, -h}\n"
-	    "\t-h\t Show this help message\n"
-	    "\t-l\t List PCI devices controlled by upci\n");
+	fprintf(stderr, "Usage upci: [-l] [-h] [-v]\n"
+	    "\t-h show this help message\n"
+	    "\t-l list PCI devices controlled by upci\n"
+	    "\t-v verbose output\n");
 	exit(status);
 }
 
@@ -73,8 +75,18 @@ upci_list_devices()
 	printf("%ld devices to list:\n", devcnt);
 
 	for (i = 0; i < devcnt; i++) {
-		printf("dev[%d]: di_devpath = \"%-40s\" flags = %x\n",
-		    i, di[i].di_devpath, di[i].di_flags); }
+
+		if (!g_vflag) {
+			printf("dev[%d]: di_devpath = \"%-40s\" flags = %x\n",
+			    i, di[i].di_devpath, di[i].di_flags);
+			continue;
+		}
+
+		/* Verbose */
+		printf("dev[%d]:\n", i);
+		printf("    di_devpath = \"%s\"\n", di[i].di_devpath);
+		printf("    di_flags = %x\n", di[i].di_flags);
+	}
 
 	free(di);
 	return (0);
@@ -85,13 +97,16 @@ main(int argc, char **argv)
 {
 	int c;
 
-	while((c = getopt(argc, argv, "lh")) != EOF) {
+	while((c = getopt(argc, argv, "lhv")) != EOF) {
 		switch (c) {
 		case 'l':
 			g_lflag = B_TRUE;
 		break;
 		case 'h':
 			return usage(0);
+		break;
+		case 'v':
+			g_vflag = B_TRUE;
 		break;
 		default:
 			return usage(1);
