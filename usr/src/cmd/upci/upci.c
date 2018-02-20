@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
+#include <sys/upci.h>
 
 int
 main(void)
@@ -26,7 +27,7 @@ main(void)
         hrtime_t start;
 
         start = gethrtime();
-        (void) printf("%lld\n", start);
+        (void) printf("%s %lld\n", UPCI_STRING, start);
 
         return (0);
 }

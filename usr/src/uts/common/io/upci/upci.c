@@ -26,6 +26,9 @@
 #include <sys/uio.h>
 #include <sys/ksynch.h>
 
+
+#include <sys/upci.h>
+
 static dev_info_t *upci_dip;
 
 static int

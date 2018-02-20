@@ -428,6 +428,7 @@ COMMON_SUBDIRS=		\
 	units		\
 	unlink		\
 	unpack		\
+	upci		\
 	userattr	\
 	users		\
 	utmp_update	\

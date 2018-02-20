@@ -597,6 +597,7 @@ CHKHDRS=			\
 	ticotsord.h		\
 	tihdr.h			\
 	time.h			\
+	upci.h			\
 	time_impl.h		\
 	time_std_impl.h		\
 	timeb.h			\
