@@ -34,16 +34,10 @@
 
 #include <sys/upci.h>
 
-/*
- * remove this variable
- */
-
+#define	abs(a) ((a) < 0 ? -(a) : (a))
 
 typedef struct upci_s {
-	uint8_t			up_seg;
-	uint8_t			up_bus;
-	uint8_t			up_dev;
-	uint8_t			up_fun;
+	char			up_devpath[MAXPATHLEN];
 	dev_info_t		*up_dip;
 	ddi_acc_handle_t 	up_hdl;
 	avl_node_t		up_avl;
@@ -55,20 +49,11 @@ static int
 upci_devices_cmp(const void *l, const void *r) {
 	upci_t *lpci = (upci_t *)l;
 	upci_t *rpci = (upci_t *)r;
+	int cmp = strncmp(lpci->up_devpath, rpci->up_devpath, MAXPATHLEN);
 
-	if ((lpci->up_seg == rpci->up_seg) &&
-	    (lpci->up_bus == rpci->up_bus) &&
-	    (lpci->up_dev == rpci->up_dev) &&
-	    (lpci->up_fun == rpci->up_fun)) {
-		return (0);
-	} else if ((lpci->up_seg <= rpci->up_seg) &&
-	    (lpci->up_bus <= rpci->up_bus) &&
-	    (lpci->up_dev <= rpci->up_dev) &&
-	    (lpci->up_fun <= rpci->up_fun)) {
-		return (-1);
-	} else {
-		return (1);
-	}
+	if (cmp != 0)
+		return cmp/abs(cmp);
+	return (0);
 }
 
 static int
@@ -118,7 +103,7 @@ upci_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
 		/*
-		 * *resultp = upci_dip;
+		 *resultp = upci_dip;
 		 */
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
@@ -137,8 +122,6 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	upci_t *up;
 	minor_t instance;
-	ddi_acc_impl_t *hdl;
-	pci_acc_cfblk_t *cfp;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -149,7 +132,6 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	up = kmem_zalloc(sizeof (*up), KM_SLEEP);
-
 	if (pci_config_setup(dip, &up->up_hdl) != DDI_SUCCESS) {
 		kmem_free(up, sizeof (*up));
 		ddi_remove_minor_node(dip, "upci");
@@ -157,20 +139,13 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	hdl = (ddi_acc_impl_t *)&up->up_hdl;
-	cfp = (pci_acc_cfblk_t *)&(hdl->ahi_common.ah_bus_private);
 
-	up->up_seg = 0;
-	up->up_bus = cfp->c_busnum;
-	up->up_dev = cfp->c_devnum;
-	up->up_fun = cfp->c_funcnum;
 	up->up_dip = dip;
+	ddi_pathname(dip, up->up_devpath);
 	avl_add(upci_devices, up);
-
 	ddi_set_driver_private(dip, (caddr_t)up);
 
-	cmn_err(CE_CONT, "Attached %2x:%2x.%2x\n", up->up_bus,
-	    up->up_dev, up->up_fun);
+	cmn_err(CE_CONT, "Attached \"%s\"\n", up->up_devpath);
 
 	return (DDI_SUCCESS);
 }
@@ -179,10 +154,6 @@ static int
 upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	upci_t *up;
-/*
-	minor_t instance;
-	pci_acc_cfblk_t *cfp;
-*/
 
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
