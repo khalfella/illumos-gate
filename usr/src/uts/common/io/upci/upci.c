@@ -40,10 +40,12 @@ typedef struct upci_s {
 	char			up_devpath[MAXPATHLEN];
 	dev_info_t		*up_dip;
 	ddi_acc_handle_t 	up_hdl;
+	kmutex_t		up_lk;
 	avl_node_t		up_avl;
 } upci_t;
 
-static avl_tree_t *upci_devices;
+static avl_tree_t	*upci_devices;		/* Tree of devices under upci */
+static kmutex_t		upci_devices_lk;	/* Tree lock */
 
 static int
 upci_devices_cmp(const void *l, const void *r) {
@@ -132,6 +134,7 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	up = kmem_zalloc(sizeof (*up), KM_SLEEP);
+
 	if (pci_config_setup(dip, &up->up_hdl) != DDI_SUCCESS) {
 		kmem_free(up, sizeof (*up));
 		ddi_remove_minor_node(dip, "upci");
@@ -139,10 +142,15 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	mutex_init(&up->up_lk, NULL, MUTEX_DRIVER, NULL);
 
 	up->up_dip = dip;
 	ddi_pathname(dip, up->up_devpath);
+
+	mutex_enter(&upci_devices_lk);
 	avl_add(upci_devices, up);
+	mutex_exit(&upci_devices_lk);
+
 	ddi_set_driver_private(dip, (caddr_t)up);
 
 	cmn_err(CE_CONT, "Attached \"%s\"\n", up->up_devpath);
@@ -159,17 +167,26 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	/* Try to find this device in the tree */
+	mutex_enter(&upci_devices_lk);
 	for (up = avl_first(upci_devices);
 	    up != NULL && up->up_dip == dip;
 	    up = AVL_NEXT(upci_devices, up))
 		;
 
-	if (up == NULL)
+	if (up == NULL) {
+		mutex_exit(&upci_devices_lk);
 		return (DDI_FAILURE);
+	}
+
+	avl_remove(upci_devices, up);
+	mutex_exit(&upci_devices_lk);
+
 
 	ddi_remove_minor_node(dip, "upci");
-	avl_remove(upci_devices, up);
 	pci_config_teardown(&up->up_hdl);
+
+	mutex_destroy(&up->up_lk);
+	kmem_free(up, sizeof(*up));
 
 
 	return (DDI_SUCCESS);
@@ -226,7 +243,11 @@ _init(void)
 	upci_devices = kmem_zalloc(sizeof (*upci_devices), KM_SLEEP);
 	avl_create(upci_devices, upci_devices_cmp, sizeof (upci_t),
 		    offsetof (upci_t, up_avl));
+
+	mutex_init(&upci_devices_lk, NULL, MUTEX_DRIVER, NULL);
+
 	cmn_err(CE_CONT, "Initialized upci_devices to %p\n", upci_devices);
+
 	return (mod_install(&upci_modlinkage));
 }
 
@@ -243,7 +264,8 @@ _fini(void)
 		VERIFY(avl_is_empty(upci_devices));
 		avl_destroy(upci_devices);
 		kmem_free((caddr_t) upci_devices, sizeof (*upci_devices));
-		cmn_err(CE_CONT, "upci_devices\n");
+		mutex_destroy(&upci_devices_lk);
+		cmn_err(CE_CONT, "upci fini\n");
 	}
 
 	return (mod_remove(&upci_modlinkage));
