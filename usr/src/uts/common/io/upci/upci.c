@@ -154,10 +154,14 @@ upci_list_open_device_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
 	    copyin((void *) ucmd->cm_uibuff, pdi->di_devpath,
 	    ucmd->cm_uibufsz) != 0 ||
 	    pdi->di_devpath[ucmd->cm_uibufsz - 1] != '\0' ||
-	    (up = upci_find_dev_from_path_locked(pdi->di_devpath)) == NULL ||
-	    up->up_flags != UPCI_DEVINFO_CLOSED) {
+	    (up = upci_find_dev_from_path_locked(pdi->di_devpath)) == NULL) {
 		rval = *rv = EINVAL;
 		goto out;
+	}
+
+	if (up->up_flags != UPCI_DEVINFO_CLOSED) {
+		rval = *rv = EINVAL;
+		goto out2;
 	}
 
 	/* Device config open code goes here */
@@ -172,6 +176,42 @@ upci_list_open_device_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
 	}
 	up->up_flags = UPCI_DEVINFO_CFG_OPEN;
 
+out2:
+	mutex_exit(&up->up_lk);
+out:
+	kmem_free(pdi, sizeof (*pdi));
+	return (abs(rval));
+}
+
+static int
+upci_list_close_device_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup, cred_t *cr,
+    int *rv)
+{
+	int rval = DDI_SUCCESS;
+	upci_t *up;
+	upci_devinfo_t *pdi;
+
+	*rv = 0;
+	pdi = kmem_alloc(sizeof (*pdi), KM_SLEEP);
+	if (ucmd->cm_uibufsz >= MAXPATHLEN ||
+	    copyin((void *) ucmd->cm_uibuff, pdi->di_devpath,
+	    ucmd->cm_uibufsz) != 0 ||
+	    pdi->di_devpath[ucmd->cm_uibufsz - 1] != '\0' ||
+	    (up = upci_find_dev_from_path_locked(pdi->di_devpath)) == NULL) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
+
+	if (up->up_flags != UPCI_DEVINFO_CFG_OPEN) {
+		rval = *rv = EINVAL;
+		goto out2;
+	}
+	/* Device config close code goes here */
+
+	pci_config_teardown(&up->up_hdl);
+	up->up_flags = UPCI_DEVINFO_CLOSED;
+
+out2:
 	mutex_exit(&up->up_lk);
 out:
 	kmem_free(pdi, sizeof (*pdi));
@@ -197,6 +237,10 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	break;
 	case UPCI_IOCTL_OPEN_DEVICE:
 		rval = upci_list_open_device_ioctl(ucmd, (upci_cmd_t *)arg,
+		    cr, rv);
+	break;
+	case UPCI_IOCTL_CLOSE_DEVICE:
+		rval = upci_list_close_device_ioctl(ucmd, (upci_cmd_t *)arg,
 		    cr, rv);
 	break;
 	default:
@@ -279,7 +323,8 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	    up = AVL_NEXT(upci_devices, up))
 		;
 
-	if (up == NULL) {
+	if (up == NULL ||
+	    up->up_flags != UPCI_DEVINFO_CLOSED) {
 		mutex_exit(&upci_devices_lk);
 		return (DDI_FAILURE);
 	}
@@ -288,11 +333,8 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&upci_devices_lk);
 
 	ddi_remove_minor_node(dip, "upci");
-	pci_config_teardown(&up->up_hdl);
-
 	mutex_destroy(&up->up_lk);
 	kmem_free(up, sizeof(*up));
-
 	return (DDI_SUCCESS);
 }
 
