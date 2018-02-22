@@ -41,6 +41,7 @@ typedef struct upci_s {
 	dev_info_t		*up_dip;
 	ddi_acc_handle_t 	up_hdl;
 	kmutex_t		up_lk;
+	uint64_t		up_flags;
 	avl_node_t		up_avl;
 } upci_t;
 
@@ -83,18 +84,70 @@ upci_read(dev_t dev, struct uio *uiop, cred_t *credp)
 }
 
 static int
+upci_list_devices_ioctl(upci_t *up, upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
+    cred_t *cr, int *rv)
+{
+	upci_t *pent;
+	upci_devinfo_t *pdi, *pudi;
+	int rval = DDI_SUCCESS;
+	unsigned long devcnt;
+
+	*rv = 0;
+	pdi = kmem_alloc(sizeof (*pdi), KM_SLEEP);
+	mutex_enter(&upci_devices_lk);
+	devcnt = avl_numnodes(upci_devices);
+	if (ucmd->cm_uobufsz < (devcnt * sizeof (upci_devinfo_t))) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
+
+	pudi = (upci_devinfo_t *) ucmd->cm_uobuff;
+
+	for (pent = avl_first(upci_devices); pent != NULL;
+	    pent = AVL_NEXT(upci_devices, pent)) {
+		strcpy(pdi->di_devpath, pent->up_devpath);
+		pdi->di_flags = pent->up_flags;
+		if (copyout(pdi, pudi++, sizeof (upci_devinfo_t)) != 0) {
+			rval = *rv = EINVAL;
+			goto out;
+		}
+	}
+
+	uint64_t uobufsz = devcnt * sizeof (upci_devinfo_t);
+	if (copyout(&uobufsz, &ucmdup->cm_uobufsz, sizeof (uint64_t)) != 0) {
+		rval = *rv = EINVAL;
+	}
+out:
+	mutex_exit(&upci_devices_lk);
+	kmem_free(pdi, sizeof (*pdi));
+	return (abs(rval));
+}
+
+static int
 upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 {
-	upci_cmd_t ucmd;
+	int rval = DDI_SUCCESS;
+	upci_cmd_t *ucmd  = kmem_alloc(sizeof(*ucmd), KM_SLEEP);
+	if (copyin((void *)arg, ucmd, sizeof(*ucmd)) != 0) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
 
+	
 	switch (cmd) {
+	case UPCI_IOCTL_LIST_DEVICES:
+		rval = upci_list_devices_ioctl(NULL, ucmd, (upci_cmd_t *)arg,
+		    cr, rv);
+	break;
 	default:
-		copyin((void *)arg, &ucmd, sizeof(upci_cmd_t));
-		copyout("ABC", (void *) (ucmd.cm_uobuff), 4);
+		copyout("ABC", (void *) (ucmd->cm_uobuff), 4);
 		*rv = 0;
 	break;
 	}
-	return (0);
+
+out:
+	kmem_free(ucmd, sizeof(*ucmd));
+	return (abs(rval));
 }
 
 static int

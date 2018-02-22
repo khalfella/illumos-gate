@@ -22,28 +22,42 @@ extern "C" {
 
 typedef struct upci_cmd_s {
 
-	uint8_t		cm_seg;		/* pci device seg or domain */
-	uint8_t		cm_bus;		/* pci bus */
-	uint8_t		cm_dev;		/* pci device */
-	uint8_t		cm_fun;		/* pci function */
-	uint8_t		pad[4];		/* padding bytes */
-
-	uint64_t	cm_off;		/* offset for read/write */
-	uint64_t	cm_uibuff;	/* userland input buffer copyin() */
-	uint64_t	cm_uibufsz;	/* userland input buffer size */
-	uint64_t	cm_uobuff;	/* userland output buffer copyout() */
-	uint64_t	cm_uobufsz;	/* userland output buffer size */
+	char		cm_devpath[MAXPATHLEN];	/* device physical path */
+	uint64_t	cm_off;			/* offset for read/write */
+	uint64_t	cm_uibuff;		/* userland buffer in */
+	uint64_t	cm_uibufsz;		/* userland buffer in sz */
+	uint64_t	cm_uobuff;		/* userland buffer out */
+	uint64_t	cm_uobufsz;		/* userland buffer out sz */
 } upci_cmd_t;
 
-#define	UPCI_IOCTL_CFG_READ	0x01
-#define	UPCI_IOCTL_CFG_WRITE	0x02
+#define	UPCI_IOCTL_LIST_DEVICES		0x01
+#define	UPCI_IOCTL_OPEN_DEVICE		0x02
+#define	UPCI_IOCTL_CLOSE_DEVICE		0x03
+#define	UPCI_IOCTL_CFG_READ		0x04
+#define	UPCI_IOCTL_CFG_WRITE		0x05
+#define	UPCI_IOCTL_REG_READ		0x06
+#define	UPCI_IOCTL_REG_WRITE		0x07
 
 
 /*
  * Add structures, function prototypes and other stuff here.
  */
 
-#define UPCI_STRING "khalfella 123"
+typedef struct upci_devinfo_s {
+	char		di_devpath[MAXPATHLEN];
+	uint64_t	di_flags;
+} upci_devinfo_t;
+
+#define	UPCI_DEVINFO_CLOSED		0x00000001
+#define	UPCI_DEVINFO_CFG_OPEN		0x00000002
+#define	UPCI_DEVINFO_DEV_ENABLED	0x00000004
+#define	UPCI_DEVINFO_REG_MAPPED		0x00000008
+#define	UPCI_DEVINFO_INTX_ENABLED	0x00000010
+#define	UPCI_DEVINFO_MSI_ENABLED	0x00000020
+#define	UPCI_DEVINFO_MSIX_ENABLED	0x00000040
+
+
+#define	UPCI_STRING			"Userland PCI Driver"
 
 #ifdef __cplusplus
 }
