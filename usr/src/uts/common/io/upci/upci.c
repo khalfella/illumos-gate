@@ -83,8 +83,24 @@ upci_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	return (uiomove((void *)&data, sizeof (data), UIO_READ, uiop));
 }
 
+
+static upci_t *
+upci_find_dev_from_path_locked(char *devpath)
+{
+	upci_t *up;
+	mutex_enter(&upci_devices_lk);
+	for (up = avl_first(upci_devices);
+	    up != NULL && strcmp(up->up_devpath, devpath) != 0;
+	    up = AVL_NEXT(upci_devices, up))
+		;
+
+	if (up != NULL) mutex_enter(&up->up_lk);
+	mutex_exit(&upci_devices_lk);
+	return (up);
+}
+
 static int
-upci_list_devices_ioctl(upci_t *up, upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
+upci_list_devices_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
     cred_t *cr, int *rv)
 {
 	upci_t *pent;
@@ -124,6 +140,46 @@ out:
 }
 
 static int
+upci_list_open_device_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
+    cred_t *cr, int *rv)
+{
+	int rval = DDI_SUCCESS;
+	upci_t *up;
+	dev_info_t *dip;
+	upci_devinfo_t *pdi;
+
+	*rv = 0;
+	pdi = kmem_alloc(sizeof (*pdi), KM_SLEEP);
+	if (ucmd->cm_uibufsz >= MAXPATHLEN ||
+	    copyin((void *) ucmd->cm_uibuff, pdi->di_devpath,
+	    ucmd->cm_uibufsz) != 0 ||
+	    pdi->di_devpath[ucmd->cm_uibufsz - 1] != '\0' ||
+	    (up = upci_find_dev_from_path_locked(pdi->di_devpath)) == NULL ||
+	    up->up_flags != UPCI_DEVINFO_CLOSED) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
+
+	/* Device config open code goes here */
+
+	dip = up->up_dip;
+
+	if (pci_config_setup(dip, &up->up_hdl) != DDI_SUCCESS) {
+		cmn_err(CE_CONT, "Failed to access PCI config space \"%s\"\n",
+		    up->up_devpath);
+		*rv = EIO;
+		rval = DDI_FAILURE;
+	}
+	up->up_flags = UPCI_DEVINFO_CFG_OPEN;
+
+	mutex_exit(&up->up_lk);
+out:
+	kmem_free(pdi, sizeof (*pdi));
+	return (abs(rval));
+}
+
+
+static int
 upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 {
 	int rval = DDI_SUCCESS;
@@ -136,7 +192,11 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	
 	switch (cmd) {
 	case UPCI_IOCTL_LIST_DEVICES:
-		rval = upci_list_devices_ioctl(NULL, ucmd, (upci_cmd_t *)arg,
+		rval = upci_list_devices_ioctl(ucmd, (upci_cmd_t *)arg,
+		    cr, rv);
+	break;
+	case UPCI_IOCTL_OPEN_DEVICE:
+		rval = upci_list_open_device_ioctl(ucmd, (upci_cmd_t *)arg,
 		    cr, rv);
 	break;
 	default:
@@ -185,20 +245,14 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_PSEUDO,  0) == DDI_FAILURE)
 		return (DDI_FAILURE);
 
+	/* Initialize device properties */
 	up = kmem_zalloc(sizeof (*up), KM_SLEEP);
-
-	if (pci_config_setup(dip, &up->up_hdl) != DDI_SUCCESS) {
-		kmem_free(up, sizeof (*up));
-		ddi_remove_minor_node(dip, "upci");
-		cmn_err(CE_CONT, "Failed to access PCI config space\n");
-		return (DDI_FAILURE);
-	}
-
 	mutex_init(&up->up_lk, NULL, MUTEX_DRIVER, NULL);
-
 	up->up_dip = dip;
+	up->up_flags = UPCI_DEVINFO_CLOSED;
 	ddi_pathname(dip, up->up_devpath);
 
+	/* Add the device to the tree */
 	mutex_enter(&upci_devices_lk);
 	avl_add(upci_devices, up);
 	mutex_exit(&upci_devices_lk);

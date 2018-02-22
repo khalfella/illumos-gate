@@ -35,6 +35,7 @@
 
 /* Flags */
 static boolean_t g_lflag = B_FALSE;
+static boolean_t g_oflag = B_FALSE;
 static boolean_t g_vflag = B_FALSE;
 
 
@@ -44,11 +45,27 @@ static int g_fd = -1;
 static int
 usage(int status)
 {
-	fprintf(stderr, "Usage upci: [-l] [-h] [-v]\n"
-	    "\t-h show this help message\n"
+	fprintf(stderr, "Usage upci: [-l] [-h] [-o devpath] [-v]\n"
 	    "\t-l list PCI devices controlled by upci\n"
+	    "\t-o open a pci device\n"
+	    "\t-h show this help message\n"
 	    "\t-v verbose output\n");
 	exit(status);
+}
+
+static int
+upci_open_device(char *devpath)
+{
+	upci_cmd_t cmd;
+
+
+	cmd.cm_uibuff = (intptr_t)devpath;
+	cmd.cm_uibufsz = strlen(devpath) + 1;
+	if (ioctl(g_fd, UPCI_IOCTL_OPEN_DEVICE, &cmd) != 0) {
+		fprintf(stderr, "Failed to open \"%s\"\n", devpath);
+		return (1);
+	}
+	return (0);
 }
 
 static int
@@ -96,22 +113,39 @@ int
 main(int argc, char **argv)
 {
 	int c;
+	char *devpath = NULL;
 
-	while((c = getopt(argc, argv, "lhv")) != EOF) {
+	while((c = getopt(argc, argv, "lo:vh")) != EOF) {
 		switch (c) {
 		case 'l':
 			g_lflag = B_TRUE;
 		break;
-		case 'h':
-			return usage(0);
+
+		case 'o':
+			g_oflag = B_TRUE;
+			devpath = optarg;
 		break;
+
 		case 'v':
 			g_vflag = B_TRUE;
 		break;
+
+		case 'h':
+			return usage(0);
+		break;
+
 		default:
 			return usage(1);
 		break;
 		}
+	}
+
+	if (!g_lflag && !g_oflag) return usage(1);
+
+	/* Make sure the user has choosen acceptable flags combination */
+	if (g_lflag && g_oflag) {
+		fprintf(stderr, "-l and -o are mutually exclusive\n");
+		return usage(1);
 	}
 
 	if((g_fd = open(UPCI_DEV, O_RDONLY)) == -1) {
@@ -120,10 +154,11 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	/* Make sure the user has choosen acceptable flags combination */
-
+	/* Do the work */
 	if (g_lflag) {
 		return upci_list_devices();
+	} else if (g_oflag) {
+		return upci_open_device(devpath);
 	}
 
 	return usage(1);
