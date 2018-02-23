@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <string.h>
 #include <stropts.h>
@@ -35,13 +36,12 @@
 
 /* Flags */
 static boolean_t g_lflag = B_FALSE;
+static boolean_t g_vflag = B_FALSE;
+static boolean_t g_dflag = B_FALSE;
 static boolean_t g_oflag = B_FALSE;
 static boolean_t g_cflag = B_FALSE;
-static boolean_t g_vflag = B_FALSE;
-static boolean_t g_Rflag = B_FALSE;
-static boolean_t g_Wflag = B_FALSE;
-static boolean_t g_Oflag = B_FALSE;
-static boolean_t g_Cflag = B_FALSE;
+static boolean_t g_rflag = B_FALSE;
+static boolean_t g_wflag = B_FALSE;
 
 
 
@@ -50,51 +50,199 @@ static int g_fd = -1;
 static int
 usage(int status)
 {
-	fprintf(stderr, "Usage upci: [-l] [-h] [-o devpath] [-c devpath] [-v]\n"
+	fprintf(stderr, "Usage upci: -l [-v] -d devpath\n"
+	    "\t-o -d devpath\n"
+	    "\t-c -d devpath\n"
+	    "\t-r [region:]offset:length -d devpath\n"
+	    "\t-w [region:]offset:length:data -d devpath\n"
+	    "\t\n"
 	    "\t-l list PCI devices controlled by upci\n"
 	    "\t-o open a pci device\n"
 	    "\t-c close a pci device\n"
-	    "\t-R read cfg of pci device\n"
-	    "\t-W write cfg of pci device\n"
-	    "\t-O read/write offset - R/W\n"
-	    "\t-C read/write count - R/W\n"
-	    "\t-c close a pci device\n"
-	    "\t-h show this help message\n"
+	    "\t-r read data out of a pci device\n"
+	    "\t-w write data to a pci device\n"
 	    "\t-v verbose output\n");
 	exit(status);
 }
 
-static int
-upci_cfg_read(char *devpath, char *offset, char *count)
+/*
+static void *
+upci_malloc(size_t sz)
 {
-	uint64_t buff = 0;
-	upci_cmd_t cmd;
-	upci_cfg_rw_t rw;
-
-
-	strcpy(rw.rw_devpath ,devpath);
-	rw.rw_offset = atoi(offset);
-	rw.rw_count = atoi(count);
-
-	strcpy(cmd.cm_devpath, devpath);
-	cmd.cm_uibuff = (intptr_t) &rw;
-	cmd.cm_uibufsz = sizeof(rw);
-	cmd.cm_uobuff = (intptr_t) &buff;
-	cmd.cm_uobufsz = atoi(count);
-
-	if (ioctl(g_fd, UPCI_IOCTL_CFG_READ, &cmd) != 0) {
-		fprintf(stderr, "Failed to cfg read \"%s\"\n", devpath);
-		return (1);
+	void *ptr;
+	if ((ptr = malloc(sz)) == NULL) {
+		fprintf(stderr, "Error: Failed to allocate memory\n");
+		exit(1);
 	}
-
-	printf("%X\n", buff);
-	
-	return (0);
+	return (ptr);
+}
+*/
+static void *
+upci_strdup(char *s1)
+{
+	char *s2;
+	if ((s2 = strdup(s1)) == NULL) {
+		fprintf(stderr, "Error: Failed to allocate memory\n");
+		exit(1);
+	}
+	return (s1);
 }
 
 static int
-upci_cfg_write(char *devpath, char *offset, char *count)
+upci_is_hex(char *s)
 {
+	 while ((*s = tolower(*s))) {
+		if (!isdigit(*s) && !(*s >= 'a' && *s <= 'f'))
+			return (0);
+		s++;
+	}
+	return (*s == '\0');
+}
+
+static int
+upci_parse_command(char *rwcom, int *oreg, uint64_t *ooff,
+    char *olen, char *odata)
+{
+	int rval = 1;
+	char *sstr, *str, *tmp;
+	char *reg, *off, *len, *data;
+	char *c;
+
+	/* Copy the command string */
+	sstr = str = upci_strdup(rwcom);
+
+	if ((off = strsep(&str, ":")) == NULL) goto out;
+
+	/* By default set region to -1 */
+	*oreg = -1;
+	if ((tmp = strchr(off, '-')) != NULL) {
+		*tmp++ = '\0';
+		reg = off;
+		off = tmp;
+
+		/* Check and output regeion */
+		if (*reg == '\0' ||
+		    strlen(reg) > 2 ||
+		    !upci_is_hex(reg)) {
+			goto out;
+		}
+		*oreg = strtol(reg, NULL, 16);
+	}
+
+	/* Check and output offset */
+	if (*off == '\0' ||
+	    strlen(off) > 16 ||
+	    !upci_is_hex(off)) {
+		goto out;
+	}
+	*ooff = strtoll(off, NULL, 16);
+
+
+	/* Extract check and output length */
+	if ((len = strsep(&str, ":")) == NULL ||
+	    *len == '\0' ||
+	    strlen(len) > 1 ||
+	    !upci_is_hex(len)) {
+		goto out;
+	}
+	*olen = strtol(len, NULL, 16);
+
+
+
+	/* Validate length in {1, 2, 4, 8} */
+	if (*olen != 1 &&
+	    *olen != 2 &&
+	    *olen != 4 &&
+	    *olen != 8) {
+		goto out;
+	}
+
+	/* In case we are writing data */
+	if (g_wflag) {
+
+		/* Validate and check data */
+		if ((data = strsep(&str, ":")) == NULL ||
+		    *data == '\0' ||
+		    strlen(data) > 16 ||
+		    !upci_is_hex(data) ||
+		    (*olen * 2) != strlen(data)) {
+			goto out;
+		}
+
+		/* Convert text hex to bin */
+		c = data;
+		while (*c) {
+			if (isdigit(*c))
+				*odata = *c - '0';
+			else
+				*odata = 10 + *c - 'a';
+
+			*odata <<= 4; c++;
+
+			if (isdigit(*c))
+				*odata += *c - '0';
+			else
+				*odata += 10 + *c - 'a';
+
+			odata++; c++;
+		}
+	}
+
+	/* Check for extra fields */
+	if (strsep(&str, ":") == NULL)
+		rval = 0;
+
+out:
+	free(sstr);
+	return (rval);
+}
+
+static int
+upci_rw(char *rwcom, char *devpath)
+{
+	char len;
+	char datain[8], dataout[8];
+	int i, reg, ioctlcmd;
+	uint64_t off;
+	upci_cmd_t cmd;
+	upci_cfg_rw_t rw;
+
+	if (upci_parse_command(rwcom, &reg, &off, &len, datain) != 0) {
+		fprintf(stderr, "Error: Failed to parse command\n");
+		return (1);
+	}
+
+	if (reg != -1) {
+		fprintf(stderr, "Region I/O is not implemented yet\n");
+		return (1);
+	}
+
+	strcpy(rw.rw_devpath ,devpath);
+	rw.rw_offset = off;
+	rw.rw_count = len;
+
+	strcpy(cmd.cm_devpath, devpath);
+	cmd.cm_uibuff = (uintptr_t) &rw;
+	cmd.cm_uibufsz = sizeof(rw);
+	cmd.cm_uobuff = (uintptr_t) (g_wflag ? datain : dataout);
+	cmd.cm_uobufsz = len;
+
+	ioctlcmd = g_wflag ? UPCI_IOCTL_CFG_WRITE: UPCI_IOCTL_CFG_READ;
+
+	if (ioctl(g_fd, ioctlcmd, &cmd) != 0) {
+		fprintf(stderr, "Error: I/O ioctl "
+		    "failed for \"%s\"\n", devpath);
+		return (1);
+	}
+
+
+	if (g_rflag) {
+		for (i = 0; i < len; i++) {
+			printf("%02x", dataout[i] & 0xff);
+		}
+		putchar('\n');
+	}
+	
 	return (0);
 }
 
@@ -171,60 +319,45 @@ int
 main(int argc, char **argv)
 {
 	int c;
-	char *devpath, *offset, *count;
+	char *devpath, *rwcom;
 
-	devpath = offset = count = NULL;
-	while((c = getopt(argc, argv, "lo:c:R:W:O:C:vh")) != EOF) {
+	devpath = rwcom = NULL;
+	while((c = getopt(argc, argv, "lvd:ocr:w:h")) != EOF) {
 		switch (c) {
 		case 'l':
 			g_lflag = B_TRUE;
 		break;
-
-		case 'o':
-			g_oflag = B_TRUE;
-			devpath = optarg;
-		break;
-
-		case 'c':
-			g_cflag = B_TRUE;
-			devpath = optarg;
-		break;
-
-		case 'R':
-			g_Rflag = B_TRUE;
-			devpath = optarg;
-		break;
-
-		case 'W':
-			g_Wflag = B_TRUE;
-			devpath = optarg;
-		break;
-
-		case 'O':
-			g_Oflag = B_TRUE;
-			offset = optarg;
-		break;
-
-		case 'C':
-			g_Cflag = B_TRUE;
-			count = optarg;
-		break;
-
 		case 'v':
 			g_vflag = B_TRUE;
 		break;
-
-		case 'h':
-			return usage(0);
+		case 'd':
+			g_dflag = B_TRUE;
+			devpath = optarg;
 		break;
-
+		case 'o':
+			g_oflag = B_TRUE;
+		break;
+		case 'c':
+			g_cflag = B_TRUE;
+		break;
+		case 'r':
+			g_rflag = B_TRUE;
+			rwcom = optarg;
+		break;
+		case 'w':
+			g_wflag = B_TRUE;
+			rwcom = optarg;
+		break;
+		case 'h':
 		default:
 			return usage(1);
 		break;
 		}
 	}
 
-	if (g_lflag + g_oflag + g_cflag + g_Rflag + g_Wflag != 1)
+	if (g_lflag + g_oflag + g_cflag + g_rflag + g_wflag != 1)
+		return usage(1);
+	if (!g_dflag)
 		return usage(1);
 
 	if((g_fd = open(UPCI_DEV, O_RDONLY)) == -1) {
@@ -240,12 +373,8 @@ main(int argc, char **argv)
 		return upci_open_device(devpath);
 	} else if (g_cflag) {
 		return upci_close_device(devpath);
-	} else if (g_Rflag) {
-		if (!g_Oflag || !g_Cflag) return usage(1);
-		return upci_cfg_read(devpath, offset, count);
-	} else if (g_Wflag) {
-		if (!g_Oflag || !g_Cflag) return usage(1);
-		return upci_cfg_write(devpath, offset, count);
+	} else if (g_rflag || g_wflag) {
+			return upci_rw(rwcom, devpath);
 	}
 
 	return usage(1);
