@@ -56,6 +56,12 @@ typedef struct upci_devinfo_s {
 #define	UPCI_DEVINFO_MSI_ENABLED	0x00000020
 #define	UPCI_DEVINFO_MSIX_ENABLED	0x00000040
 
+typedef struct upci_cfg_rw_s {
+	char		rw_devpath[MAXPATHLEN];
+	uint64_t	rw_offset;
+	uint64_t	rw_count;
+} upci_cfg_rw_t;
+
 
 #define	UPCI_STRING			"Userland PCI Driver"
 

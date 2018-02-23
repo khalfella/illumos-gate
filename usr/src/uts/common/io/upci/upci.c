@@ -220,6 +220,89 @@ out:
 
 
 static int
+upci_cfg_rw_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup, cred_t *cr, int *rv,
+    int write)
+{
+	int rval = DDI_SUCCESS;
+	uint64_t buff;
+	upci_t *up;
+	upci_cfg_rw_t *crw;
+
+	*rv = 0;
+	crw = kmem_alloc(sizeof (*crw), KM_SLEEP);
+	if (ucmd->cm_uibufsz != sizeof (upci_cfg_rw_t) ||
+	    copyin((void *) ucmd->cm_uibuff, crw, ucmd->cm_uibufsz) != 0 ||
+	    (up = upci_find_dev_from_path_locked(crw->rw_devpath)) == NULL) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
+
+	/* TODO: Check offset + count <= PCI config space size */
+	if (!(up->up_flags & UPCI_DEVINFO_CFG_OPEN) ||
+	    (crw->rw_count != 1 && crw->rw_count != 2 &&
+	    crw->rw_count != 4 && crw->rw_count != 8) ||
+	    ucmd->cm_uobufsz != crw->rw_count) {
+		rval = *rv = EINVAL;
+		goto out2;
+	}
+	if (write) goto write;
+
+	/* Read */
+	switch (crw->rw_count) {
+	case 1:
+		*((uint8_t *)&buff) = pci_config_get8(up->up_hdl,
+		    crw->rw_offset);
+	break;
+	case 2:
+		*((uint16_t *)&buff) = pci_config_get16(up->up_hdl,
+		    crw->rw_offset);
+	break;
+	case 4:
+		*((uint32_t *)&buff) = pci_config_get32(up->up_hdl,
+		    crw->rw_offset);
+	break;
+	case 8:
+		*((uint64_t *)&buff) = pci_config_get64(up->up_hdl,
+		    crw->rw_offset);
+	break;
+	}
+
+	if (copyout(&buff, (void *) ucmd->cm_uobuff, crw->rw_count) == 0)
+		goto out2;
+write:
+	if (copyin((void *) ucmd->cm_uobuff, &buff, crw->rw_count) == 0) {
+		switch (crw->rw_count) {
+		case 1:
+			pci_config_put8(up->up_hdl, crw->rw_offset,
+			    *((uint8_t *)&buff));
+		break;
+		case 2:
+			pci_config_put16(up->up_hdl, crw->rw_offset,
+			    *((uint16_t *)&buff));
+		break;
+		case 4:
+			pci_config_put32(up->up_hdl, crw->rw_offset,
+			    *((uint32_t *)&buff));
+		break;
+		case 8:
+			pci_config_put64(up->up_hdl, crw->rw_offset,
+			    *((uint64_t *)&buff));
+		break;
+		}
+		goto out2;
+	}
+
+	/* Handle error */
+	rval = *rv = EINVAL;
+out2:
+	mutex_exit(&up->up_lk);
+out:
+	kmem_free(crw, sizeof (*crw));
+	return (abs(rval));
+}
+
+
+static int
 upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 {
 	int rval = DDI_SUCCESS;
@@ -242,6 +325,14 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case UPCI_IOCTL_CLOSE_DEVICE:
 		rval = upci_list_close_device_ioctl(ucmd, (upci_cmd_t *)arg,
 		    cr, rv);
+	break;
+	case UPCI_IOCTL_CFG_READ:
+		rval = upci_cfg_rw_ioctl(ucmd, (upci_cmd_t *)arg,
+		    cr, rv, 0);
+	break;
+	case UPCI_IOCTL_CFG_WRITE:
+		rval = upci_cfg_rw_ioctl(ucmd, (upci_cmd_t *)arg,
+		    cr, rv, 1);
 	break;
 	default:
 		*rv = EINVAL;
