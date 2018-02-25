@@ -24,13 +24,15 @@
 #include <unistd.h>
 #include <string.h>
 #include <stropts.h>
+#include <libdevinfo.h>
 #include <sys/types.h>
+#include <sys/mkdev.h>
 #include <sys/stat.h>
 
 
 #include <sys/upci.h>
 
-#define UPCI_DEV	"/devices/pci@0,0/pci15ad,1976@0:upci"
+#define UPCI_DEV	"/devices/pci@0,0/pci15ad,7a0@15/pci15ad,7b0@0:upci"
 #define UPCI_MAX_DEVS	10
 
 
@@ -275,11 +277,49 @@ upci_close_device(char *devpath)
 }
 
 static int
+upci_list_devices_devinfo()
+{
+	int instance;
+	di_minor_t minor;
+	di_node_t root, node;
+	char *path;
+	dev_t dev;
+
+	if ((root = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
+		fprintf(stderr, "Error: failed to initialize libdevinfo\n");
+		return (1);
+	}
+
+	node = di_drv_first_node("upci", root);
+	while (node != DI_NODE_NIL) {
+
+		minor = DI_MINOR_NIL;
+		instance = di_instance(node);
+
+		while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
+
+			path = di_devfs_minor_path(minor);
+			dev = di_minor_devt(minor);
+			printf("[%02d %03d:%02d] /devices%s\n", instance,
+			    major(dev), minor(dev), path);
+			di_devfs_path_free(path);
+			node = di_drv_next_node(node);
+		}
+
+		node = di_drv_next_node(node);
+	}
+
+	return (0);
+}
+
+static int
 upci_list_devices()
 {
 	int i, devcnt;
 	upci_cmd_t cmd;
 	upci_devinfo_t *di;
+
+	return upci_list_devices_devinfo();
 
 	if ((di = malloc(sizeof (upci_devinfo_t) * UPCI_MAX_DEVS)) == NULL) {
 		fprintf(stderr, "Failed to allocate memory\n");

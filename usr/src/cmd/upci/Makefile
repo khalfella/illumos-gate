@@ -17,6 +17,8 @@ PROG =  upci
 
 include ../Makefile.cmd
 
+LDLIBS  += -ldevinfo
+
 all: $(PROG)
 
 install: all $(ROOTPROG)
