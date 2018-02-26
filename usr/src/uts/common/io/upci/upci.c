@@ -36,7 +36,6 @@
 #define	abs(a) ((a) < 0 ? -(a) : (a))
 
 typedef struct upci_s {
-	char			up_devpath[MAXPATHLEN];
 	dev_info_t		*up_dip;
 	ddi_acc_handle_t 	up_hdl;
 	kmutex_t		up_lk;
@@ -104,8 +103,8 @@ upci_list_open_device_ioctl(dev_t dev, upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
 	dip = up->up_dip;
 
 	if (pci_config_setup(dip, &up->up_hdl) != DDI_SUCCESS) {
-		cmn_err(CE_CONT, "Failed to access PCI config space \"%s\"\n",
-		    up->up_devpath);
+		cmn_err(CE_CONT, "Error: filed to setup PCI config space [%d]\n",
+		    instance);
 		*rv = EIO;
 		rval = DDI_FAILURE;
 	}
@@ -330,11 +329,10 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&up->up_lk, NULL, MUTEX_DRIVER, NULL);
 	up->up_dip = dip;
 	up->up_flags = UPCI_DEVINFO_CLOSED;
-	ddi_pathname(dip, up->up_devpath);
 
 	ddi_set_driver_private(dip, (caddr_t)up);
 
-	cmn_err(CE_CONT, "Attached \"%s\"\n", up->up_devpath);
+	cmn_err(CE_CONT, "Attached [%d]\n", instance);
 
 	return (DDI_SUCCESS);
 }
@@ -354,7 +352,7 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (up == NULL || up->up_flags != UPCI_DEVINFO_CLOSED)
 		return (DDI_FAILURE);
 
-	cmn_err(CE_CONT, "Detached \"%s\"\n", up->up_devpath);
+	cmn_err(CE_CONT, "Detached [%d]\n", instance);
 
 	ddi_remove_minor_node(dip, "upci");
 	mutex_destroy(&up->up_lk);
