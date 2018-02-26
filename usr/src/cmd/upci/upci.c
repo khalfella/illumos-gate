@@ -24,17 +24,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <stropts.h>
+#include <errno.h>
 #include <libdevinfo.h>
 #include <sys/types.h>
 #include <sys/mkdev.h>
 #include <sys/stat.h>
 
-
 #include <sys/upci.h>
-
-#define UPCI_DEV	"/devices/pci@0,0/pci15ad,7a0@15/pci15ad,7b0@0:upci"
-#define UPCI_MAX_DEVS	10
-
 
 /* Flags */
 static boolean_t g_lflag = B_FALSE;
@@ -45,18 +41,17 @@ static boolean_t g_cflag = B_FALSE;
 static boolean_t g_rflag = B_FALSE;
 static boolean_t g_wflag = B_FALSE;
 
+/* devinfo root node */
+static di_node_t g_di_root;
 
-
-static int g_fd = -1;
-
-static int
-usage(int status)
+static void
+usage()
 {
-	fprintf(stderr, "Usage upci: -l [-v] -d devpath\n"
-	    "\t-o -d devpath\n"
-	    "\t-c -d devpath\n"
-	    "\t-r [region:]offset:length -d devpath\n"
-	    "\t-w [region:]offset:length:data -d devpath\n"
+	fprintf(stderr, "Usage upci: -l [-v]\n"
+	    "\t-o -d dev\n"
+	    "\t-c -d dev\n"
+	    "\t-r [region:]offset:length -d dev\n"
+	    "\t-w [region:]offset:length:data -d dev\n"
 	    "\t\n"
 	    "\t-l list PCI devices controlled by upci\n"
 	    "\t-o open a pci device\n"
@@ -64,7 +59,6 @@ usage(int status)
 	    "\t-r read data out of a pci device\n"
 	    "\t-w write data to a pci device\n"
 	    "\t-v verbose output\n");
-	exit(status);
 }
 
 /*
@@ -79,6 +73,7 @@ upci_malloc(size_t sz)
 	return (ptr);
 }
 */
+
 static void *
 upci_strdup(char *s1)
 {
@@ -87,7 +82,7 @@ upci_strdup(char *s1)
 		fprintf(stderr, "Error: Failed to allocate memory\n");
 		exit(1);
 	}
-	return (s1);
+	return (s2);
 }
 
 static int
@@ -99,6 +94,32 @@ upci_is_hex(char *s)
 		s++;
 	}
 	return (*s == '\0');
+}
+
+static int
+upci_open_minor(int dev)
+{
+	di_minor_t minor;
+	di_node_t node;
+	char *path;
+	char opath[MAXPATHLEN];
+
+	node = di_drv_first_node("upci", g_di_root);
+	while (node != DI_NODE_NIL) {
+
+		minor = DI_MINOR_NIL;
+
+		if ((di_instance(node) == dev) &&
+		    (minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
+			path = di_devfs_minor_path(minor);
+			sprintf(opath, "/devices%s",path);
+			di_devfs_path_free(path);
+			return open(opath, O_RDWR);
+		}
+		node = di_drv_next_node(node);
+	}
+
+	return (-1);
 }
 
 static int
@@ -139,7 +160,6 @@ upci_parse_command(char *rwcom, int *oreg, uint64_t *ooff,
 	}
 	*ooff = strtoll(off, NULL, 16);
 
-
 	/* Extract check and output length */
 	if ((len = strsep(&str, ":")) == NULL ||
 	    *len == '\0' ||
@@ -148,8 +168,6 @@ upci_parse_command(char *rwcom, int *oreg, uint64_t *ooff,
 		goto out;
 	}
 	*olen = strtol(len, NULL, 16);
-
-
 
 	/* Validate length in {1, 2, 4, 8} */
 	if (*olen != 1 &&
@@ -193,21 +211,20 @@ upci_parse_command(char *rwcom, int *oreg, uint64_t *ooff,
 	/* Check for extra fields */
 	if (strsep(&str, ":") == NULL)
 		rval = 0;
-
 out:
 	free(sstr);
 	return (rval);
 }
 
+/* TODO: Use the same variable for datain and dataout */
 static int
-upci_rw(char *rwcom, char *devpath)
+upci_rw(char *rwcom, int dev)
 {
 	char len;
 	char datain[8], dataout[8];
-	int i, reg, ioctlcmd;
+	int i, reg, ioctlcmd, fd, rval = 0;
 	uint64_t off;
-	upci_cmd_t cmd;
-	upci_cfg_rw_t rw;
+	upci_rw_cmd_t rw;
 
 	if (upci_parse_command(rwcom, &reg, &off, &len, datain) != 0) {
 		fprintf(stderr, "Error: Failed to parse command\n");
@@ -219,61 +236,70 @@ upci_rw(char *rwcom, char *devpath)
 		return (1);
 	}
 
-	strcpy(rw.rw_devpath ,devpath);
+	rw.rw_region = reg;
 	rw.rw_offset = off;
 	rw.rw_count = len;
+	rw.rw_pdatain = (uintptr_t) datain;
+	rw.rw_pdataout = (uintptr_t) dataout;
 
-	strcpy(cmd.cm_devpath, devpath);
-	cmd.cm_uibuff = (uintptr_t) &rw;
-	cmd.cm_uibufsz = sizeof(rw);
-	cmd.cm_uobuff = (uintptr_t) (g_wflag ? datain : dataout);
-	cmd.cm_uobufsz = len;
+	ioctlcmd = g_wflag ? UPCI_IOCTL_WRITE: UPCI_IOCTL_READ;
 
-	ioctlcmd = g_wflag ? UPCI_IOCTL_CFG_WRITE: UPCI_IOCTL_CFG_READ;
-
-	if (ioctl(g_fd, ioctlcmd, &cmd) != 0) {
-		fprintf(stderr, "Error: I/O ioctl "
-		    "failed for \"%s\"\n", devpath);
+	if ((fd = upci_open_minor(dev)) == -1) {
+		fprintf(stderr, "Error: Failed to open [%d]\n", dev);
 		return (1);
+	}
+
+	if (ioctl(fd, ioctlcmd, &rw) != 0) {
+		fprintf(stderr, "Error: I/O ioctl failed for [%d]\n", dev);
+		rval = 1;
+		goto out;
 	}
 
 
 	if (g_rflag) {
-		for (i = 0; i < len; i++) {
+		for (i = 0; i < len; i++)
 			printf("%02x", dataout[i] & 0xff);
-		}
 		putchar('\n');
 	}
-	
-	return (0);
+out:
+	close(fd);
+	return (rval);
 }
 
 static int
-upci_open_device(char *devpath)
+upci_open_device(int dev)
 {
-	upci_cmd_t cmd;
+	int fd, rval = 0;
 
-	cmd.cm_uibuff = (intptr_t)devpath;
-	cmd.cm_uibufsz = strlen(devpath) + 1;
-	if (ioctl(g_fd, UPCI_IOCTL_OPEN_DEVICE, &cmd) != 0) {
-		fprintf(stderr, "Failed to open \"%s\"\n", devpath);
+	if ((fd = upci_open_minor(dev)) == -1) {
+		fprintf(stderr, "Error: Failed to open [%d]\n", dev);
 		return (1);
 	}
-	return (0);
+
+	if (ioctl(fd, UPCI_IOCTL_OPEN, NULL) != 0) {
+		fprintf(stderr, "Failed to open [%d]\n", dev);
+		rval = 1;
+	}
+	close(fd);
+	return (rval);
 }
 
 static int
-upci_close_device(char *devpath)
+upci_close_device(int dev)
 {
-	upci_cmd_t cmd;
+	int fd, rval = 0;
 
-	cmd.cm_uibuff = (intptr_t)devpath;
-	cmd.cm_uibufsz = strlen(devpath) + 1;
-	if (ioctl(g_fd, UPCI_IOCTL_CLOSE_DEVICE, &cmd) != 0) {
-		fprintf(stderr, "Failed to close \"%s\"\n", devpath);
+	if ((fd = upci_open_minor(dev)) == -1) {
+		fprintf(stderr, "Error: Failed to open [%d]\n", dev);
 		return (1);
 	}
-	return (0);
+
+	if (ioctl(fd, UPCI_IOCTL_CLOSE, NULL) != 0) {
+		fprintf(stderr, "Failed to close [%d]\n", dev);
+		rval = 1;
+	}
+	close(fd);
+	return (rval);
 }
 
 static int
@@ -281,31 +307,22 @@ upci_list_devices()
 {
 	int instance;
 	di_minor_t minor;
-	di_node_t root, node;
+	di_node_t node;
 	char *path;
 	dev_t dev;
 
-	if ((root = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
-		fprintf(stderr, "Error: failed to initialize libdevinfo\n");
-		return (1);
-	}
-
-	node = di_drv_first_node("upci", root);
+	node = di_drv_first_node("upci", g_di_root);
 	while (node != DI_NODE_NIL) {
 
 		minor = DI_MINOR_NIL;
 		instance = di_instance(node);
-
-		while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
-
+		if ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
 			path = di_devfs_minor_path(minor);
 			dev = di_minor_devt(minor);
 			printf("[%02d %03d:%02d] /devices%s\n", instance,
 			    major(dev), minor(dev), path);
 			di_devfs_path_free(path);
-			node = di_drv_next_node(node);
 		}
-
 		node = di_drv_next_node(node);
 	}
 
@@ -315,10 +332,10 @@ upci_list_devices()
 int
 main(int argc, char **argv)
 {
-	int c;
-	char *devpath, *rwcom;
+	int c, dev, rval = 1;
+	char *devstr, *rwcom, *str;
 
-	devpath = rwcom = NULL;
+	devstr = rwcom = NULL;
 	while((c = getopt(argc, argv, "lvd:ocr:w:h")) != EOF) {
 		switch (c) {
 		case 'l':
@@ -329,7 +346,7 @@ main(int argc, char **argv)
 		break;
 		case 'd':
 			g_dflag = B_TRUE;
-			devpath = optarg;
+			devstr = optarg;
 		break;
 		case 'o':
 			g_oflag = B_TRUE;
@@ -347,32 +364,50 @@ main(int argc, char **argv)
 		break;
 		case 'h':
 		default:
-			return usage(1);
+			usage();
+			goto out;
 		break;
 		}
 	}
 
-	if (g_lflag + g_oflag + g_cflag + g_rflag + g_wflag != 1)
-		return usage(1);
-	if (!g_dflag)
-		return usage(1);
-
-	if((g_fd = open(UPCI_DEV, O_RDONLY)) == -1) {
-		fprintf(stderr, "Failed to open upci device \"%s\"\n",
-		    UPCI_DEV);
-		return (1);
+	if (g_lflag + g_oflag + g_cflag + g_rflag + g_wflag != 1) {
+		usage();
+		goto out;
+	}
+	if (!g_lflag && !g_dflag) {
+		usage();
+		goto out;
 	}
 
-	/* Do the work */
+	if ((g_di_root = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
+		fprintf(stderr, "Error: failed to initialize libdevinfo\n");
+		goto out;
+	}
+
+	/* list upci devices */
 	if (g_lflag) {
-		return upci_list_devices();
-	} else if (g_oflag) {
-		return upci_open_device(devpath);
-	} else if (g_cflag) {
-		return upci_close_device(devpath);
-	} else if (g_rflag || g_wflag) {
-			return upci_rw(rwcom, devpath);
+		rval = upci_list_devices();
+		goto out2;
 	}
 
-	return usage(1);
+
+	errno = 0;
+	dev = strtol(devstr, &str, 10);
+	if (*str || errno != 0) {
+		usage();
+		goto out2;
+	}
+
+	if (g_oflag) {
+		rval = upci_open_device(dev);
+	} else if (g_cflag) {
+		rval = upci_close_device(dev);
+	} else if (g_rflag || g_wflag) {
+		rval = upci_rw(rwcom, dev);
+	}
+
+out2:
+	di_fini(g_di_root);
+out:
+	return (rval);
 }
