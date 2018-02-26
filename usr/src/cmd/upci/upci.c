@@ -277,7 +277,7 @@ upci_close_device(char *devpath)
 }
 
 static int
-upci_list_devices_devinfo()
+upci_list_devices()
 {
 	int instance;
 	di_minor_t minor;
@@ -309,49 +309,6 @@ upci_list_devices_devinfo()
 		node = di_drv_next_node(node);
 	}
 
-	return (0);
-}
-
-static int
-upci_list_devices()
-{
-	int i, devcnt;
-	upci_cmd_t cmd;
-	upci_devinfo_t *di;
-
-	return upci_list_devices_devinfo();
-
-	if ((di = malloc(sizeof (upci_devinfo_t) * UPCI_MAX_DEVS)) == NULL) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		return (1);
-	}
-
-	cmd.cm_uobufsz = sizeof (upci_devinfo_t) * UPCI_MAX_DEVS;
-	cmd.cm_uobuff = (uint64_t)((intptr_t) di);
-
-	if (ioctl(g_fd, UPCI_IOCTL_LIST_DEVICES, &cmd) != 0) {
-		fprintf(stderr, "upci driver LIST_DEVICES ioctl failed\n");
-		return (1);
-	}
-
-	devcnt = cmd.cm_uobufsz / sizeof (upci_devinfo_t);
-	printf("%ld devices to list:\n", devcnt);
-
-	for (i = 0; i < devcnt; i++) {
-
-		if (!g_vflag) {
-			printf("dev[%d]: di_devpath = \"%-40s\" flags = %x\n",
-			    i, di[i].di_devpath, di[i].di_flags);
-			continue;
-		}
-
-		/* Verbose */
-		printf("dev[%d]:\n", i);
-		printf("    di_devpath = \"%s\"\n", di[i].di_devpath);
-		printf("    di_flags = %x\n", di[i].di_flags);
-	}
-
-	free(di);
 	return (0);
 }
 

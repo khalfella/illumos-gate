@@ -30,13 +30,12 @@ typedef struct upci_cmd_s {
 	uint64_t	cm_uobufsz;		/* userland buffer out sz */
 } upci_cmd_t;
 
-#define	UPCI_IOCTL_LIST_DEVICES		0x01
-#define	UPCI_IOCTL_OPEN_DEVICE		0x02
-#define	UPCI_IOCTL_CLOSE_DEVICE		0x03
-#define	UPCI_IOCTL_CFG_READ		0x04
-#define	UPCI_IOCTL_CFG_WRITE		0x05
-#define	UPCI_IOCTL_REG_READ		0x06
-#define	UPCI_IOCTL_REG_WRITE		0x07
+#define	UPCI_IOCTL_OPEN_DEVICE		0x01
+#define	UPCI_IOCTL_CLOSE_DEVICE		0x02
+#define	UPCI_IOCTL_CFG_READ		0x03
+#define	UPCI_IOCTL_CFG_WRITE		0x04
+#define	UPCI_IOCTL_REG_READ		0x05
+#define	UPCI_IOCTL_REG_WRITE		0x06
 
 
 /*

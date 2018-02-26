@@ -27,7 +27,6 @@
 #include <sys/errno.h>
 #include <sys/uio.h>
 #include <sys/ksynch.h>
-#include <sys/avl.h>
 
 #include <sys/pci_impl.h>
 #include <sys/ddi_isa.h>
@@ -42,22 +41,9 @@ typedef struct upci_s {
 	ddi_acc_handle_t 	up_hdl;
 	kmutex_t		up_lk;
 	uint64_t		up_flags;
-	avl_node_t		up_avl;
 } upci_t;
 
-static avl_tree_t	*upci_devices;		/* Tree of devices under upci */
-static kmutex_t		upci_devices_lk;	/* Tree lock */
-
-static int
-upci_devices_cmp(const void *l, const void *r) {
-	upci_t *lpci = (upci_t *)l;
-	upci_t *rpci = (upci_t *)r;
-	int cmp = strncmp(lpci->up_devpath, rpci->up_devpath, MAXPATHLEN);
-
-	if (cmp != 0)
-		return cmp/abs(cmp);
-	return (0);
-}
+static void		*soft_state_p;
 
 static int
 upci_open(dev_t *devp, int flag, int otyp, cred_t *credp)
@@ -84,80 +70,29 @@ upci_read(dev_t dev, struct uio *uiop, cred_t *credp)
 }
 
 
-static upci_t *
-upci_find_dev_from_path_locked(char *devpath)
-{
-	upci_t *up;
-	mutex_enter(&upci_devices_lk);
-	for (up = avl_first(upci_devices);
-	    up != NULL && strcmp(up->up_devpath, devpath) != 0;
-	    up = AVL_NEXT(upci_devices, up))
-		;
-
-	if (up != NULL) mutex_enter(&up->up_lk);
-	mutex_exit(&upci_devices_lk);
-	return (up);
-}
-
 static int
-upci_list_devices_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
-    cred_t *cr, int *rv)
-{
-	upci_t *pent;
-	upci_devinfo_t *pdi, *pudi;
-	int rval = DDI_SUCCESS;
-	unsigned long devcnt;
-
-	*rv = 0;
-	pdi = kmem_alloc(sizeof (*pdi), KM_SLEEP);
-	mutex_enter(&upci_devices_lk);
-	devcnt = avl_numnodes(upci_devices);
-	if (ucmd->cm_uobufsz < (devcnt * sizeof (upci_devinfo_t))) {
-		rval = *rv = EINVAL;
-		goto out;
-	}
-
-	pudi = (upci_devinfo_t *) ucmd->cm_uobuff;
-
-	for (pent = avl_first(upci_devices); pent != NULL;
-	    pent = AVL_NEXT(upci_devices, pent)) {
-		strcpy(pdi->di_devpath, pent->up_devpath);
-		pdi->di_flags = pent->up_flags;
-		if (copyout(pdi, pudi++, sizeof (upci_devinfo_t)) != 0) {
-			rval = *rv = EINVAL;
-			goto out;
-		}
-	}
-
-	uint64_t uobufsz = devcnt * sizeof (upci_devinfo_t);
-	if (copyout(&uobufsz, &ucmdup->cm_uobufsz, sizeof (uint64_t)) != 0) {
-		rval = *rv = EINVAL;
-	}
-out:
-	mutex_exit(&upci_devices_lk);
-	kmem_free(pdi, sizeof (*pdi));
-	return (abs(rval));
-}
-
-static int
-upci_list_open_device_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
+upci_list_open_device_ioctl(dev_t dev, upci_cmd_t *ucmd, upci_cmd_t *ucmdup,
     cred_t *cr, int *rv)
 {
 	int rval = DDI_SUCCESS;
 	upci_t *up;
+	minor_t instance;
 	dev_info_t *dip;
 	upci_devinfo_t *pdi;
 
 	*rv = 0;
+	instance = getminor(dev);
 	pdi = kmem_alloc(sizeof (*pdi), KM_SLEEP);
 	if (ucmd->cm_uibufsz >= MAXPATHLEN ||
 	    copyin((void *) ucmd->cm_uibuff, pdi->di_devpath,
 	    ucmd->cm_uibufsz) != 0 ||
 	    pdi->di_devpath[ucmd->cm_uibufsz - 1] != '\0' ||
-	    (up = upci_find_dev_from_path_locked(pdi->di_devpath)) == NULL) {
+	    (up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
 		rval = *rv = EINVAL;
 		goto out;
 	}
+
+	mutex_enter(&up->up_lk);
 
 	if (up->up_flags != UPCI_DEVINFO_CLOSED) {
 		rval = *rv = EINVAL;
@@ -184,23 +119,27 @@ out:
 }
 
 static int
-upci_list_close_device_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup, cred_t *cr,
+upci_list_close_device_ioctl(dev_t dev, upci_cmd_t *ucmd, upci_cmd_t *ucmdup, cred_t *cr,
     int *rv)
 {
 	int rval = DDI_SUCCESS;
 	upci_t *up;
+	minor_t instance;
 	upci_devinfo_t *pdi;
 
 	*rv = 0;
+	instance = getminor(dev);
 	pdi = kmem_alloc(sizeof (*pdi), KM_SLEEP);
 	if (ucmd->cm_uibufsz >= MAXPATHLEN ||
 	    copyin((void *) ucmd->cm_uibuff, pdi->di_devpath,
 	    ucmd->cm_uibufsz) != 0 ||
 	    pdi->di_devpath[ucmd->cm_uibufsz - 1] != '\0' ||
-	    (up = upci_find_dev_from_path_locked(pdi->di_devpath)) == NULL) {
+	    (up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
 		rval = *rv = EINVAL;
 		goto out;
 	}
+
+	mutex_enter(&up->up_lk);
 
 	if (up->up_flags != UPCI_DEVINFO_CFG_OPEN) {
 		rval = *rv = EINVAL;
@@ -220,22 +159,26 @@ out:
 
 
 static int
-upci_cfg_rw_ioctl(upci_cmd_t *ucmd, upci_cmd_t *ucmdup, cred_t *cr, int *rv,
+upci_cfg_rw_ioctl(dev_t dev, upci_cmd_t *ucmd, upci_cmd_t *ucmdup, cred_t *cr, int *rv,
     int write)
 {
 	int rval = DDI_SUCCESS;
 	uint64_t buff;
 	upci_t *up;
+	minor_t instance;
 	upci_cfg_rw_t *crw;
 
 	*rv = 0;
+	instance = getminor(dev);
 	crw = kmem_alloc(sizeof (*crw), KM_SLEEP);
 	if (ucmd->cm_uibufsz != sizeof (upci_cfg_rw_t) ||
 	    copyin((void *) ucmd->cm_uibuff, crw, ucmd->cm_uibufsz) != 0 ||
-	    (up = upci_find_dev_from_path_locked(crw->rw_devpath)) == NULL) {
+	    (up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
 		rval = *rv = EINVAL;
 		goto out;
 	}
+
+	mutex_enter(&up->up_lk);
 
 	/* TODO: Check offset + count <= PCI config space size */
 	if (!(up->up_flags & UPCI_DEVINFO_CFG_OPEN) ||
@@ -314,24 +257,20 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 
 	
 	switch (cmd) {
-	case UPCI_IOCTL_LIST_DEVICES:
-		rval = upci_list_devices_ioctl(ucmd, (upci_cmd_t *)arg,
-		    cr, rv);
-	break;
 	case UPCI_IOCTL_OPEN_DEVICE:
-		rval = upci_list_open_device_ioctl(ucmd, (upci_cmd_t *)arg,
+		rval = upci_list_open_device_ioctl(dev, ucmd, (upci_cmd_t *)arg,
 		    cr, rv);
 	break;
 	case UPCI_IOCTL_CLOSE_DEVICE:
-		rval = upci_list_close_device_ioctl(ucmd, (upci_cmd_t *)arg,
+		rval = upci_list_close_device_ioctl(dev, ucmd, (upci_cmd_t *)arg,
 		    cr, rv);
 	break;
 	case UPCI_IOCTL_CFG_READ:
-		rval = upci_cfg_rw_ioctl(ucmd, (upci_cmd_t *)arg,
+		rval = upci_cfg_rw_ioctl(dev, ucmd, (upci_cmd_t *)arg,
 		    cr, rv, 0);
 	break;
 	case UPCI_IOCTL_CFG_WRITE:
-		rval = upci_cfg_rw_ioctl(ucmd, (upci_cmd_t *)arg,
+		rval = upci_cfg_rw_ioctl(dev, ucmd, (upci_cmd_t *)arg,
 		    cr, rv, 1);
 	break;
 	default:
@@ -376,21 +315,22 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	instance = ddi_get_instance(dip);
+
 	if (ddi_create_minor_node(dip, "upci", S_IFCHR, instance,
 	    DDI_PSEUDO,  0) == DDI_FAILURE)
 		return (DDI_FAILURE);
 
+	if (ddi_soft_state_zalloc(soft_state_p, instance) != DDI_SUCCESS) {
+		ddi_remove_minor_node(dip, "upci");
+		return (DDI_FAILURE);
+	}
+	up = ddi_get_soft_state(soft_state_p, instance);
+
 	/* Initialize device properties */
-	up = kmem_zalloc(sizeof (*up), KM_SLEEP);
 	mutex_init(&up->up_lk, NULL, MUTEX_DRIVER, NULL);
 	up->up_dip = dip;
 	up->up_flags = UPCI_DEVINFO_CLOSED;
 	ddi_pathname(dip, up->up_devpath);
-
-	/* Add the device to the tree */
-	mutex_enter(&upci_devices_lk);
-	avl_add(upci_devices, up);
-	mutex_exit(&upci_devices_lk);
 
 	ddi_set_driver_private(dip, (caddr_t)up);
 
@@ -403,29 +343,22 @@ static int
 upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	upci_t *up;
+	minor_t instance;
 
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	/* Try to find this device in the tree */
-	mutex_enter(&upci_devices_lk);
-	for (up = avl_first(upci_devices);
-	    up != NULL && up->up_dip == dip;
-	    up = AVL_NEXT(upci_devices, up))
-		;
+	instance = ddi_get_instance(dip);
+	up = ddi_get_driver_private(dip);
 
-	if (up == NULL ||
-	    up->up_flags != UPCI_DEVINFO_CLOSED) {
-		mutex_exit(&upci_devices_lk);
+	if (up == NULL || up->up_flags != UPCI_DEVINFO_CLOSED)
 		return (DDI_FAILURE);
-	}
 
-	avl_remove(upci_devices, up);
-	mutex_exit(&upci_devices_lk);
+	cmn_err(CE_CONT, "Detached \"%s\"\n", up->up_devpath);
 
 	ddi_remove_minor_node(dip, "upci");
 	mutex_destroy(&up->up_lk);
-	kmem_free(up, sizeof(*up));
+	ddi_soft_state_free(soft_state_p, instance);
 	return (DDI_SUCCESS);
 }
 
@@ -477,13 +410,10 @@ static struct modlinkage upci_modlinkage = {
 int
 _init(void)
 {
-	upci_devices = kmem_zalloc(sizeof (*upci_devices), KM_SLEEP);
-	avl_create(upci_devices, upci_devices_cmp, sizeof (upci_t),
-		    offsetof (upci_t, up_avl));
+	if (ddi_soft_state_init(&soft_state_p, sizeof(upci_t), 0) != 0)
+		return DDI_FAILURE;
 
-	mutex_init(&upci_devices_lk, NULL, MUTEX_DRIVER, NULL);
-
-	cmn_err(CE_CONT, "Initialized upci_devices to %p\n", upci_devices);
+	cmn_err(CE_CONT, "Initialized upci\n");
 
 	return (mod_install(&upci_modlinkage));
 }
@@ -497,13 +427,6 @@ _info(struct modinfo *modinfop)
 int
 _fini(void)
 {
-	if (upci_devices != NULL) {
-		VERIFY(avl_is_empty(upci_devices));
-		avl_destroy(upci_devices);
-		kmem_free((caddr_t) upci_devices, sizeof (*upci_devices));
-		mutex_destroy(&upci_devices_lk);
-		cmn_err(CE_CONT, "upci fini\n");
-	}
-
+	ddi_soft_state_fini(&soft_state_p);
 	return (mod_remove(&upci_modlinkage));
 }
