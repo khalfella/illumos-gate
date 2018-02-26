@@ -35,12 +35,21 @@
 
 #define	abs(a) ((a) < 0 ? -(a) : (a))
 
+typedef struct upci_reg_s {
+	caddr_t			reg_base;
+	off_t			reg_size;
+	ddi_acc_handle_t	reg_hdl;
+} upci_reg_t;
+
 typedef struct upci_s {
 	dev_info_t		*up_dip;
 	ddi_acc_handle_t 	up_hdl;
 	kmutex_t		up_lk;
 	uint_t			up_flags;
+	int			up_nregs;
+	upci_reg_t		*up_regs;
 } upci_t;
+
 
 static void		*soft_state_p;
 
@@ -62,7 +71,91 @@ upci_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	return (0);
 }
 
+static int
+upci_close_regs_ioctl(dev_t dev, cred_t *cr, int *rv)
+{
+	uint_t r;
+	int rval = DDI_SUCCESS;
+	minor_t instance;
+	upci_t *up;
 
+	 *rv = 0;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	mutex_enter(&up->up_lk);
+
+	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN)) {
+		rval = *rv = EIO;
+		goto out;
+	}
+	for (r = 0; r < up->up_nregs; r++) {
+		ddi_regs_map_free(&up->up_regs[r].reg_hdl);
+	}
+
+	up->up_flags &= ~UPCI_DEVINFO_REG_OPEN;
+	kmem_free(up->up_regs, up->up_nregs * sizeof(upci_reg_t));
+	up->up_regs = NULL;
+	up->up_nregs = 0;
+out:
+	mutex_exit(&up->up_lk);
+	return (abs(rval));
+}
+
+static int
+upci_open_regs_ioctl(dev_t dev, cred_t *cr, int *rv)
+{
+	uint_t r;
+	int rval = DDI_SUCCESS;
+	upci_t *up;
+	minor_t instance;
+	dev_info_t *dip;
+	upci_reg_t *regs;
+	ddi_device_acc_attr_t reg_attr;
+
+	reg_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	reg_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+	reg_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+
+	*rv = 0;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	mutex_enter(&up->up_lk);
+	dip = up->up_dip;
+
+	if (!(up->up_flags & UPCI_DEVINFO_DEV_OPEN) ||
+	    (up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
+	    ddi_dev_nregs(dip,  &up->up_nregs) != DDI_SUCCESS) {
+		rval = *rv = EIO;
+		goto out2;
+	}
+
+	regs = up->up_regs = kmem_alloc(up->up_nregs * sizeof(upci_reg_t),
+				KM_SLEEP);
+
+	for (r = 0; r < up->up_nregs; r++) {
+		if (ddi_dev_regsize(dip, r, &regs[r].reg_size) != DDI_SUCCESS ||
+		    ddi_regs_map_setup(dip, r, &regs[r].reg_base, 0, 0,
+		    &reg_attr, &regs[r].reg_hdl)!= DDI_SUCCESS) {
+			rval = *rv = EIO;
+			goto out2;
+		}
+	}
+
+	up->up_flags |= UPCI_DEVINFO_REG_OPEN;
+
+out2:
+	mutex_exit(&up->up_lk);
+	return (abs(rval));
+
+}
 static int
 upci_open_device_ioctl(dev_t dev, cred_t *cr, int *rv)
 {
@@ -127,6 +220,94 @@ out:
 	return (abs(rval));
 }
 
+static int
+upci_rw_reg(dev_t dev, upci_rw_cmd_t *rw, cred_t *cr, int *rv, int write)
+{
+	int rval = DDI_SUCCESS;
+	uint64_t buff;
+	upci_t *up;
+	upci_reg_t *reg;
+	minor_t instance;
+
+
+	*rv = 0;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	mutex_enter(&up->up_lk);
+
+	if ((rw->rw_region >= up->up_nregs) ||
+	    !(up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
+	    (rw->rw_count != 1 && rw->rw_count != 2 &&
+	    rw->rw_count != 4 && rw->rw_count != 8)) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
+
+	reg = &up->up_regs[rw->rw_region];
+
+	if (write) goto write;
+	/* Read */
+	switch (rw->rw_count) {
+	case 1:
+		*((uint8_t *)&buff) = ddi_get8(
+		    reg->reg_hdl, (uint8_t *)(reg->reg_base + rw->rw_offset));
+	break;
+	case 2:
+		*((uint16_t *)&buff) = ddi_get16(
+		    reg->reg_hdl, (uint16_t *)(reg->reg_base + rw->rw_offset));
+	break;
+	case 4:
+		*((uint32_t *)&buff) = ddi_get32(
+		    reg->reg_hdl, (uint32_t *)(reg->reg_base + rw->rw_offset));
+	break;
+	case 8:
+		*((uint64_t *)&buff) = ddi_get64(
+		    reg->reg_hdl, (uint64_t *)(reg->reg_base + rw->rw_offset));
+	break;
+	}
+	if (copyout(&buff, (void *) rw->rw_pdataout, rw->rw_count) != 0) {
+		rval = *rv = EINVAL;
+	}
+
+	goto out;
+
+write:
+	if (copyin((void *) rw->rw_pdatain, &buff, rw->rw_count) == 0) {
+		switch (rw->rw_count) {
+		case 1:
+			ddi_put8(reg->reg_hdl,
+			    (uint8_t *)(reg->reg_base + rw->rw_offset),
+			    *((uint8_t *)&buff));
+		break;
+		case 2:
+			ddi_put16(reg->reg_hdl,
+			    (uint16_t *)(reg->reg_base + rw->rw_offset),
+			    *((uint16_t *)&buff));
+		break;
+		case 4:
+			ddi_put32(reg->reg_hdl,
+			    (uint32_t *)(reg->reg_base + rw->rw_offset),
+			    *((uint32_t *)&buff));
+		break;
+		case 8:
+			ddi_put64(reg->reg_hdl,
+			    (uint64_t *)(reg->reg_base + rw->rw_offset),
+			    *((uint64_t *)&buff));
+		break;
+		}
+		goto out;
+	}
+
+	/* Handle error */
+	rval = *rv = EINVAL;
+out:
+	mutex_exit(&up->up_lk);
+	return (abs(rval));
+}
 
 static int
 upci_rw_ioctl(dev_t dev, upci_rw_cmd_t *rw, cred_t *cr, int *rv, int write)
@@ -139,8 +320,10 @@ upci_rw_ioctl(dev_t dev, upci_rw_cmd_t *rw, cred_t *cr, int *rv, int write)
 	*rv = 0;
 	instance = getminor(dev);
 
-	if (rw->rw_region != -1 || 
-	    (up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+	if (rw->rw_region != -1)
+		return upci_rw_reg(dev, rw, cr, rv, write);
+
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
 		rval = *rv = EINVAL;
 		return (abs(rval));
 	}
@@ -226,6 +409,12 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case UPCI_IOCTL_CLOSE:
 		rval = upci_close_device_ioctl(dev, cr, rv);
 	break;
+	case UPCI_IOCTL_OPEN_REGS:
+		rval = upci_open_regs_ioctl(dev, cr, rv);
+	break;
+	case UPCI_IOCTL_CLOSE_REGS:
+		rval = upci_close_regs_ioctl(dev, cr, rv);
+	break;
 	case UPCI_IOCTL_READ:
 	case UPCI_IOCTL_WRITE:
 		rval = *rv = EINVAL;
@@ -291,6 +480,8 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&up->up_lk, NULL, MUTEX_DRIVER, NULL);
 	up->up_dip = dip;
 	up->up_flags = 0;
+	up->up_nregs = 0;
+	up->up_regs = NULL;
 
 	ddi_set_driver_private(dip, (caddr_t)up);
 

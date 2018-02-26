@@ -24,7 +24,9 @@ extern "C" {
 #define	UPCI_IOCTL_CLOSE	0x02
 #define	UPCI_IOCTL_READ		0x03
 #define	UPCI_IOCTL_WRITE	0x04
-#define	UPCI_IOCTL_GET_INFO	0x04
+#define	UPCI_IOCTL_GET_INFO	0x05
+#define	UPCI_IOCTL_OPEN_REGS	0x06
+#define	UPCI_IOCTL_CLOSE_REGS	0x07
 
 
 /*
@@ -35,9 +37,10 @@ extern "C" {
  * UPCI_IOCTL_GET_INFO
  */
 #define	UPCI_DEVINFO_DEV_OPEN	0x01
+#define	UPCI_DEVINFO_REG_OPEN	0x02
 
 typedef struct upci_devinfo_s {
-	uint64_t	di_flags;
+	uint_t	di_flags;
 } upci_devinfo_t;
 
 /*

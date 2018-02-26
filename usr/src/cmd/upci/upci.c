@@ -38,6 +38,8 @@ static boolean_t g_vflag = B_FALSE;
 static boolean_t g_dflag = B_FALSE;
 static boolean_t g_oflag = B_FALSE;
 static boolean_t g_cflag = B_FALSE;
+static boolean_t g_Oflag = B_FALSE;
+static boolean_t g_Cflag = B_FALSE;
 static boolean_t g_rflag = B_FALSE;
 static boolean_t g_wflag = B_FALSE;
 
@@ -50,12 +52,16 @@ usage()
 	fprintf(stderr, "Usage upci: -l [-v]\n"
 	    "\t-o -d dev\n"
 	    "\t-c -d dev\n"
+	    "\t-O -d dev\n"
+	    "\t-C -d dev\n"
 	    "\t-r [region:]offset:length -d dev\n"
 	    "\t-w [region:]offset:length:data -d dev\n"
 	    "\t\n"
 	    "\t-l list PCI devices controlled by upci\n"
 	    "\t-o open a pci device\n"
 	    "\t-c close a pci device\n"
+	    "\t-O open a pci regions\n"
+	    "\t-C close a pci regions\n"
 	    "\t-r read data out of a pci device\n"
 	    "\t-w write data to a pci device\n"
 	    "\t-v verbose output\n");
@@ -231,11 +237,6 @@ upci_rw(char *rwcom, int dev)
 		return (1);
 	}
 
-	if (reg != -1) {
-		fprintf(stderr, "Region I/O is not implemented yet\n");
-		return (1);
-	}
-
 	rw.rw_region = reg;
 	rw.rw_offset = off;
 	rw.rw_count = len;
@@ -303,6 +304,42 @@ upci_close_device(int dev)
 }
 
 static int
+upci_open_device_regs(int dev)
+{
+	int fd, rval = 0;
+
+	if ((fd = upci_open_minor(dev)) == -1) {
+		fprintf(stderr, "Error: Failed to open [%d]\n", dev);
+		return (1);
+	}
+
+	if (ioctl(fd, UPCI_IOCTL_OPEN_REGS, NULL) != 0) {
+		fprintf(stderr, "Failed to open [%d]\n", dev);
+		rval = 1;
+	}
+	close(fd);
+	return (rval);
+}
+
+static int
+upci_close_device_regs(int dev)
+{
+	int fd, rval = 0;
+
+	if ((fd = upci_open_minor(dev)) == -1) {
+		fprintf(stderr, "Error: Failed to open [%d]\n", dev);
+		return (1);
+	}
+
+	if (ioctl(fd, UPCI_IOCTL_CLOSE_REGS, NULL) != 0) {
+		fprintf(stderr, "Failed to close [%d]\n", dev);
+		rval = 1;
+	}
+	close(fd);
+	return (rval);
+}
+
+static int
 upci_list_devices()
 {
 	int instance;
@@ -336,7 +373,7 @@ main(int argc, char **argv)
 	char *devstr, *rwcom, *str;
 
 	devstr = rwcom = NULL;
-	while((c = getopt(argc, argv, "lvd:ocr:w:h")) != EOF) {
+	while((c = getopt(argc, argv, "lvd:ocOCr:w:h")) != EOF) {
 		switch (c) {
 		case 'l':
 			g_lflag = B_TRUE;
@@ -354,6 +391,12 @@ main(int argc, char **argv)
 		case 'c':
 			g_cflag = B_TRUE;
 		break;
+		case 'O':
+			g_Oflag = B_TRUE;
+		break;
+		case 'C':
+			g_Cflag = B_TRUE;
+		break;
 		case 'r':
 			g_rflag = B_TRUE;
 			rwcom = optarg;
@@ -370,7 +413,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (g_lflag + g_oflag + g_cflag + g_rflag + g_wflag != 1) {
+	if (g_lflag + g_oflag + g_cflag +
+	    g_Oflag + g_Cflag + g_rflag + g_wflag != 1) {
 		usage();
 		goto out;
 	}
@@ -402,6 +446,10 @@ main(int argc, char **argv)
 		rval = upci_open_device(dev);
 	} else if (g_cflag) {
 		rval = upci_close_device(dev);
+	} else if (g_Oflag) {
+		rval = upci_open_device_regs(dev);
+	} else if (g_Cflag) {
+		rval = upci_close_device_regs(dev);
 	} else if (g_rflag || g_wflag) {
 		rval = upci_rw(rwcom, dev);
 	}
