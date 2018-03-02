@@ -404,6 +404,33 @@ out:
 	return (abs(rval));
 }
 
+static int
+upci_devinfo_ioctl(dev_t dev, upci_dev_info_t *udi, cred_t *cr, int *rv)
+{
+	int rval = DDI_SUCCESS;
+	upci_t *up;
+	minor_t instance;
+	upci_dev_info_t di;
+
+	*rv = 0;
+	instance = getminor(dev);
+
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	mutex_enter(&up->up_lk);
+	di.di_flags = up->up_flags;
+	di.di_nregs = up->up_nregs;
+	mutex_exit(&up->up_lk);
+
+
+	if (copyout(&di, udi, sizeof(di)) != 0) {
+		rval = *rv = EINVAL;
+	}
+	return (abs(rval));
+}
 
 static int
 upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
@@ -434,6 +461,10 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 			    cmd == UPCI_IOCTL_WRITE ? 1 : 0);
 		}
 		kmem_free(rw, sizeof(*rw));
+	break;
+	case UPCI_IOCTL_DEV_INFO:
+		rval = upci_devinfo_ioctl(dev,
+		    (upci_dev_info_t *) arg, cr, rv);
 	break;
 	default:
 		rval = *rv = EINVAL;
