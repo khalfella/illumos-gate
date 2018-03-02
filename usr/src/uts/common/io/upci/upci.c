@@ -108,6 +108,45 @@ out:
 }
 
 static int
+upci_get_reg_info_ioctl(dev_t dev, upci_reg_info_t *uri, cred_t *cr, int *rv)
+{
+	int rval = DDI_SUCCESS;
+	upci_t *up;
+	minor_t instance;
+	upci_reg_t *regs;
+	upci_reg_info_t ri;
+
+	*rv = 0;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+	mutex_enter(&up->up_lk);
+
+	regs = up->up_regs;
+
+	if (!(up->up_flags && UPCI_DEVINFO_REG_OPEN) ||
+	    copyin(uri, &ri, sizeof(ri)) != 0 ||
+	    ri.ri_region < 0 || ri.ri_region >= up->up_nregs) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
+
+	ri.ri_flags = regs[ri.ri_region].reg_flags;
+	ri.ri_base = (uint64_t) regs[ri.ri_region].reg_base;
+	ri.ri_size = regs[ri.ri_region].reg_size;
+
+	if (copyout(&ri, uri, sizeof (ri)) != 0) {
+		rval = *rv = EINVAL;
+		goto out;
+	}
+out:
+	mutex_exit(&up->up_lk);
+	return (abs(rval));
+}
+
+static int
 upci_open_regs_ioctl(dev_t dev, cred_t *cr, int *rv)
 {
 	uint_t r;
@@ -465,6 +504,10 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case UPCI_IOCTL_DEV_INFO:
 		rval = upci_devinfo_ioctl(dev,
 		    (upci_dev_info_t *) arg, cr, rv);
+	break;
+	case UPCI_IOCTL_REG_INFO:
+		rval = upci_get_reg_info_ioctl(dev,
+		    (upci_reg_info_t *) arg, cr, rv);
 	break;
 	default:
 		rval = *rv = EINVAL;
