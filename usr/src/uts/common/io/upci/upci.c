@@ -184,8 +184,8 @@ upci_open_regs_ioctl(dev_t dev, cred_t *cr, int *rv)
 
 	for (r = 0; r < up->up_nregs; r++) {
 		regs[r].reg_flags = UPCI_IO_REG_VALID;
-		if (ddi_dev_regsize(dip, r, &regs[r].reg_size) != DDI_SUCCESS ||
-		    ddi_regs_map_setup(dip, r, &regs[r].reg_base, 0, 0,
+		if (ddi_dev_regsize(dip, r + 1, &regs[r].reg_size) != DDI_SUCCESS ||
+		    ddi_regs_map_setup(dip, r + 1, &regs[r].reg_base, 0, 0,
 		    &reg_attr, &regs[r].reg_hdl)!= DDI_SUCCESS) {
 			regs[r].reg_flags &= ~UPCI_IO_REG_VALID;
 			continue;

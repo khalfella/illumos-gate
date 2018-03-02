@@ -384,7 +384,7 @@ upci_get_dev_info(int fd)
 	printf("flags = %s %s\n",
 	    di.di_flags & UPCI_DEVINFO_DEV_OPEN ? "UPCI_DEVINFO_DEV_OPEN" : "",
 	    di.di_flags & UPCI_DEVINFO_REG_OPEN ? "UPCI_DEVINFO_REG_OPEN" : "");
-	printf("nregs = %ull\n", di.di_nregs);
+	printf("nregs = %"PRIx64"\n", di.di_nregs);
 
 out:
 	close(fd);
@@ -417,8 +417,8 @@ upci_get_info(int reg, int dev)
 	    ri.ri_flags & UPCI_IO_REG_IO ? "UPCI_IO_REG_IO" : "UPCI_IO_REG_MEM",
 	    ri.ri_flags & UPCI_IO_REG_PREFETCH ? "UPCI_IO_REG_PREFETCH" : "",
 	    ri.ri_flags & UPCI_IO_REG_VALID ? "UPCI_IO_REG_VALID" : "");
-	printf("  base = %ull\n", ri.ri_base);
-	printf("  size = %ull\n", ri.ri_size);
+	printf("  base = x%"PRIx64"\n", ri.ri_base);
+	printf("  size = x%"PRIx64"\n", ri.ri_size);
 out:
 	close(fd);
 	return (rval);
