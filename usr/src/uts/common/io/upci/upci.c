@@ -36,6 +36,7 @@
 #define	abs(a) ((a) < 0 ? -(a) : (a))
 
 typedef struct upci_reg_s {
+	uint32_t		reg_flags;
 	caddr_t			reg_base;
 	off_t			reg_size;
 	ddi_acc_handle_t	reg_hdl;
@@ -93,7 +94,8 @@ upci_close_regs_ioctl(dev_t dev, cred_t *cr, int *rv)
 		goto out;
 	}
 	for (r = 0; r < up->up_nregs; r++) {
-		ddi_regs_map_free(&up->up_regs[r].reg_hdl);
+		if (up->up_regs[r].reg_flags & UPCI_IO_REG_VALID)
+			ddi_regs_map_free(&up->up_regs[r].reg_hdl);
 	}
 
 	up->up_flags &= ~UPCI_DEVINFO_REG_OPEN;
@@ -109,6 +111,7 @@ static int
 upci_open_regs_ioctl(dev_t dev, cred_t *cr, int *rv)
 {
 	uint_t r;
+	uint8_t rflags;
 	int rval = DDI_SUCCESS;
 	upci_t *up;
 	minor_t instance;
@@ -141,11 +144,18 @@ upci_open_regs_ioctl(dev_t dev, cred_t *cr, int *rv)
 				KM_SLEEP);
 
 	for (r = 0; r < up->up_nregs; r++) {
+		regs[r].reg_flags = UPCI_IO_REG_VALID;
 		if (ddi_dev_regsize(dip, r, &regs[r].reg_size) != DDI_SUCCESS ||
 		    ddi_regs_map_setup(dip, r, &regs[r].reg_base, 0, 0,
 		    &reg_attr, &regs[r].reg_hdl)!= DDI_SUCCESS) {
-			rval = *rv = EIO;
-			goto out2;
+			regs[r].reg_flags &= ~UPCI_IO_REG_VALID;
+			continue;
+		}
+
+		rflags = pci_config_get8(up->up_hdl, 0x10 + 0x4 * r);
+		regs[r].reg_flags |= (rflags & UPCI_IO_REG_IO);
+		if (!(rflags & UPCI_IO_REG_IO)) {
+			regs[r].reg_flags |= (rflags & UPCI_IO_REG_PREFETCH);
 		}
 	}
 
