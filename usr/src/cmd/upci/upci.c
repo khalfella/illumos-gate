@@ -40,6 +40,7 @@ static boolean_t g_oflag = B_FALSE;
 static boolean_t g_cflag = B_FALSE;
 static boolean_t g_Oflag = B_FALSE;
 static boolean_t g_Cflag = B_FALSE;
+static boolean_t g_iflag = B_FALSE;
 static boolean_t g_rflag = B_FALSE;
 static boolean_t g_wflag = B_FALSE;
 
@@ -54,6 +55,7 @@ usage()
 	    "\t-c -d dev\n"
 	    "\t-O -d dev\n"
 	    "\t-C -d dev\n"
+	    "\t-i region -d dev\n"
 	    "\t-r [region:]offset:length -d dev\n"
 	    "\t-w [region:]offset:length:data -d dev\n"
 	    "\t\n"
@@ -62,6 +64,7 @@ usage()
 	    "\t-c close a pci device\n"
 	    "\t-O open a pci regions\n"
 	    "\t-C close a pci regions\n"
+	    "\t-i get dev/region info\n"
 	    "\t-r read data out of a pci device\n"
 	    "\t-w write data to a pci device\n"
 	    "\t-v verbose output\n");
@@ -366,14 +369,70 @@ upci_list_devices()
 	return (0);
 }
 
+static int
+upci_get_dev_info(int fd)
+{
+	int rval = 0;
+
+	upci_dev_info_t di;
+	if (ioctl(fd, UPCI_IOCTL_DEV_INFO, &di) != 0) {
+		fprintf(stderr, "Failed to IOCTL [%d]\n");
+		rval = 1;
+		goto out;
+	}
+
+	printf("flags = %s %s\n",
+	    di.di_flags & UPCI_DEVINFO_DEV_OPEN ? "UPCI_DEVINFO_DEV_OPEN" : "",
+	    di.di_flags & UPCI_DEVINFO_REG_OPEN ? "UPCI_DEVINFO_REG_OPEN" : "");
+	printf("nregs = %ull\n", di.di_nregs);
+
+out:
+	close(fd);
+	return (rval);
+}
+
+static int
+upci_get_info(int reg, int dev)
+{
+	int fd, rval = 0;
+	upci_reg_info_t ri;
+
+	if ((fd = upci_open_minor(dev)) == -1) {
+		fprintf(stderr, "Error: Failed to open [%d]\n", dev);
+		return (1);
+	}
+
+	if (reg < 0)
+		return upci_get_dev_info(fd);
+
+	ri.ri_region = reg;
+	if (ioctl(fd, UPCI_IOCTL_REG_INFO, &ri) != 0) {
+		fprintf(stderr, "Failed to IOCTL [%d]\n", dev);
+		rval = 1;
+		goto out;
+	}
+
+	printf("region [%d]\n", reg);
+	printf("  flags = %s %s %s\n",
+	    ri.ri_flags & UPCI_IO_REG_IO ? "UPCI_IO_REG_IO" : "UPCI_IO_REG_MEM",
+	    ri.ri_flags & UPCI_IO_REG_PREFETCH ? "UPCI_IO_REG_PREFETCH" : "",
+	    ri.ri_flags & UPCI_IO_REG_VALID ? "UPCI_IO_REG_VALID" : "");
+	printf("  base = %ull\n", ri.ri_base);
+	printf("  size = %ull\n", ri.ri_size);
+out:
+	close(fd);
+	return (rval);
+}
+
+
 int
 main(int argc, char **argv)
 {
-	int c, dev, rval = 1;
-	char *devstr, *rwcom, *str;
+	int c, dev, reg, rval = 1;
+	char *devstr, *regstr, *rwcom, *str;
 
-	devstr = rwcom = NULL;
-	while((c = getopt(argc, argv, "lvd:ocOCr:w:h")) != EOF) {
+	regstr = devstr = rwcom = NULL;
+	while((c = getopt(argc, argv, "lvd:ocOCi:r:w:h")) != EOF) {
 		switch (c) {
 		case 'l':
 			g_lflag = B_TRUE;
@@ -397,6 +456,10 @@ main(int argc, char **argv)
 		case 'C':
 			g_Cflag = B_TRUE;
 		break;
+		case 'i':
+			g_iflag = B_TRUE;
+			regstr = optarg;
+		break;
 		case 'r':
 			g_rflag = B_TRUE;
 			rwcom = optarg;
@@ -413,8 +476,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (g_lflag + g_oflag + g_cflag +
-	    g_Oflag + g_Cflag + g_rflag + g_wflag != 1) {
+	if (g_lflag + g_oflag + g_cflag + g_Oflag +
+	    g_Cflag + g_iflag + g_rflag + g_wflag != 1) {
 		usage();
 		goto out;
 	}
@@ -452,6 +515,14 @@ main(int argc, char **argv)
 		rval = upci_close_device_regs(dev);
 	} else if (g_rflag || g_wflag) {
 		rval = upci_rw(rwcom, dev);
+	} else if (g_iflag) {
+		errno = 0;
+		reg = strtol(regstr, &str, 10);
+		if (*str || errno != 0) {
+			usage();
+			goto out2;
+		}
+		rval = upci_get_info(reg, dev);
 	}
 
 out2:
