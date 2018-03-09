@@ -34,6 +34,10 @@
 #include <sys/upci.h>
 
 #define	abs(a) ((a) < 0 ? -(a) : (a))
+typedef struct upci_msi_int_ent_s {
+	int		ie_number;
+	list_node_t	ie_next;
+} upci_msi_int_ent_t;
 
 typedef struct upci_reg_s {
 	uint32_t		reg_flags;
@@ -52,6 +56,10 @@ typedef struct upci_s {
 	ddi_intr_handle_t	up_intx_hdl;
 	ddi_intr_handle_t	up_msi_hdl[32];
 	int			up_msi_count;
+	kmutex_t		up_msi_outer_lk;
+	kcondvar_t		up_msi_outer_cv;
+	kmutex_t		up_msi_inner_lk;
+	list_t			up_msi_int_list;
 } upci_t;
 
 
@@ -542,6 +550,24 @@ out:
 static uint_t
 upci_msi_handler(caddr_t arg1, caddr_t arg2)
 {
+	upci_t *up;
+	upci_msi_int_ent_t *ie;
+
+	if ((ie = kmem_alloc(sizeof (*ie), KM_NOSLEEP)) == NULL) {
+		/* Interrupt loss!! */
+		return (DDI_INTR_CLAIMED);
+	}
+
+
+	up = (upci_t *) arg1;
+	ie->ie_number = (intptr_t) arg2;
+
+	mutex_enter(&up->up_msi_inner_lk);
+	list_insert_tail(&up->up_msi_int_list, ie);
+	mutex_exit(&up->up_msi_inner_lk);
+
+	cv_signal(&up->up_msi_outer_cv);
+
 	cmn_err(CE_CONT, "MSI handler fired\n");
 	return (DDI_INTR_CLAIMED);
 }
@@ -562,6 +588,7 @@ upci_msi_disable(upci_t *up)
 			ddi_intr_free(up->up_msi_hdl[i]);
 		}
 
+		mutex_destroy(&up->up_msi_inner_lk);
 		up->up_msi_count = 0;
 		up->up_flags &= ~UPCI_DEVINFO_MSI_ENABLED;
 	}
@@ -574,46 +601,71 @@ upci_msi_update(upci_t *up, int enable, int count)
 {
 	int i;
 	int rval, type, cnt, actual;
+	uint_t pri;
 
+	cmn_err(CE_CONT, "%s: enable = %d, count = %d\n",
+	    __func__, enable, count);
 	upci_msi_disable(up);
+	cmn_err(CE_CONT, "%s: disabled msi\n", __func__);
 	if (!enable)
 		return (0);
 	rval = -1;
 	if (ddi_intr_get_supported_types(up->up_dip, &type) != DDI_SUCCESS ||
 	    !(type & DDI_INTR_TYPE_MSI)) {
+		cmn_err(CE_CONT, "%s: Failed to get supported intr\n", __func__);
 		goto out;
 	}
+	cmn_err(CE_CONT, "%s: the card suppors msi\n", __func__);
 	if (ddi_intr_get_nintrs(up->up_dip,
 	    DDI_INTR_TYPE_MSI, &cnt) != DDI_SUCCESS ||
 	    count > cnt) {
+		cmn_err(CE_CONT, "%s: No enough vectors\n", __func__);
 		goto out;
 	}
+	cmn_err(CE_CONT, "%s: the card suppors msi\n", __func__);
 	if (ddi_intr_alloc(up->up_dip, up->up_msi_hdl, DDI_INTR_TYPE_MSI,
 	    0, count, &actual, DDI_INTR_ALLOC_NORMAL) != DDI_SUCCESS ||
 	    actual != count) {
+		cmn_err(CE_CONT, "%s: Failed to allocate vectors\n", __func__);
 		goto out;
 	}
 
+	cmn_err(CE_CONT, "%s: Getting msi intr priority\n", __func__);
+	if (ddi_intr_get_pri(up->up_msi_hdl[0], &pri) != DDI_SUCCESS ||
+	    pri >= ddi_intr_get_hilevel_pri()) {
+		cmn_err(CE_CONT, "%s: Failed to get msi intr priority\n", __func__);
+		goto free_vector;
+	}
+
+	mutex_init(&up->up_msi_inner_lk, NULL, MUTEX_DRIVER, DDI_INTR_PRI(pri));
+
+	cmn_err(CE_CONT, "%s: Adding intr handlers\n", __func__);
 	for (i = 0; i < count; i++) {
 		if (ddi_intr_add_handler(up->up_msi_hdl[i],
 		    upci_msi_handler, (caddr_t) up,
 		    (void *)((intptr_t) i)) != DDI_SUCCESS) {
+			cmn_err(CE_CONT, "%s: Failed adding handlers\n", __func__);
 			while (--i >= 0)
 				ddi_intr_remove_handler(up->up_msi_hdl[i]);
-			goto free_vector;
+			goto out2;
 		}
 	}
 
+	cmn_err(CE_CONT, "%s: Successfully added interrupt handlers\n", __func__);
 	if (ddi_intr_block_enable(up->up_msi_hdl, count) == DDI_SUCCESS) {
+		cmn_err(CE_CONT, "%s: Successfully enabled block\n", __func__);
 		up->up_msi_count = count;
 		up->up_flags |= UPCI_DEVINFO_MSI_ENABLED;
-		rval = 0;
-		goto out;
+		return (0);
 	}
+	cmn_err(CE_CONT, "%s: Failed to enable block\n", __func__);
 
 	for (i = 0; i < count; i++) {
 		ddi_intr_remove_handler(up->up_msi_hdl[i]);
 	}
+out2:
+	mutex_destroy(&up->up_msi_inner_lk);
+
 free_vector:
 	for (i = 0; i < count; i++) {
 		ddi_intr_free(up->up_msi_hdl[i]);
@@ -643,7 +695,7 @@ upci_int_update_ioctl(dev_t dev,upci_int_update_t *arg, cred_t *cr, int *rv)
 		return (abs(rval));
 	}
 
-	mutex_enter(&up->up_lk);
+	mutex_enter(&up->up_msi_outer_lk);
 
 	switch (ip.iu_type) {
 	case UPCI_INTR_TYPE_FIXED:
@@ -658,9 +710,87 @@ upci_int_update_ioctl(dev_t dev,upci_int_update_t *arg, cred_t *cr, int *rv)
 	break;
 	}
 out:
-	mutex_exit(&up->up_lk);
+	mutex_exit(&up->up_msi_outer_lk);
 
 	return (-1);
+}
+
+static int
+upci_intx_get(upci_t *up, upci_int_get_t * arg)
+{
+	return (-1);
+}
+
+static int
+upci_int_get_ioctl(dev_t dev, upci_int_get_t * arg, cred_t *cr, int *rv)
+{
+	int rval = DDI_SUCCESS;
+	upci_t *up;
+	minor_t instance;
+	upci_int_get_t ig;
+	upci_msi_int_ent_t *ie;
+
+	if (copyin((void *) arg, &ig, sizeof(ig)) != 0) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	*rv = 0;
+	switch (ig.ig_type) {
+	case UPCI_INTR_TYPE_FIXED:
+		rval = *rv = upci_intx_get(up, arg);
+	break;
+	case UPCI_INTR_TYPE_MSI:
+
+		mutex_enter(&up->up_msi_outer_lk);
+try_outer:
+		if (!(up->up_flags & UPCI_DEVINFO_MSI_ENABLED)) {
+wait_on_outer:
+			cv_wait(&up->up_msi_outer_cv,
+			    &up->up_msi_outer_lk);
+				goto try_outer;
+
+			/* interrupted */
+/*
+			mutex_exit(&up->up_msi_outer_lk);
+			rval = *rv = EINVAL;
+			return (abs(rval));
+*/
+		}
+
+		/* MSI is enabled, we have the outer lock */
+		mutex_enter(&up->up_msi_inner_lk);
+		if (!list_is_empty(&up->up_msi_int_list)) {
+			ie = list_remove_head(&up->up_msi_int_list);
+			mutex_exit(&up->up_msi_inner_lk);
+			mutex_exit(&up->up_msi_outer_lk);
+			ig.ig_number = ie->ie_number;
+			kmem_free(ie, sizeof(*ie));
+			if (copyout((void *) &ig, arg,
+			    sizeof (upci_int_get_t)) == 0) {
+				return (0);
+			}
+			/* Interrupt loss!! */
+			rval = *rv = EINVAL;
+			return (abs(rval));
+		}
+		mutex_exit(&up->up_msi_inner_lk);
+
+		/* No data found, wait on the outer lock */
+		goto wait_on_outer;
+	break;
+	default:
+		rval = *rv = EINVAL;
+	break;
+	}
+
+	return (abs(rval));
 }
 
 static int
@@ -704,6 +834,10 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case UPCI_IOCTL_INT_UPDATE:
 		rval = upci_int_update_ioctl(dev,
 		    (upci_int_update_t *) arg, cr, rv);
+	break;
+	case UPCI_IOCTL_INT_GET:
+		rval = upci_int_get_ioctl(dev,
+		    (upci_int_get_t *) arg, cr, rv);
 	break;
 	default:
 		rval = *rv = EINVAL;
@@ -763,6 +897,11 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	up->up_nregs = 0;
 	up->up_regs = NULL;
 
+	mutex_init(&up->up_msi_outer_lk, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&up->up_msi_outer_cv, NULL, CV_DRIVER, NULL);
+	list_create(&up->up_msi_int_list, sizeof (upci_msi_int_ent_t),
+	    offsetof (upci_msi_int_ent_t, ie_next));
+
 	ddi_set_driver_private(dip, (caddr_t)up);
 
 	cmn_err(CE_CONT, "Attached [%d]\n", instance);
@@ -789,6 +928,11 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	ddi_remove_minor_node(dip, "upci");
 	mutex_destroy(&up->up_lk);
+
+	mutex_destroy(&up->up_msi_outer_lk);
+	cv_destroy(&up->up_msi_outer_cv);
+	list_destroy(&up->up_msi_int_list);
+
 	ddi_soft_state_free(soft_state_p, instance);
 	return (DDI_SUCCESS);
 }

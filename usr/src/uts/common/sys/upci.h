@@ -29,6 +29,7 @@ extern "C" {
 #define	UPCI_IOCTL_DEV_INFO	0x07
 #define	UPCI_IOCTL_REG_INFO	0x08
 #define	UPCI_IOCTL_INT_UPDATE	0x09
+#define UPCI_IOCTL_INT_GET	0x0A
 
 
 /*
@@ -86,6 +87,15 @@ typedef struct upci_int_update_s {
 	int64_t		iu_enable;
 	int64_t		iu_vcount;
 } upci_int_update_t;
+
+/*
+ * UPCI_IOCTL_INT_GET
+ */
+
+typedef struct upci_int_get_s {
+	int64_t		ig_type;
+	int64_t		ig_number;
+} upci_int_get_t;
 
 #ifdef __cplusplus
 }
