@@ -49,6 +49,9 @@ typedef struct upci_s {
 	uint_t			up_flags;
 	int			up_nregs;
 	upci_reg_t		*up_regs;
+	ddi_intr_handle_t	up_intx_hdl;
+	ddi_intr_handle_t	up_msi_hdl[32];
+	int			up_msi_count;
 } upci_t;
 
 
@@ -471,6 +474,195 @@ upci_devinfo_ioctl(dev_t dev, upci_dev_info_t *udi, cred_t *cr, int *rv)
 	return (abs(rval));
 }
 
+static uint_t
+upci_intx_handler(caddr_t arg1, caddr_t arg2)
+{
+	cmn_err(CE_CONT, "INTX handler fired\n");
+	return (DDI_INTR_UNCLAIMED);
+}
+
+static int
+upci_intx_disable(upci_t *up)
+{
+	if (up->up_flags && UPCI_DEVINFO_INT_ENABLED) {
+		ddi_intr_remove_handler(up->up_intx_hdl);
+		ddi_intr_free(up->up_intx_hdl);
+		up->up_flags &= ~UPCI_DEVINFO_INT_ENABLED;
+	}
+	return (0);
+}
+
+static int
+upci_intx_update(upci_t *up, int enable)
+{
+	int rval, type, count, actual;
+
+	upci_intx_disable(up);
+	if (!enable)
+		return (0);
+
+	rval = -1;
+	if (ddi_intr_get_supported_types(up->up_dip, &type) != DDI_SUCCESS ||
+	    !(type & DDI_INTR_TYPE_FIXED)) {
+		goto out;
+	}
+
+	if (ddi_intr_get_nintrs(up->up_dip,
+	    DDI_INTR_TYPE_FIXED, &count) != DDI_SUCCESS ||
+	    count != 1) {
+		goto out;
+	}
+
+	if (ddi_intr_alloc(up->up_dip, &up->up_intx_hdl,
+	    DDI_INTR_TYPE_FIXED, 0, count, &actual, 0) != DDI_SUCCESS ||
+	    actual != 1) {
+		goto out;
+	}
+
+	if (ddi_intr_add_handler(up->up_intx_hdl, upci_intx_handler,
+	    (caddr_t) up, 0) != DDI_SUCCESS) {
+		ddi_intr_free(up->up_intx_hdl);
+		goto free_intr;
+	}
+	if (ddi_intr_enable(up->up_intx_hdl) != DDI_SUCCESS) {
+		goto remove_hdlr;
+	}
+
+	up->up_flags |= UPCI_DEVINFO_INT_ENABLED;
+	return (0);
+
+remove_hdlr:
+	ddi_intr_remove_handler(up->up_intx_hdl);
+free_intr:
+	ddi_intr_free(up->up_intx_hdl);
+out:
+	return (rval);
+}
+
+static uint_t
+upci_msi_handler(caddr_t arg1, caddr_t arg2)
+{
+	cmn_err(CE_CONT, "MSI handler fired\n");
+	return (DDI_INTR_CLAIMED);
+}
+
+static int
+upci_msi_disable(upci_t *up)
+{
+	int i;
+	if (up->up_flags & UPCI_DEVINFO_MSI_ENABLED) {
+		if (ddi_intr_block_disable(up->up_msi_hdl,
+		    up->up_msi_count) != DDI_SUCCESS) {
+			return (-1);
+		}
+
+
+		for (i = 0; i < up->up_msi_count; i++) {
+			ddi_intr_remove_handler(up->up_msi_hdl[i]);
+			ddi_intr_free(up->up_msi_hdl[i]);
+		}
+
+		up->up_msi_count = 0;
+		up->up_flags &= ~UPCI_DEVINFO_MSI_ENABLED;
+	}
+
+	return (0);
+}
+
+static int
+upci_msi_update(upci_t *up, int enable, int count)
+{
+	int i;
+	int rval, type, cnt, actual;
+
+	upci_msi_disable(up);
+	if (!enable)
+		return (0);
+	rval = -1;
+	if (ddi_intr_get_supported_types(up->up_dip, &type) != DDI_SUCCESS ||
+	    !(type & DDI_INTR_TYPE_MSI)) {
+		goto out;
+	}
+	if (ddi_intr_get_nintrs(up->up_dip,
+	    DDI_INTR_TYPE_MSI, &cnt) != DDI_SUCCESS ||
+	    count > cnt) {
+		goto out;
+	}
+	if (ddi_intr_alloc(up->up_dip, up->up_msi_hdl, DDI_INTR_TYPE_MSI,
+	    0, count, &actual, DDI_INTR_ALLOC_NORMAL) != DDI_SUCCESS ||
+	    actual != count) {
+		goto out;
+	}
+
+	for (i = 0; i < count; i++) {
+		if (ddi_intr_add_handler(up->up_msi_hdl[i],
+		    upci_msi_handler, (caddr_t) up,
+		    (void *)((intptr_t) i)) != DDI_SUCCESS) {
+			while (--i >= 0)
+				ddi_intr_remove_handler(up->up_msi_hdl[i]);
+			goto free_vector;
+		}
+	}
+
+	if (ddi_intr_block_enable(up->up_msi_hdl, count) == DDI_SUCCESS) {
+		up->up_msi_count = count;
+		up->up_flags |= UPCI_DEVINFO_MSI_ENABLED;
+		rval = 0;
+		goto out;
+	}
+
+	for (i = 0; i < count; i++) {
+		ddi_intr_remove_handler(up->up_msi_hdl[i]);
+	}
+free_vector:
+	for (i = 0; i < count; i++) {
+		ddi_intr_free(up->up_msi_hdl[i]);
+	}
+out:
+	return (rval);
+}
+
+static int
+upci_int_update_ioctl(dev_t dev,upci_int_update_t *arg, cred_t *cr, int *rv)
+{
+	int rval = DDI_SUCCESS;
+	upci_t *up;
+	minor_t instance;
+	upci_int_update_t ip;
+
+	if (copyin((void *) arg, &ip, sizeof(ip)) != 0) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+
+	*rv = 0;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	mutex_enter(&up->up_lk);
+
+	switch (ip.iu_type) {
+	case UPCI_INTR_TYPE_FIXED:
+		rval = *rv = upci_intx_update(up, ip.iu_enable);
+	break;
+	case UPCI_INTR_TYPE_MSI:
+		rval = *rv = upci_msi_update(up, ip.iu_enable, ip.iu_vcount);
+	break;
+	default:
+		rval = *rv = EINVAL;
+		goto out;
+	break;
+	}
+out:
+	mutex_exit(&up->up_lk);
+
+	return (-1);
+}
+
 static int
 upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 {
@@ -508,6 +700,10 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case UPCI_IOCTL_REG_INFO:
 		rval = upci_get_reg_info_ioctl(dev,
 		    (upci_reg_info_t *) arg, cr, rv);
+	break;
+	case UPCI_IOCTL_INT_UPDATE:
+		rval = upci_int_update_ioctl(dev,
+		    (upci_int_update_t *) arg, cr, rv);
 	break;
 	default:
 		rval = *rv = EINVAL;

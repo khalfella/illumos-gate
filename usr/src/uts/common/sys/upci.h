@@ -28,6 +28,7 @@ extern "C" {
 #define	UPCI_IOCTL_CLOSE_REGS	0x06
 #define	UPCI_IOCTL_DEV_INFO	0x07
 #define	UPCI_IOCTL_REG_INFO	0x08
+#define	UPCI_IOCTL_INT_UPDATE	0x09
 
 
 /*
@@ -37,8 +38,10 @@ extern "C" {
 /*
  * UPCI_IOCTL_DEV_INFO
  */
-#define	UPCI_DEVINFO_DEV_OPEN	0x01
-#define	UPCI_DEVINFO_REG_OPEN	0x02
+#define	UPCI_DEVINFO_DEV_OPEN		0x01
+#define	UPCI_DEVINFO_REG_OPEN		0x02
+#define	UPCI_DEVINFO_INT_ENABLED	0x04
+#define	UPCI_DEVINFO_MSI_ENABLED	0x08
 
 typedef struct upci_dev_info_s {
 	uint64_t	di_flags;
@@ -70,6 +73,19 @@ typedef struct upci_rw_cmd_s {
 	uint64_t	rw_pdatain;
 	uint64_t	rw_pdataout;
 } upci_rw_cmd_t;
+
+/*
+ * UPCI_IOCTL_INT_UPDATE
+ */
+
+#define UPCI_INTR_TYPE_FIXED		0x01
+#define UPCI_INTR_TYPE_MSI		0x02
+
+typedef struct upci_int_update_s {
+	int64_t		iu_type;
+	int64_t		iu_enable;
+	int64_t		iu_vcount;
+} upci_int_update_t;
 
 #ifdef __cplusplus
 }
