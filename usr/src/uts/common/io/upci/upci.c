@@ -34,6 +34,11 @@
 #include <sys/upci.h>
 
 #define	abs(a) ((a) < 0 ? -(a) : (a))
+typedef struct upci_intx_int_ent_s {
+	int		ie_dummy;
+	list_node_t	ie_next;
+} upci_intx_int_ent_t;
+
 typedef struct upci_msi_int_ent_s {
 	int		ie_number;
 	list_node_t	ie_next;
@@ -53,7 +58,13 @@ typedef struct upci_s {
 	uint_t			up_flags;
 	int			up_nregs;
 	upci_reg_t		*up_regs;
+
 	ddi_intr_handle_t	up_intx_hdl;
+	kmutex_t		up_intx_outer_lk;
+	kcondvar_t		up_intx_outer_cv;
+	kmutex_t		up_intx_inner_lk;
+	list_t			up_intx_int_list;
+
 	ddi_intr_handle_t	up_msi_hdl[32];
 	int			up_msi_count;
 	kmutex_t		up_msi_outer_lk;
@@ -503,26 +514,16 @@ upci_intx_disable(upci_t *up)
 static int
 upci_intx_update(upci_t *up, int enable)
 {
-	int rval, type, count, actual;
+	int actual;
 
 	upci_intx_disable(up);
 	if (!enable)
 		return (0);
 
 	rval = -1;
-	if (ddi_intr_get_supported_types(up->up_dip, &type) != DDI_SUCCESS ||
-	    !(type & DDI_INTR_TYPE_FIXED)) {
-		goto out;
-	}
-
-	if (ddi_intr_get_nintrs(up->up_dip,
-	    DDI_INTR_TYPE_FIXED, &count) != DDI_SUCCESS ||
-	    count != 1) {
-		goto out;
-	}
 
 	if (ddi_intr_alloc(up->up_dip, &up->up_intx_hdl,
-	    DDI_INTR_TYPE_FIXED, 0, count, &actual, 0) != DDI_SUCCESS ||
+	    DDI_INTR_TYPE_FIXED, 0, 1, &actual, 0) != DDI_SUCCESS ||
 	    actual != 1) {
 		goto out;
 	}
@@ -606,10 +607,8 @@ upci_msi_update(upci_t *up, int enable, int count)
 	    __func__, enable, count);
 
 	/* We are disabling MSI */
-	if (!enable) {
-		upci_msi_disable(up);
-		return (0);
-	}
+	if (!enable)
+		return upci_msi_disable(up);
 
 	/* Same number of vectors. Nothing to do */
 	if (up->up_msi_count == count)
@@ -712,7 +711,7 @@ upci_int_update_ioctl(dev_t dev,upci_int_update_t *arg, cred_t *cr, int *rv)
 out:
 	mutex_exit(&up->up_msi_outer_lk);
 
-	return (-1);
+	return (abs(rval));
 }
 
 static int
@@ -728,7 +727,8 @@ upci_int_get_ioctl(dev_t dev, upci_int_get_t * arg, cred_t *cr, int *rv)
 	upci_t *up;
 	minor_t instance;
 	upci_int_get_t ig;
-	upci_msi_int_ent_t *ie;
+	upci_msi_int_ent_t *mie;
+	upci_intx_int_ent_t *iie;
 
 	if (copyin((void *) arg, &ig, sizeof(ig)) != 0) {
 		rval = *rv = EINVAL;
@@ -744,17 +744,43 @@ upci_int_get_ioctl(dev_t dev, upci_int_get_t * arg, cred_t *cr, int *rv)
 	*rv = 0;
 	switch (ig.ig_type) {
 	case UPCI_INTR_TYPE_FIXED:
+try_intx_outer:
+		mutex_enter(&up->up_intx_outer_lk);
+		if (!(up->up_flags & UPCI_DEVINFO_INT_ENABLED)) {
+wait_on_intx_outer:
+			cv_wait(&up->up_intx_outer_cv, &up->up_intx_outer_lk);
+				goto try_intx_outer;
+		}
 		rval = *rv = upci_intx_get(up, arg);
+
+		/* INTX is enabled, we have the outer lock */
+		mutex_enter(&up->up_intx_inner_lk);
+		if (!list_is_empty(&up->up_intx_int_list)) {
+			iie = list_remove_head(&up->up_intx_int_list);
+			mutex_exit(&up->up_intx_inner_lk);
+			mutex_exit(&up->up_intx_outer_lk);
+			ig.ig_number = iie->ie_dummy;
+			kmem_free(iie, sizeof(*iie));
+			if (copyout((void *) &ig, arg,
+			    sizeof (upci_int_get_t)) == 0) {
+				return (0);
+			}
+			/* Intx loss */
+			rval = *rv = EINVAL;
+			return (abs(rval));
+		}
+		mutex_exit(&up->up_intx_inner_lk);
+		goto wait_on_intx_outer;
 	break;
 	case UPCI_INTR_TYPE_MSI:
 
 		mutex_enter(&up->up_msi_outer_lk);
-try_outer:
+try_msi_outer:
 		if (!(up->up_flags & UPCI_DEVINFO_MSI_ENABLED)) {
-wait_on_outer:
+wait_on_msi_outer:
 			cv_wait(&up->up_msi_outer_cv,
 			    &up->up_msi_outer_lk);
-				goto try_outer;
+				goto try_msi_outer;
 
 			/* interrupted */
 /*
@@ -767,11 +793,11 @@ wait_on_outer:
 		/* MSI is enabled, we have the outer lock */
 		mutex_enter(&up->up_msi_inner_lk);
 		if (!list_is_empty(&up->up_msi_int_list)) {
-			ie = list_remove_head(&up->up_msi_int_list);
+			mie = list_remove_head(&up->up_msi_int_list);
 			mutex_exit(&up->up_msi_inner_lk);
 			mutex_exit(&up->up_msi_outer_lk);
-			ig.ig_number = ie->ie_number;
-			kmem_free(ie, sizeof(*ie));
+			ig.ig_number = mie->ie_number;
+			kmem_free(mie, sizeof(*mie));
 			if (copyout((void *) &ig, arg,
 			    sizeof (upci_int_get_t)) == 0) {
 				return (0);
@@ -783,7 +809,7 @@ wait_on_outer:
 		mutex_exit(&up->up_msi_inner_lk);
 
 		/* No data found, wait on the outer lock */
-		goto wait_on_outer;
+		goto wait_on_msi_outer;
 	break;
 	default:
 		rval = *rv = EINVAL;
@@ -897,6 +923,11 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	up->up_nregs = 0;
 	up->up_regs = NULL;
 
+	mutex_init(&up->up_intx_outer_lk, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&up->up_intx_outer_cv, NULL, CV_DRIVER, NULL);
+	list_create(&up->up_intx_int_list, sizeof (upci_intx_int_ent_t),
+	    offsetof (upci_intx_int_ent_t, ie_next));
+
 	up->up_msi_count = 0;
 	mutex_init(&up->up_msi_outer_lk, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&up->up_msi_outer_cv, NULL, CV_DRIVER, NULL);
@@ -929,6 +960,10 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	ddi_remove_minor_node(dip, "upci");
 	mutex_destroy(&up->up_lk);
+
+	mutex_destroy(&up->up_intx_outer_lk);
+	cv_destroy(&up->up_intx_outer_cv);
+	list_destroy(&up->up_intx_int_list);
 
 	mutex_destroy(&up->up_msi_outer_lk);
 	cv_destroy(&up->up_msi_outer_cv);
