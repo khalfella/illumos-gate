@@ -553,10 +553,9 @@ upci_msi_handler(caddr_t arg1, caddr_t arg2)
 	upci_t *up;
 	upci_msi_int_ent_t *ie;
 
-	if ((ie = kmem_alloc(sizeof (*ie), KM_NOSLEEP)) == NULL) {
-		/* Interrupt loss!! */
-		return (DDI_INTR_CLAIMED);
-	}
+	/* Interrupt loss!! */
+	if ((ie = kmem_alloc(sizeof (*ie), KM_NOSLEEP)) == NULL)
+		goto out;
 
 
 	up = (upci_t *) arg1;
@@ -567,7 +566,7 @@ upci_msi_handler(caddr_t arg1, caddr_t arg2)
 	mutex_exit(&up->up_msi_inner_lk);
 
 	cv_signal(&up->up_msi_outer_cv);
-
+out:
 	cmn_err(CE_CONT, "MSI handler fired\n");
 	return (DDI_INTR_CLAIMED);
 }
@@ -600,34 +599,35 @@ static int
 upci_msi_update(upci_t *up, int enable, int count)
 {
 	int i;
-	int rval, type, cnt, actual;
+	int actual;
 	uint_t pri;
 
 	cmn_err(CE_CONT, "%s: enable = %d, count = %d\n",
 	    __func__, enable, count);
-	upci_msi_disable(up);
-	cmn_err(CE_CONT, "%s: disabled msi\n", __func__);
-	if (!enable)
+
+	/* We are disabling MSI */
+	if (!enable) {
+		upci_msi_disable(up);
 		return (0);
-	rval = -1;
-	if (ddi_intr_get_supported_types(up->up_dip, &type) != DDI_SUCCESS ||
-	    !(type & DDI_INTR_TYPE_MSI)) {
-		cmn_err(CE_CONT, "%s: Failed to get supported intr\n", __func__);
-		goto out;
 	}
-	cmn_err(CE_CONT, "%s: the card suppors msi\n", __func__);
-	if (ddi_intr_get_nintrs(up->up_dip,
-	    DDI_INTR_TYPE_MSI, &cnt) != DDI_SUCCESS ||
-	    count > cnt) {
-		cmn_err(CE_CONT, "%s: No enough vectors\n", __func__);
-		goto out;
+
+	/* Same number of vectors. Nothing to do */
+	if (up->up_msi_count == count)
+		return (0);
+
+	upci_msi_disable(up);
+
+	if (count <= 0) {
+		cmn_err(CE_CONT, "%s: count should be > 0\n", __func__);
+		return (-1);
 	}
-	cmn_err(CE_CONT, "%s: the card suppors msi\n", __func__);
+
+	/* We are enabling MSI interrupts */
 	if (ddi_intr_alloc(up->up_dip, up->up_msi_hdl, DDI_INTR_TYPE_MSI,
 	    0, count, &actual, DDI_INTR_ALLOC_NORMAL) != DDI_SUCCESS ||
 	    actual != count) {
 		cmn_err(CE_CONT, "%s: Failed to allocate vectors\n", __func__);
-		goto out;
+		return (-1);
 	}
 
 	cmn_err(CE_CONT, "%s: Getting msi intr priority\n", __func__);
@@ -670,8 +670,8 @@ free_vector:
 	for (i = 0; i < count; i++) {
 		ddi_intr_free(up->up_msi_hdl[i]);
 	}
-out:
-	return (rval);
+
+	return (-1);
 }
 
 static int
@@ -897,6 +897,7 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	up->up_nregs = 0;
 	up->up_regs = NULL;
 
+	up->up_msi_count = 0;
 	mutex_init(&up->up_msi_outer_lk, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&up->up_msi_outer_cv, NULL, CV_DRIVER, NULL);
 	list_create(&up->up_msi_int_list, sizeof (upci_msi_int_ent_t),
