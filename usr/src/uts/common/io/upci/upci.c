@@ -496,6 +496,18 @@ upci_devinfo_ioctl(dev_t dev, upci_dev_info_t *udi, cred_t *cr, int *rv)
 static uint_t
 upci_intx_handler(caddr_t arg1, caddr_t arg2)
 {
+	upci_t *up;
+	upci_intx_int_ent_t *ie;
+
+	if ((ie = kmem_alloc(sizeof (*ie), KM_NOSLEEP)) == NULL)
+	goto out;
+
+	up = (upci_t *) arg1;
+	ie->ie_dummy = 0;
+	mutex_enter(&up->up_intx_inner_lk);
+	list_insert_tail(&up->up_intx_int_list, ie);
+	mutex_exit(&up->up_intx_inner_lk);
+out:
 	cmn_err(CE_CONT, "INTX handler fired\n");
 	return (DDI_INTR_UNCLAIMED);
 }
@@ -503,8 +515,9 @@ upci_intx_handler(caddr_t arg1, caddr_t arg2)
 static int
 upci_intx_disable(upci_t *up)
 {
-	if (up->up_flags && UPCI_DEVINFO_INT_ENABLED) {
+	if (up->up_flags & UPCI_DEVINFO_INT_ENABLED) {
 		ddi_intr_remove_handler(up->up_intx_hdl);
+		mutex_destroy(&up->up_intx_inner_lk);
 		ddi_intr_free(up->up_intx_hdl);
 		up->up_flags &= ~UPCI_DEVINFO_INT_ENABLED;
 	}
@@ -515,25 +528,43 @@ static int
 upci_intx_update(upci_t *up, int enable)
 {
 	int actual;
+	uint_t pri;
 
-	upci_intx_disable(up);
+	cmn_err(CE_CONT, "%s: enable = %d\n",
+	    __func__, enable);
+
+	/* Try to disable the interrupts */
 	if (!enable)
+		return upci_intx_disable(up);
+
+	/* Interrupts are already enabled */
+	if (up->up_flags & UPCI_DEVINFO_INT_ENABLED)
 		return (0);
 
-	rval = -1;
 
 	if (ddi_intr_alloc(up->up_dip, &up->up_intx_hdl,
 	    DDI_INTR_TYPE_FIXED, 0, 1, &actual, 0) != DDI_SUCCESS ||
 	    actual != 1) {
+		cmn_err(CE_CONT, "%s: Failed to allocate intx hdl\n", __func__);
 		goto out;
 	}
 
-	if (ddi_intr_add_handler(up->up_intx_hdl, upci_intx_handler,
-	    (caddr_t) up, 0) != DDI_SUCCESS) {
-		ddi_intr_free(up->up_intx_hdl);
+	if (ddi_intr_get_pri(up->up_intx_hdl, &pri) != DDI_SUCCESS ||
+	    pri >= ddi_intr_get_hilevel_pri()) {
+		cmn_err(CE_CONT, "%s: Failed to get intx pri\n", __func__);
 		goto free_intr;
 	}
+
+	mutex_init(&up->up_intx_inner_lk, NULL, MUTEX_DRIVER, DDI_INTR_PRI(pri));
+
+	if (ddi_intr_add_handler(up->up_intx_hdl, upci_intx_handler,
+	    (caddr_t) up, 0) != DDI_SUCCESS) {
+		cmn_err(CE_CONT, "%s: Failed to add intx handlers\n", __func__);
+		goto destroy_inner_mutex;
+	}
+
 	if (ddi_intr_enable(up->up_intx_hdl) != DDI_SUCCESS) {
+		cmn_err(CE_CONT, "%s: Failed to enable intx\n", __func__);
 		goto remove_hdlr;
 	}
 
@@ -542,10 +573,12 @@ upci_intx_update(upci_t *up, int enable)
 
 remove_hdlr:
 	ddi_intr_remove_handler(up->up_intx_hdl);
+destroy_inner_mutex:
+	mutex_destroy(&up->up_intx_inner_lk);
 free_intr:
 	ddi_intr_free(up->up_intx_hdl);
 out:
-	return (rval);
+	return (-1);
 }
 
 static uint_t
