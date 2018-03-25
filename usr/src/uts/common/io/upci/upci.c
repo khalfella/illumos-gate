@@ -777,12 +777,17 @@ upci_int_get_ioctl(dev_t dev, upci_int_get_t * arg, cred_t *cr, int *rv)
 	*rv = 0;
 	switch (ig.ig_type) {
 	case UPCI_INTR_TYPE_FIXED:
-try_intx_outer:
 		mutex_enter(&up->up_intx_outer_lk);
+try_intx_outer:
 		if (!(up->up_flags & UPCI_DEVINFO_INT_ENABLED)) {
 wait_on_intx_outer:
-			cv_wait(&up->up_intx_outer_cv, &up->up_intx_outer_lk);
-				goto try_intx_outer;
+			if (cv_wait_sig(&up->up_intx_outer_cv,
+			    &up->up_intx_outer_lk) == 0) {
+				mutex_exit(&up->up_intx_outer_lk);
+				rval = *rv = EINVAL;
+				return (abs(rval));
+			}
+			goto try_intx_outer;
 		}
 		rval = *rv = upci_intx_get(up, arg);
 
@@ -811,16 +816,15 @@ wait_on_intx_outer:
 try_msi_outer:
 		if (!(up->up_flags & UPCI_DEVINFO_MSI_ENABLED)) {
 wait_on_msi_outer:
-			cv_wait(&up->up_msi_outer_cv,
-			    &up->up_msi_outer_lk);
-				goto try_msi_outer;
+			if (cv_wait_sig(&up->up_msi_outer_cv,
+			    &up->up_msi_outer_lk) == 0) {
+				/* Interrupted */
+				mutex_exit(&up->up_msi_outer_lk);
+				rval = *rv = EINVAL;
+				return (abs(rval));
+			}
 
-			/* interrupted */
-/*
-			mutex_exit(&up->up_msi_outer_lk);
-			rval = *rv = EINVAL;
-			return (abs(rval));
-*/
+			goto try_msi_outer;
 		}
 
 		/* MSI is enabled, we have the outer lock */
