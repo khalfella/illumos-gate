@@ -55,6 +55,7 @@ typedef struct upci_dev_info_s {
 #define UPCI_IO_REG_IO			0x01
 #define UPCI_IO_REG_PREFETCH		0x08
 #define UPCI_IO_REG_VALID		0x10
+#define UPCI_IO_REG_VIR			0x20
 
 typedef struct upci_reg_info_s {
 	int64_t		ri_region;
