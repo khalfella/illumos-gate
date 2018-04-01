@@ -36,7 +36,7 @@
 
 #define	abs(a) ((a) < 0 ? -(a) : (a))
 
-static void		*soft_state_p;
+void *soft_state_p;
 
 static int
 upci_open(dev_t *devp, int flag, int otyp, cred_t *credp)
@@ -949,6 +949,9 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	list_create(&up->up_msi_int_list, sizeof (upci_msi_int_ent_t),
 	    offsetof (upci_msi_int_ent_t, ie_next));
 
+	list_create(&up->up_ch_xdma_list, sizeof (upci_ch_ent_t),
+	    offsetof (upci_ch_ent_t, ch_next));
+
 	ddi_set_driver_private(dip, (caddr_t)up);
 
 	cmn_err(CE_CONT, "Attached [%d]\n", instance);
@@ -972,6 +975,8 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	cmn_err(CE_CONT, "Detached [%d]\n", instance);
+
+	list_destroy(&up->up_ch_xdma_list);
 
 	ddi_remove_minor_node(dip, "upci");
 	mutex_destroy(&up->up_lk);

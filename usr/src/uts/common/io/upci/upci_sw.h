@@ -51,6 +51,17 @@ typedef struct upci_reg_s {
 	ddi_acc_handle_t	reg_hdl;
 } upci_reg_t;
 
+typedef struct upci_ch_ent_s {
+	size_t			ch_length;
+	size_t			ch_real_length;
+	caddr_t			ch_kaddr;
+	ddi_dma_handle_t	ch_hdl;
+	ddi_acc_handle_t	ch_acc_hdl;
+	ddi_dma_cookie_t	ch_cookie;
+	uint_t			ch_ncookies;
+	list_node_t		ch_next;
+} upci_ch_ent_t;
+
 typedef struct upci_s {
 	dev_info_t		*up_dip;
 	ddi_acc_handle_t 	up_hdl;
@@ -71,6 +82,8 @@ typedef struct upci_s {
 	kcondvar_t		up_msi_outer_cv;
 	kmutex_t		up_msi_inner_lk;
 	list_t			up_msi_int_list;
+
+	list_t			up_ch_xdma_list;
 } upci_t;
 
 

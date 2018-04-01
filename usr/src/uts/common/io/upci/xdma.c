@@ -39,7 +39,9 @@
 
 #define	abs(a) ((a) < 0 ? -(a) : (a))
 
-static ddi_dma_attr_t dma_attrs = {
+extern void *soft_state_p;
+
+static ddi_dma_attr_t upci_dma_attrs = {
 	DMA_ATTR_V0,		/* Version number */
 	0x00000000,		/* low address */
 	0xFFFFFFFF,		/* high address */
@@ -54,7 +56,8 @@ static ddi_dma_attr_t dma_attrs = {
 	DDI_DMA_FLAGERR,	/* attr flag */
 };
 
-static ddi_device_acc_attr_t dev_attrs = {
+
+static ddi_device_acc_attr_t xdma_dev_attrs = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC
@@ -64,11 +67,11 @@ int
 upci_xdma_alloc_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
     int *rv)
 {
-	uint_t r;
 	int rval = DDI_SUCCESS;
 	minor_t instance;
 	upci_t *up;
-	ddi_dma_handle_t dma_hdl;
+	upci_coherent_t uch;
+	upci_ch_ent_t *che;
 
 
 	*rv = 0;
@@ -80,28 +83,57 @@ upci_xdma_alloc_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
 
 	mutex_enter(&up->up_lk);
 
-	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN)) {
+	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
+	    copyin(uarg, &uch, sizeof(uch)) != 0) {
 		rval = *rv = EIO;
 		goto out;
 	}
 
-	 if (ddi_dma_alloc_handle(up->up_dip, dma_attrs, DDI_DMA_SLEEP, NULL,
-		&dma_hdl) != DDI_SUCCESS) {
-		cmn_err(CE_CONT, "Error: filed to allocate dma_handle [%d]\n",
-		rval = *rv = EIO;
-		goto out;
-	}
+	che = kmem_alloc(sizeof(*che), KM_SLEEP);
+	che->ch_length = uch.ch_length;
 
+       if (ddi_dma_alloc_handle(up->up_dip, &upci_dma_attrs, DDI_DMA_SLEEP,
+	    NULL, &che->ch_hdl) != DDI_SUCCESS) {
+		rval = *rv = ENOMEM;
+		goto free_ent;
+       }
 
-	if (ddi_dma_mem_alloc(dma_hdl, size, &dev_attrs,
+	if (ddi_dma_mem_alloc(che->ch_hdl, che->ch_length, &xdma_dev_attrs,
 	    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
-	    DDI_DMA_SLEEP, NULL, &dma->buf, &dma->bufLen,
-	    &dma->dataHandle) != DDI_SUCCESS) {
-		VMXNET3_WARN(dp, "ddi_dma_mem_alloc() failed");
-		err = ENOMEM;
-		goto error_dma_handle;
+	    DDI_DMA_SLEEP, NULL, &che->ch_kaddr, &che->ch_real_length,
+	    &che->ch_acc_hdl) != DDI_SUCCESS) {
+		rval = *rv = ENOMEM;
+		goto free_hdl;
 	}
 
+	if (ddi_dma_addr_bind_handle(che->ch_hdl, NULL, che->ch_kaddr,
+	    che->ch_real_length, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP, NULL, &che->ch_cookie,
+	    &che->ch_ncookies) != DDI_DMA_MAPPED) {
+		rval = *rv = ENOMEM;
+		goto free_mem;
+	}
+
+	if (che->ch_ncookies != 1) {
+		rval = *rv = ENOMEM;
+		goto unbind_mem;
+	}
+
+	uch.ch_cookie = che->ch_cookie.dmac_address;
+	if (copyout(&uch, uarg, sizeof(uch)) == 0) {
+		list_insert_tail(&up->up_ch_xdma_list, che);
+		mutex_exit(&up->up_lk);
+		return (0);
+	}
+
+unbind_mem:
+	ddi_dma_unbind_handle(che->ch_hdl);
+free_mem:
+	ddi_dma_mem_free(&che->ch_acc_hdl);
+free_hdl:
+	ddi_dma_free_handle(&che->ch_hdl);
+free_ent:
+	kmem_free(che, sizeof(*che));
 out:
 	mutex_exit(&up->up_lk);
 	return (abs(rval));
