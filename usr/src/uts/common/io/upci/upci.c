@@ -873,12 +873,12 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		    (upci_coherent_t *) arg, cr, rv);
 	break;
 	case UPCI_IOCTL_XDMA_READ_COHERENT:
-		rval = upci_xdma_read_coherent(dev,
-		    (upci_coherent_t *) arg, cr, rv);
+		rval = upci_xdma_rw_coherent(dev,
+		    (upci_coherent_t *) arg, cr, rv, 0);
 	break;
 	case UPCI_IOCTL_XDMA_WRITE_COHERENT:
-		rval = upci_xdma_free_coherent(dev,
-		    (upci_coherent_t *) arg, cr, rv);
+		rval = upci_xdma_rw_coherent(dev,
+		    (upci_coherent_t *) arg, cr, rv, 1);
 	break;
 	default:
 		rval = *rv = EINVAL;

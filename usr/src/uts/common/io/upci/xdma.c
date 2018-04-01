@@ -67,14 +67,14 @@ int
 upci_xdma_alloc_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
     int *rv)
 {
-	int rval = DDI_SUCCESS;
+	int rval;
 	minor_t instance;
 	upci_t *up;
 	upci_coherent_t uch;
 	upci_ch_ent_t *che;
 
 
-	*rv = 0;
+	rval = *rv = EINVAL;
 	instance = getminor(dev);
 	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
 		rval = *rv = EINVAL;
@@ -127,7 +127,7 @@ upci_xdma_alloc_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
 		}
 		list_insert_tail(&up->up_ch_xdma_list, che);
 		mutex_exit(&up->up_lk);
-		return (0);
+		return (*rv = 0);
 	}
 
 unbind_mem:
@@ -143,6 +143,20 @@ out:
 	return (abs(rval));
 }
 
+static upci_ch_ent_t *
+find_xdma_coherent_map(upci_t *up, uint64_t cookie)
+{
+	upci_ch_ent_t *che;
+	for (che = list_head(&up->up_ch_xdma_list); che != NULL;
+	    che = list_next(&up->up_ch_xdma_list, che)) {
+		if (cookie == che->ch_cookie.dmac_address) {
+			return (che);
+		}
+	}
+
+	return (NULL);
+}
+
 int
 upci_xdma_free_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
     int *rv)
@@ -151,15 +165,52 @@ upci_xdma_free_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
 }
 
 int
-upci_xdma_read_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
-    int *rv)
+upci_xdma_rw_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
+    int *rv, int write)
 {
-	return (0);
-}
+	int i, rval;
+	minor_t instance;
+	upci_t *up;
+	upci_coherent_t uch;
+	upci_ch_ent_t *che;
+	char *src, *dst;
 
-int
-upci_xdma_write_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
-    int *rv)
-{
-	return (0);
+
+	rval = *rv = EINVAL;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		rval = *rv = EINVAL;
+		return (abs(rval));
+	}
+
+	mutex_enter(&up->up_lk);
+
+	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
+	    copyin(uarg, &uch, sizeof(uch)) != 0 ||
+	    (che = find_xdma_coherent_map(up, uch.ch_cookie)) == NULL) {
+		rval = *rv = EIO;
+		goto out;
+	}
+
+	if (!write) {
+		uch.ch_udata = 0;
+		ddi_dma_sync(che->ch_hdl, 0, 0, DDI_DMA_SYNC_FORCPU);
+	}
+
+	*(write ? &src : &dst) = (char *) &uch.ch_udata;
+	*(write ? &dst : &src) = (char *) (che->ch_kaddr + uch.ch_offset);
+
+	if (write) {
+		ddi_dma_sync(che->ch_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
+	}
+
+	for (i = 0; i < uch.ch_length; i++)
+		dst[i] = src[i];
+
+	if (copyout(&uch, uarg, sizeof(uch)) == 0) {
+		rval = *rv = 0;
+	}
+out:
+	mutex_exit(&up->up_lk);
+	return (abs(rval));
 }

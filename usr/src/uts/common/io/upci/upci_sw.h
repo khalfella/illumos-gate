@@ -89,5 +89,4 @@ typedef struct upci_s {
 
 int upci_xdma_alloc_coherent(dev_t, upci_coherent_t *, cred_t *, int *);
 int upci_xdma_free_coherent(dev_t, upci_coherent_t *, cred_t *, int *);
-int upci_xdma_read_coherent(dev_t, upci_coherent_t *, cred_t *, int *);
-int upci_xdma_write_coherent(dev_t, upci_coherent_t *, cred_t *, int *);
+int upci_xdma_rw_coherent(dev_t, upci_coherent_t *, cred_t *, int *, int);
