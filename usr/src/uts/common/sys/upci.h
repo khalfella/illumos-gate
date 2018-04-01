@@ -110,9 +110,11 @@ typedef struct upci_int_get_s {
  * UPCI_IOCTL_XDMA_WRITE_COHERENT
  */
 typedef struct upci_coherent_s {
-	uint64_t	ch_cookie;
-	uint64_t	ch_length;
 	uint64_t	ch_flags;
+	uint64_t	ch_length;
+	uint64_t	ch_cookie;
+	uint64_t	ch_offset;
+	uint64_t	ch_udata;
 } upci_coherent_t;
 
 #ifdef __cplusplus

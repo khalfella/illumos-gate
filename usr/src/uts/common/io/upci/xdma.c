@@ -121,6 +121,10 @@ upci_xdma_alloc_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
 
 	uch.ch_cookie = che->ch_cookie.dmac_address;
 	if (copyout(&uch, uarg, sizeof(uch)) == 0) {
+
+		if (uch.ch_flags == 1) {
+			bzero(che->ch_kaddr, che->ch_real_length);
+		}
 		list_insert_tail(&up->up_ch_xdma_list, che);
 		mutex_exit(&up->up_lk);
 		return (0);
