@@ -20,16 +20,21 @@
 extern "C" {
 #endif
 
-#define	UPCI_IOCTL_OPEN		0x01
-#define	UPCI_IOCTL_CLOSE	0x02
-#define	UPCI_IOCTL_READ		0x03
-#define	UPCI_IOCTL_WRITE	0x04
-#define	UPCI_IOCTL_OPEN_REGS	0x05
-#define	UPCI_IOCTL_CLOSE_REGS	0x06
-#define	UPCI_IOCTL_DEV_INFO	0x07
-#define	UPCI_IOCTL_REG_INFO	0x08
-#define	UPCI_IOCTL_INT_UPDATE	0x09
-#define UPCI_IOCTL_INT_GET	0x0A
+#define	UPCI_IOCTL_OPEN			0x01
+#define	UPCI_IOCTL_CLOSE		0x02
+#define	UPCI_IOCTL_READ			0x03
+#define	UPCI_IOCTL_WRITE		0x04
+#define	UPCI_IOCTL_OPEN_REGS		0x05
+#define	UPCI_IOCTL_CLOSE_REGS		0x06
+#define	UPCI_IOCTL_DEV_INFO		0x07
+#define	UPCI_IOCTL_REG_INFO		0x08
+#define	UPCI_IOCTL_INT_UPDATE		0x09
+#define UPCI_IOCTL_INT_GET		0x0A
+
+#define	UPCI_IOCTL_XDMA_ALLOC_COHERENT	0x0B
+#define	UPCI_IOCTL_XDMA_FREE_COHERENT	0x0C
+#define	UPCI_IOCTL_XDMA_READ_COHERENT	0x0D
+#define	UPCI_IOCTL_XDMA_WRITE_COHERENT	0x0E
 
 
 /*
@@ -97,6 +102,19 @@ typedef struct upci_int_get_s {
 	int64_t		ig_type;
 	int64_t		ig_number;
 } upci_int_get_t;
+
+/*
+ * UPCI_IOCTL_XDMA_ALLOC_COHERENT
+ * UPCI_IOCTL_XDMA_FREE_COHERENT
+ * UPCI_IOCTL_XDMA_READ_COHERENT
+ * UPCI_IOCTL_XDMA_WRITE_COHERENT
+ */
+typedef struct upci_coherent_s {
+	uint64_t	ch_cookie;
+	uint64_t	ch_size;
+	uint64_t	ch_flags;
+	uint64_t	ch_udata;
+} upci_coherent_t;
 
 #ifdef __cplusplus
 }

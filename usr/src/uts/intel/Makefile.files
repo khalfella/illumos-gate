@@ -240,7 +240,7 @@ AMD8111S_OBJS += amd8111s_main.o amd8111s_hw.o
 #	UPCI driver
 #
 
-UPCI_OBJS += upci.o
+UPCI_OBJS += upci.o xdma.o
 
 #
 #	Pentium Performance Counter BackEnd module

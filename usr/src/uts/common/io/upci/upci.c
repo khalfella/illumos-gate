@@ -32,47 +32,9 @@
 #include <sys/ddi_isa.h>
 
 #include <sys/upci.h>
+#include "upci_sw.h"
 
 #define	abs(a) ((a) < 0 ? -(a) : (a))
-typedef struct upci_intx_int_ent_s {
-	int		ie_dummy;
-	list_node_t	ie_next;
-} upci_intx_int_ent_t;
-
-typedef struct upci_msi_int_ent_s {
-	int		ie_number;
-	list_node_t	ie_next;
-} upci_msi_int_ent_t;
-
-typedef struct upci_reg_s {
-	uint32_t		reg_flags;
-	caddr_t			reg_base;
-	off_t			reg_size;
-	ddi_acc_handle_t	reg_hdl;
-} upci_reg_t;
-
-typedef struct upci_s {
-	dev_info_t		*up_dip;
-	ddi_acc_handle_t 	up_hdl;
-	kmutex_t		up_lk;
-	uint_t			up_flags;
-	int			up_nregs;
-	upci_reg_t		*up_regs;
-
-	ddi_intr_handle_t	up_intx_hdl;
-	kmutex_t		up_intx_outer_lk;
-	kcondvar_t		up_intx_outer_cv;
-	kmutex_t		up_intx_inner_lk;
-	list_t			up_intx_int_list;
-
-	ddi_intr_handle_t	up_msi_hdl[32];
-	int			up_msi_count;
-	kmutex_t		up_msi_outer_lk;
-	kcondvar_t		up_msi_outer_cv;
-	kmutex_t		up_msi_inner_lk;
-	list_t			up_msi_int_list;
-} upci_t;
-
 
 static void		*soft_state_p;
 
@@ -901,6 +863,22 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case UPCI_IOCTL_INT_GET:
 		rval = upci_int_get_ioctl(dev,
 		    (upci_int_get_t *) arg, cr, rv);
+	break;
+	case UPCI_IOCTL_XDMA_ALLOC_COHERENT:
+		rval = upci_xdma_alloc_coherent(dev,
+		    (upci_coherent_t *) arg, cr, rv);
+	break;
+	case UPCI_IOCTL_XDMA_FREE_COHERENT:
+		rval = upci_xdma_free_coherent(dev,
+		    (upci_coherent_t *) arg, cr, rv);
+	break;
+	case UPCI_IOCTL_XDMA_READ_COHERENT:
+		rval = upci_xdma_read_coherent(dev,
+		    (upci_coherent_t *) arg, cr, rv);
+	break;
+	case UPCI_IOCTL_XDMA_WRITE_COHERENT:
+		rval = upci_xdma_free_coherent(dev,
+		    (upci_coherent_t *) arg, cr, rv);
 	break;
 	default:
 		rval = *rv = EINVAL;
