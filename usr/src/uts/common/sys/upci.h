@@ -31,10 +31,9 @@ extern "C" {
 #define	UPCI_IOCTL_INT_UPDATE		0x09
 #define UPCI_IOCTL_INT_GET		0x0A
 
-#define	UPCI_IOCTL_XDMA_ALLOC_COHERENT	0x0B
-#define	UPCI_IOCTL_XDMA_FREE_COHERENT	0x0C
-#define	UPCI_IOCTL_XDMA_READ_COHERENT	0x0D
-#define	UPCI_IOCTL_XDMA_WRITE_COHERENT	0x0E
+#define	UPCI_IOCTL_XDMA_ALLOC		0x0B
+#define	UPCI_IOCTL_XDMA_REMOVE		0x0C
+#define	UPCI_IOCTL_XDMA_RW		0x0D
 
 
 /*
@@ -104,18 +103,19 @@ typedef struct upci_int_get_s {
 } upci_int_get_t;
 
 /*
- * UPCI_IOCTL_XDMA_ALLOC_COHERENT
- * UPCI_IOCTL_XDMA_FREE_COHERENT
- * UPCI_IOCTL_XDMA_READ_COHERENT
- * UPCI_IOCTL_XDMA_WRITE_COHERENT
+ * UPCI_IOCTL_XDMA_ALLOC
+ * UPCI_IOCTL_XDMA_REMOVE
+ * UPCI_IOCTL_XDMA_RW
  */
-typedef struct upci_coherent_s {
-	uint64_t	ch_flags;
-	uint64_t	ch_length;
-	uint64_t	ch_cookie;
-	uint64_t	ch_offset;
-	uint64_t	ch_udata;
-} upci_coherent_t;
+typedef struct upci_dma_s {
+	uint64_t	ud_flags;
+	uint64_t	ud_type;
+	uint64_t	ud_dir;
+	uint64_t	ud_length;
+	uint64_t	ud_rwoff;
+	uint64_t	ud_host_phys;
+	uint64_t	ud_udata;
+} upci_dma_t;
 
 #ifdef __cplusplus
 }

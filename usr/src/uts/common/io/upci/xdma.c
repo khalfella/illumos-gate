@@ -27,16 +27,13 @@
 #include <sys/errno.h>
 #include <sys/uio.h>
 #include <sys/ksynch.h>
-
 #include <sys/pci_impl.h>
 #include <sys/ddi_isa.h>
-
 #include <sys/upci.h>
 
 #include "upci_sw.h"
 
 #define ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
-
 #define	abs(a) ((a) < 0 ? -(a) : (a))
 
 extern void *soft_state_p;
@@ -64,14 +61,13 @@ static ddi_device_acc_attr_t xdma_dev_attrs = {
 };
 
 int
-upci_xdma_alloc_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
-    int *rv)
+upci_xdma_alloc(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 {
 	int rval;
 	minor_t instance;
 	upci_t *up;
-	upci_coherent_t uch;
-	upci_ch_ent_t *che;
+	upci_dma_t udma;
+	upci_xdma_ent_t *xde;
 
 
 	rval = *rv = EINVAL;
@@ -84,73 +80,74 @@ upci_xdma_alloc_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
 	mutex_enter(&up->up_lk);
 
 	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
-	    copyin(uarg, &uch, sizeof(uch)) != 0) {
+	    copyin(uarg, &udma, sizeof(udma)) != 0) {
 		rval = *rv = EIO;
 		goto out;
 	}
 
-	che = kmem_alloc(sizeof(*che), KM_SLEEP);
-	che->ch_length = uch.ch_length;
-
-       if (ddi_dma_alloc_handle(up->up_dip, &upci_dma_attrs, DDI_DMA_SLEEP,
-	    NULL, &che->ch_hdl) != DDI_SUCCESS) {
+	xde = kmem_alloc(sizeof(*xde), KM_SLEEP);
+	if (ddi_dma_alloc_handle(up->up_dip, &upci_dma_attrs, DDI_DMA_SLEEP,
+	    NULL, &xde->xe_hdl) != DDI_SUCCESS) {
 		rval = *rv = ENOMEM;
 		goto free_ent;
-       }
+	}
 
-	if (ddi_dma_mem_alloc(che->ch_hdl, che->ch_length, &xdma_dev_attrs,
-	    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
-	    DDI_DMA_SLEEP, NULL, &che->ch_kaddr, &che->ch_real_length,
-	    &che->ch_acc_hdl) != DDI_SUCCESS) {
+	xde->xe_flags = IOMEM_DATA_UNCACHED;
+	xde->xe_flags |= udma.ud_type == DDI_DMA_CONSISTENT ?
+	    DDI_DMA_CONSISTENT : DDI_DMA_CONSISTENT;
+	xde->xe_length = udma.ud_length;
+	if (ddi_dma_mem_alloc(xde->xe_hdl, xde->xe_length, &xdma_dev_attrs,
+	    xde->xe_flags, DDI_DMA_SLEEP, NULL, &xde->xe_kaddr,
+	    &xde->xe_real_length, &xde->xe_acc_hdl) != DDI_SUCCESS) {
 		rval = *rv = ENOMEM;
 		goto free_hdl;
 	}
 
-	if (ddi_dma_addr_bind_handle(che->ch_hdl, NULL, che->ch_kaddr,
-	    che->ch_real_length, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-	    DDI_DMA_SLEEP, NULL, &che->ch_cookie,
-	    &che->ch_ncookies) != DDI_DMA_MAPPED) {
+	if (ddi_dma_addr_bind_handle(xde->xe_hdl, NULL, xde->xe_kaddr,
+	    xde->xe_real_length, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP, NULL, &xde->xe_cookie,
+	    &xde->xe_ncookies) != DDI_DMA_MAPPED) {
 		rval = *rv = ENOMEM;
 		goto free_mem;
 	}
 
-	if (che->ch_ncookies != 1) {
+	if (xde->xe_ncookies != 1) {
 		rval = *rv = ENOMEM;
 		goto unbind_mem;
 	}
 
-	uch.ch_cookie = che->ch_cookie.dmac_address;
-	if (copyout(&uch, uarg, sizeof(uch)) == 0) {
+	udma.ud_host_phys = xde->xe_cookie.dmac_address;
+	if (copyout(&udma, uarg, sizeof(udma)) == 0) {
 
-		if (uch.ch_flags == 1) {
-			bzero(che->ch_kaddr, che->ch_real_length);
+		if (udma.ud_flags == 1) {
+			bzero(xde->xe_kaddr, xde->xe_real_length);
 		}
-		list_insert_tail(&up->up_ch_xdma_list, che);
+		list_insert_tail(&up->up_xdma_list, xde);
 		mutex_exit(&up->up_lk);
 		return (*rv = 0);
 	}
 
 unbind_mem:
-	ddi_dma_unbind_handle(che->ch_hdl);
+	ddi_dma_unbind_handle(xde->xe_hdl);
 free_mem:
-	ddi_dma_mem_free(&che->ch_acc_hdl);
+	ddi_dma_mem_free(&xde->xe_acc_hdl);
 free_hdl:
-	ddi_dma_free_handle(&che->ch_hdl);
+	ddi_dma_free_handle(&xde->xe_hdl);
 free_ent:
-	kmem_free(che, sizeof(*che));
+	kmem_free(xde, sizeof(*xde));
 out:
 	mutex_exit(&up->up_lk);
 	return (abs(rval));
 }
 
-static upci_ch_ent_t *
-find_xdma_coherent_map(upci_t *up, uint64_t cookie)
+static upci_xdma_ent_t *
+find_xdma_map(upci_t *up, uint64_t cookie)
 {
-	upci_ch_ent_t *che;
-	for (che = list_head(&up->up_ch_xdma_list); che != NULL;
-	    che = list_next(&up->up_ch_xdma_list, che)) {
-		if (cookie == che->ch_cookie.dmac_address) {
-			return (che);
+	upci_xdma_ent_t *xde;
+	for (xde = list_head(&up->up_xdma_list); xde != NULL;
+	    xde = list_next(&up->up_xdma_list, xde)) {
+		if (cookie == xde->xe_cookie.dmac_address) {
+			return (xde);
 		}
 	}
 
@@ -158,23 +155,21 @@ find_xdma_coherent_map(upci_t *up, uint64_t cookie)
 }
 
 int
-upci_xdma_free_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
-    int *rv)
+upci_xdma_free(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 {
 	return (0);
 }
 
 int
-upci_xdma_rw_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
-    int *rv, int write)
+upci_xdma_rw(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 {
 	int i, rval;
 	minor_t instance;
 	upci_t *up;
-	upci_coherent_t uch;
-	upci_ch_ent_t *che;
+	upci_dma_t udma;
+	upci_xdma_ent_t *xde;
 	char *src, *dst;
-
+	int write;
 
 	rval = *rv = EINVAL;
 	instance = getminor(dev);
@@ -186,28 +181,30 @@ upci_xdma_rw_coherent(dev_t dev, upci_coherent_t * uarg, cred_t *cr,
 	mutex_enter(&up->up_lk);
 
 	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
-	    copyin(uarg, &uch, sizeof(uch)) != 0 ||
-	    (che = find_xdma_coherent_map(up, uch.ch_cookie)) == NULL) {
+	    copyin(uarg, &udma, sizeof(udma)) != 0 ||
+	    (xde = find_xdma_map(up, udma.ud_host_phys)) == NULL) {
 		rval = *rv = EIO;
 		goto out;
 	}
 
+	write = udma.ud_dir;
+
 	if (!write) {
-		uch.ch_udata = 0;
-		ddi_dma_sync(che->ch_hdl, 0, 0, DDI_DMA_SYNC_FORCPU);
+		udma.ud_udata = 0;
+		ddi_dma_sync(xde->xe_hdl, 0, 0, DDI_DMA_SYNC_FORCPU);
 	}
 
-	*(write ? &src : &dst) = (char *) &uch.ch_udata;
-	*(write ? &dst : &src) = (char *) (che->ch_kaddr + uch.ch_offset);
+	*(write ? &src : &dst) = (char *) &udma.ud_udata;
+	*(write ? &dst : &src) = (char *) (xde->xe_kaddr + udma.ud_rwoff);
 
 	if (write) {
-		ddi_dma_sync(che->ch_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
+		ddi_dma_sync(xde->xe_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
 	}
 
-	for (i = 0; i < uch.ch_length; i++)
+	for (i = 0; i < udma.ud_length; i++)
 		dst[i] = src[i];
 
-	if (copyout(&uch, uarg, sizeof(uch)) == 0) {
+	if (copyout(&udma, uarg, sizeof(udma)) == 0) {
 		rval = *rv = 0;
 	}
 out:

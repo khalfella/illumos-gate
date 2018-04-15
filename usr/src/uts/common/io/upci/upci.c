@@ -864,21 +864,14 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		rval = upci_int_get_ioctl(dev,
 		    (upci_int_get_t *) arg, cr, rv);
 	break;
-	case UPCI_IOCTL_XDMA_ALLOC_COHERENT:
-		rval = upci_xdma_alloc_coherent(dev,
-		    (upci_coherent_t *) arg, cr, rv);
+	case UPCI_IOCTL_XDMA_ALLOC:
+		rval = upci_xdma_alloc(dev, (upci_dma_t *) arg, cr, rv);
 	break;
-	case UPCI_IOCTL_XDMA_FREE_COHERENT:
-		rval = upci_xdma_free_coherent(dev,
-		    (upci_coherent_t *) arg, cr, rv);
+	case UPCI_IOCTL_XDMA_REMOVE:
+		rval = upci_xdma_remove(dev, (upci_dma_t *) arg, cr, rv);
 	break;
-	case UPCI_IOCTL_XDMA_READ_COHERENT:
-		rval = upci_xdma_rw_coherent(dev,
-		    (upci_coherent_t *) arg, cr, rv, 0);
-	break;
-	case UPCI_IOCTL_XDMA_WRITE_COHERENT:
-		rval = upci_xdma_rw_coherent(dev,
-		    (upci_coherent_t *) arg, cr, rv, 1);
+	case UPCI_IOCTL_XDMA_RW:
+		rval = upci_xdma_rw(dev, (upci_dma_t *) arg, cr, rv);
 	break;
 	default:
 		rval = *rv = EINVAL;
@@ -949,8 +942,8 @@ upci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	list_create(&up->up_msi_int_list, sizeof (upci_msi_int_ent_t),
 	    offsetof (upci_msi_int_ent_t, ie_next));
 
-	list_create(&up->up_ch_xdma_list, sizeof (upci_ch_ent_t),
-	    offsetof (upci_ch_ent_t, ch_next));
+	list_create(&up->up_xdma_list, sizeof (upci_xdma_ent_t),
+	    offsetof (upci_xdma_ent_t, xe_next));
 
 	ddi_set_driver_private(dip, (caddr_t)up);
 
@@ -976,7 +969,7 @@ upci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	cmn_err(CE_CONT, "Detached [%d]\n", instance);
 
-	list_destroy(&up->up_ch_xdma_list);
+	list_destroy(&up->up_xdma_list);
 
 	ddi_remove_minor_node(dip, "upci");
 	mutex_destroy(&up->up_lk);

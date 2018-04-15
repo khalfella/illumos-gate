@@ -51,16 +51,17 @@ typedef struct upci_reg_s {
 	ddi_acc_handle_t	reg_hdl;
 } upci_reg_t;
 
-typedef struct upci_ch_ent_s {
-	size_t			ch_length;
-	size_t			ch_real_length;
-	caddr_t			ch_kaddr;
-	ddi_dma_handle_t	ch_hdl;
-	ddi_acc_handle_t	ch_acc_hdl;
-	ddi_dma_cookie_t	ch_cookie;
-	uint_t			ch_ncookies;
-	list_node_t		ch_next;
-} upci_ch_ent_t;
+typedef struct upci_xdma_ent_s {
+	uint_t 			xe_flags;
+	size_t			xe_length;
+	size_t			xe_real_length;
+	caddr_t			xe_kaddr;
+	ddi_dma_handle_t	xe_hdl;
+	ddi_acc_handle_t	xe_acc_hdl;
+	ddi_dma_cookie_t	xe_cookie;
+	uint_t			xe_ncookies;
+	list_node_t		xe_next;
+} upci_xdma_ent_t;
 
 typedef struct upci_s {
 	dev_info_t		*up_dip;
@@ -83,10 +84,10 @@ typedef struct upci_s {
 	kmutex_t		up_msi_inner_lk;
 	list_t			up_msi_int_list;
 
-	list_t			up_ch_xdma_list;
+	list_t			up_xdma_list;
 } upci_t;
 
 
-int upci_xdma_alloc_coherent(dev_t, upci_coherent_t *, cred_t *, int *);
-int upci_xdma_free_coherent(dev_t, upci_coherent_t *, cred_t *, int *);
-int upci_xdma_rw_coherent(dev_t, upci_coherent_t *, cred_t *, int *, int);
+int upci_xdma_alloc(dev_t, upci_dma_t *, cred_t *, int *);
+int upci_xdma_remove(dev_t, upci_dma_t *, cred_t *, int *);
+int upci_xdma_rw(dev_t, upci_dma_t *, cred_t *, int *);
