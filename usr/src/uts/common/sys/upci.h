@@ -108,9 +108,8 @@ typedef struct upci_int_get_s {
  * UPCI_IOCTL_XDMA_RW
  */
 typedef struct upci_dma_s {
-	uint64_t	ud_flags;
 	uint64_t	ud_type;
-	uint64_t	ud_dir;
+	uint64_t	ud_write;
 	uint64_t	ud_length;
 	uint64_t	ud_rwoff;
 	uint64_t	ud_host_phys;
@@ -122,4 +121,3 @@ typedef struct upci_dma_s {
 #endif
 
 #endif /* _UPCI_H */
-

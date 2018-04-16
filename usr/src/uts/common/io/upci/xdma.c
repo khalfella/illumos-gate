@@ -94,7 +94,7 @@ upci_xdma_alloc(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 
 	xde->xe_flags = IOMEM_DATA_UNCACHED;
 	xde->xe_flags |= udma.ud_type == DDI_DMA_CONSISTENT ?
-	    DDI_DMA_CONSISTENT : DDI_DMA_CONSISTENT;
+	    DDI_DMA_CONSISTENT : DDI_DMA_STREAMING;
 	xde->xe_length = udma.ud_length;
 	if (ddi_dma_mem_alloc(xde->xe_hdl, xde->xe_length, &xdma_dev_attrs,
 	    xde->xe_flags, DDI_DMA_SLEEP, NULL, &xde->xe_kaddr,
@@ -119,7 +119,7 @@ upci_xdma_alloc(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 	udma.ud_host_phys = xde->xe_cookie.dmac_address;
 	if (copyout(&udma, uarg, sizeof(udma)) == 0) {
 
-		if (udma.ud_flags == 1) {
+		if (udma.ud_write == 1) {
 			bzero(xde->xe_kaddr, xde->xe_real_length);
 		}
 		list_insert_tail(&up->up_xdma_list, xde);
@@ -155,7 +155,7 @@ find_xdma_map(upci_t *up, uint64_t cookie)
 }
 
 int
-upci_xdma_free(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
+upci_xdma_remove(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 {
 	return (0);
 }
@@ -169,12 +169,10 @@ upci_xdma_rw(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 	upci_dma_t udma;
 	upci_xdma_ent_t *xde;
 	char *src, *dst;
-	int write;
 
 	rval = *rv = EINVAL;
 	instance = getminor(dev);
 	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
-		rval = *rv = EINVAL;
 		return (abs(rval));
 	}
 
@@ -187,22 +185,23 @@ upci_xdma_rw(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 		goto out;
 	}
 
-	write = udma.ud_dir;
 
-	if (!write) {
+	if (!udma.ud_write) {
 		udma.ud_udata = 0;
-		ddi_dma_sync(xde->xe_hdl, 0, 0, DDI_DMA_SYNC_FORCPU);
+		if (xde->xe_flags & DDI_DMA_CONSISTENT) {
+			ddi_dma_sync(xde->xe_hdl, 0, 0, DDI_DMA_SYNC_FORCPU);
+		}
 	}
 
-	*(write ? &src : &dst) = (char *) &udma.ud_udata;
-	*(write ? &dst : &src) = (char *) (xde->xe_kaddr + udma.ud_rwoff);
-
-	if (write) {
-		ddi_dma_sync(xde->xe_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
-	}
+	*(udma.ud_write ? &src : &dst) = (char *) &udma.ud_udata;
+	*(udma.ud_write ? &dst : &src) = (char *) (xde->xe_kaddr + udma.ud_rwoff);
 
 	for (i = 0; i < udma.ud_length; i++)
 		dst[i] = src[i];
+
+	if (udma.ud_write && (xde->xe_flags & DDI_DMA_CONSISTENT)) {
+		ddi_dma_sync(xde->xe_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
+	}
 
 	if (copyout(&udma, uarg, sizeof(udma)) == 0) {
 		rval = *rv = 0;
