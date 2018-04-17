@@ -157,7 +157,35 @@ find_xdma_map(upci_t *up, uint64_t cookie)
 int
 upci_xdma_remove(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 {
-	return (0);
+	int rval;
+	minor_t instance;
+	upci_t *up;
+	upci_dma_t udma;
+	upci_xdma_ent_t *xde;
+
+	rval = *rv = 0;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		return (*rv = EINVAL);
+	}
+
+	mutex_enter(&up->up_lk);
+
+	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
+	    copyin(uarg, &udma, sizeof(udma)) != 0 ||
+	    (xde = find_xdma_map(up, udma.ud_host_phys)) == NULL ||
+	    ddi_dma_unbind_handle(xde->xe_hdl) != DDI_SUCCESS) {
+		rval = *rv = EIO;
+		goto out;
+	}
+
+	ddi_dma_mem_free(&xde->xe_acc_hdl);
+	ddi_dma_free_handle(&xde->xe_hdl);
+	list_remove(&up->up_xdma_list, xde);
+	kmem_free(xde, sizeof(*xde));
+out:
+	mutex_exit(&up->up_lk);
+	return (abs(rval));
 }
 
 int
