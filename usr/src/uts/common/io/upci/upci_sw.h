@@ -90,4 +90,5 @@ typedef struct upci_s {
 
 int upci_xdma_alloc(dev_t, upci_dma_t *, cred_t *, int *);
 int upci_xdma_remove(dev_t, upci_dma_t *, cred_t *, int *);
+int upci_xdma_sync(dev_t, upci_dma_t *, cred_t *, int *);
 int upci_xdma_rw(dev_t, upci_dma_t *, cred_t *, int *);

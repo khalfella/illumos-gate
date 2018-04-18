@@ -870,6 +870,9 @@ upci_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case UPCI_IOCTL_XDMA_REMOVE:
 		rval = upci_xdma_remove(dev, (upci_dma_t *) arg, cr, rv);
 	break;
+	case UPCI_IOCTL_XDMA_SYNC:
+		rval = upci_xdma_sync(dev, (upci_dma_t *) arg, cr, rv);
+	break;
 	case UPCI_IOCTL_XDMA_RW:
 		rval = upci_xdma_rw(dev, (upci_dma_t *) arg, cr, rv);
 	break;

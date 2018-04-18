@@ -189,6 +189,39 @@ out:
 }
 
 int
+upci_xdma_sync(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
+{
+	int rval;
+	uint_t sdir;
+	minor_t instance;
+	upci_t *up;
+	upci_dma_t udma;
+	upci_xdma_ent_t *xde;
+
+	rval = *rv = 0;
+	instance = getminor(dev);
+	if ((up = ddi_get_soft_state(soft_state_p, instance)) == NULL) {
+		return (*rv = EINVAL);
+	}
+
+	mutex_enter(&up->up_lk);
+
+	if (!(up->up_flags & UPCI_DEVINFO_REG_OPEN) ||
+	    copyin(uarg, &udma, sizeof(udma)) != 0 ||
+	    (xde = find_xdma_map(up, udma.ud_host_phys)) == NULL) {
+		rval = *rv = EIO;
+		goto out;
+	}
+
+	sdir = (udma.ud_write == DDI_DMA_SYNC_FORCPU) ?
+	    DDI_DMA_SYNC_FORCPU : DDI_DMA_SYNC_FORDEV;
+	ddi_dma_sync(xde->xe_hdl, 0, 0, sdir);
+out:
+	mutex_exit(&up->up_lk);
+	return (abs(rval));
+}
+
+int
 upci_xdma_rw(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 {
 	int i, rval;

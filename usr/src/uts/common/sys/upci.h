@@ -33,7 +33,8 @@ extern "C" {
 
 #define	UPCI_IOCTL_XDMA_ALLOC		0x0B
 #define	UPCI_IOCTL_XDMA_REMOVE		0x0C
-#define	UPCI_IOCTL_XDMA_RW		0x0D
+#define	UPCI_IOCTL_XDMA_SYNC		0x0D
+#define	UPCI_IOCTL_XDMA_RW		0x0E
 
 
 /*
@@ -105,6 +106,7 @@ typedef struct upci_int_get_s {
 /*
  * UPCI_IOCTL_XDMA_ALLOC
  * UPCI_IOCTL_XDMA_REMOVE
+ * UPCI_IOCTL_XDMA_SYNC
  * UPCI_IOCTL_XDMA_RW
  */
 typedef struct upci_dma_s {
