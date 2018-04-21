@@ -213,9 +213,17 @@ upci_xdma_sync(dev_t dev, upci_dma_t * uarg, cred_t *cr, int *rv)
 		goto out;
 	}
 
+	if (udma.ud_udata != 0 && udma.ud_write == DDI_DMA_SYNC_FORDEV) {
+		copyin((void *) udma.ud_udata, xde->xe_kaddr, xde->xe_length);
+	}
+
 	sdir = (udma.ud_write == DDI_DMA_SYNC_FORCPU) ?
 	    DDI_DMA_SYNC_FORCPU : DDI_DMA_SYNC_FORDEV;
 	ddi_dma_sync(xde->xe_hdl, 0, 0, sdir);
+
+	if (udma.ud_udata != 0 && udma.ud_write == DDI_DMA_SYNC_FORDEV) {
+		copyout(xde->xe_kaddr, (void *) udma.ud_udata, xde->xe_length);
+	}
 out:
 	mutex_exit(&up->up_lk);
 	return (abs(rval));
